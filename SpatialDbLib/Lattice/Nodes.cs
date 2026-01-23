@@ -1,6 +1,4 @@
 ﻿///////////////////////////////
-using static SpatialDbLib.Lattice.AdmitResult;
-
 namespace SpatialDbLib.Lattice;
 
 public abstract class SpatialNode(Region bounds)
@@ -135,14 +133,14 @@ public abstract class OctetParentNode
 
             switch (admitResult.Response)
             {
-                case AdmitResponse.Created:
-                case AdmitResponse.Rejected:
-                case AdmitResponse.Escalate:
+                case AdmitResult.AdmitResponse.Created:
+                case AdmitResult.AdmitResponse.Rejected:
+                case AdmitResult.AdmitResponse.Escalate:
                     return admitResult;
-                case AdmitResponse.Retry:
+                case AdmitResult.AdmitResponse.Retry:
                     break;
-                case AdmitResponse.Subdivide:
-                case AdmitResponse.Delegate:
+                case AdmitResult.AdmitResponse.Subdivide:
+                case AdmitResult.AdmitResponse.Delegate:
                 {
                     var subdividingleaf = childRegion as OccupantLeafNode;
 #if DEBUG
@@ -161,7 +159,7 @@ public abstract class OctetParentNode
                     if (occupantsSnapshot.Count != 16)
                         throw new InvalidOperationException("Subdivision requested on non full leaf: " + occupantsSnapshot.Count);
 #endif
-                    ParentNode newBranch = admitResult.Response == AdmitResponse.Subdivide
+                    ParentNode newBranch = admitResult.Response == AdmitResult.AdmitResponse.Subdivide
                         ? new OctetBranchNode(subdividingleaf.Bounds, this, occupantsSnapshot)
                         : new SubLatticeBranchNode(subdividingleaf.Bounds, this, (byte)(occupantsSnapshot[0].PositionStackDepth), occupantsSnapshot);
                     using var s2 = new SlimSyncer(newBranch.m_dependantsSync, SlimSyncer.LockMode.Write);

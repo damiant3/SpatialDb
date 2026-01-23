@@ -2,12 +2,9 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
-using static SpatialDbLib.Lattice.AdmitResult;
-
 
 namespace SpatialDbLibTest
 {
-
     public class TestSpatialLattice
         : SpatialLattice,
           ITestCatalog
@@ -19,7 +16,7 @@ namespace SpatialDbLibTest
             {
                 ret = base.Insert(obj);
                 Assert.IsNotNull(ret);
-                if (ret.Response != AdmitResponse.Created)
+                if (ret.Response != AdmitResult.AdmitResponse.Created)
                 {
                     Debugger.Break();
                 }

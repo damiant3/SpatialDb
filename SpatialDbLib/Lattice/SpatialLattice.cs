@@ -1,8 +1,6 @@
 ﻿///////////////////////////////
-using System.Diagnostics;
-using static SpatialDbLib.Lattice.AdmitResult;
-
 namespace SpatialDbLib.Lattice;
+
 public class SpatialLattice : RootNode
 {
     public SpatialLattice()
@@ -25,7 +23,7 @@ public class SpatialLattice : RootNode
     {
         using var s = new SlimSyncer(obj.m_positionLock, SlimSyncer.LockMode.Write);
         var admitResult = Admit(obj, obj.LocalPosition);
-        if (admitResult.Response == AdmitResponse.Created)
+        if (admitResult.Response == AdmitResult.AdmitResponse.Created)
             admitResult.Proxy!.Commit();
         else
             throw new InvalidOperationException("Insertion failed: " + admitResult.Response);

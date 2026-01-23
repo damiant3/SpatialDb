@@ -1,4 +1,4 @@
-﻿/////////////////////////
+﻿///////////////////////////////
 namespace SpatialDbLib.Lattice;
 
 public class SpatialObject(LongVector3 initialPosition)
