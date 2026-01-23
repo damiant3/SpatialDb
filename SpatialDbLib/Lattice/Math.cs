@@ -1,0 +1,267 @@
+﻿///////////////////////////////
+namespace SpatialDbLib.Lattice;
+
+public static class LatticeUniverse
+{
+    public const int RootBits = 63;
+    public const long HalfExtent = 1L << (RootBits - 1);
+
+    public static readonly Region RootRegion =
+        new(
+            new LongVector3(-HalfExtent, -HalfExtent, -HalfExtent),
+            new LongVector3(+HalfExtent, +HalfExtent, +HalfExtent)
+        );
+}
+
+public interface ILatticeCoordinateTransform
+{
+    LongVector3 OuterToInnerCanonical(LongVector3 outerPosition);
+    LongVector3 OuterToInnerInsertion(LongVector3 outerPosition, ulong discriminator);
+    LongVector3 InnerToOuter(LongVector3 innerPosition);
+    bool ContainsOuter(LongVector3 outerPosition);
+    bool ContainsInner(LongVector3 innerPosition);
+}
+
+public class ParentToSubLatticeTransform(Region outerBounds)
+    : ILatticeCoordinateTransform
+{
+    public Region OuterLatticeBounds { get; } = outerBounds;
+    public static Region InnerLatticeBounds => LatticeUniverse.RootRegion;
+
+    public bool ContainsOuter(LongVector3 outerPosition)
+        => OuterLatticeBounds.Contains(outerPosition);
+
+    public bool ContainsInner(LongVector3 innerPosition)
+        => InnerLatticeBounds.Contains(innerPosition);
+
+    public LongVector3 OuterToInnerInsertion(LongVector3 outer, ulong discriminator)
+    {
+#if DEBUG
+        if (!ContainsOuter(outer))
+            throw new ArgumentOutOfRangeException(nameof(outer));
+#endif
+        var innerSize = InnerLatticeBounds.Size;
+        var outerSize = OuterLatticeBounds.Size;
+
+        if (innerSize == outerSize)
+            return outer;
+
+        return outerSize.X == 1
+            ? OuterToInnerFromSizeOne(discriminator)
+            : OuterToInnerFromLarge(outer, discriminator, innerSize, outerSize);
+
+        static LongVector3 OuterToInnerFromSizeOne(ulong discriminator)
+        {
+            int octant = (int)(discriminator & 0b111);
+            long signX = (octant & 0b001) != 0 ? +1 : -1;
+            long signY = (octant & 0b010) != 0 ? +1 : -1;
+            long signZ = (octant & 0b100) != 0 ? +1 : -1;
+
+            long half = LatticeUniverse.HalfExtent;
+
+            return new LongVector3(
+                signX > 0 ? half - 1 : -half,
+                signY > 0 ? half - 1 : -half,
+                signZ > 0 ? half - 1 : -half
+            );
+        }
+
+        LongVector3 OuterToInnerFromLarge(LongVector3 outer, ulong discriminator, ULongVector3 innerSize, ULongVector3 outerSize)
+        {
+            var outerOffset = outer.OffsetFrom(OuterLatticeBounds.Min);
+
+            var scaleX = innerSize.X / outerSize.X;
+            var scaleY = innerSize.Y / outerSize.Y;
+            var scaleZ = innerSize.Z / outerSize.Z;
+
+            var baseX = (ulong)InnerLatticeBounds.Min.X + outerOffset.X * scaleX;
+            var baseY = (ulong)InnerLatticeBounds.Min.Y + outerOffset.Y * scaleY;
+            var baseZ = (ulong)InnerLatticeBounds.Min.Z + outerOffset.Z * scaleZ;
+
+            var repX = baseX + (discriminator % scaleX);
+            var repY = baseY + ((discriminator >> 21) % scaleY);
+            var repZ = baseZ + ((discriminator >> 42) % scaleZ);
+
+            return new LongVector3(
+                unchecked((long)repX),
+                unchecked((long)repY),
+                unchecked((long)repZ)
+            );
+        }
+    }
+    public LongVector3 OuterToInnerCanonical(LongVector3 outerPosition)
+    {
+#if DEBUG
+        if (!ContainsOuter(outerPosition))
+            throw new ArgumentOutOfRangeException(nameof(outerPosition));
+#endif
+        if (OuterLatticeBounds.Size == InnerLatticeBounds.Size)
+            return outerPosition;
+
+        var outerOffset = outerPosition.OffsetFrom(OuterLatticeBounds.Min);
+        var outerSize = OuterLatticeBounds.Size;
+        var innerSize = InnerLatticeBounds.Size;
+
+        return new LongVector3(
+            InnerLatticeBounds.Min.X +
+                (long)(outerOffset.X * (innerSize.X / outerSize.X)),
+
+            InnerLatticeBounds.Min.Y +
+                (long)(outerOffset.Y * (innerSize.Y / outerSize.Y)),
+
+            InnerLatticeBounds.Min.Z +
+                (long)(outerOffset.Z * (innerSize.Z / outerSize.Z))
+        );
+    }
+
+    public LongVector3 InnerToOuter(LongVector3 innerPosition)
+    {
+#if DEBUG
+        if (!ContainsInner(innerPosition))
+            throw new ArgumentOutOfRangeException(nameof(innerPosition));
+#endif
+
+        if (OuterLatticeBounds.Size == InnerLatticeBounds.Size)
+            return innerPosition;
+
+        var innerOffset = innerPosition.OffsetFrom(InnerLatticeBounds.Min);
+        var outerSize = OuterLatticeBounds.Size;
+        var innerSize = InnerLatticeBounds.Size;
+
+        var scaleX = innerSize.X / outerSize.X;
+        var scaleY = innerSize.Y / outerSize.Y;
+        var scaleZ = innerSize.Z / outerSize.Z;
+
+        return new LongVector3(
+            OuterLatticeBounds.Min.X + (long)(innerOffset.X / scaleX),
+            OuterLatticeBounds.Min.Y + (long)(innerOffset.Y / scaleY),
+            OuterLatticeBounds.Min.Z + (long)(innerOffset.Z / scaleZ)
+        );
+    }
+}
+public readonly struct ULongVector3(ulong x, ulong y, ulong z)
+{
+    public readonly ulong X = x;
+    public readonly ulong Y = y;
+    public readonly ulong Z = z;
+
+    public ULongVector3(ulong xyz) : this(xyz, xyz, xyz) { }
+
+    public override string ToString() => $"({X}, {Y}, {Z})";
+
+    public override bool Equals(object? obj)
+        => obj is ULongVector3 o && this == o;
+
+    public override int GetHashCode()
+        => HashCode.Combine(X, Y, Z);
+
+    public static bool operator ==(ULongVector3 a, ULongVector3 b)
+        => a.X == b.X && a.Y == b.Y && a.Z == b.Z;
+
+    public static bool operator !=(ULongVector3 a, ULongVector3 b)
+        => !(a == b);
+
+    public static ULongVector3 operator +(ULongVector3 a, ULongVector3 b)
+        => new(a.X + b.X, a.Y + b.Y, a.Z + b.Z);
+
+    public static ULongVector3 operator -(ULongVector3 a, ULongVector3 b)
+        => new(a.X - b.X, a.Y - b.Y, a.Z - b.Z);
+
+    public static ULongVector3 operator *(ULongVector3 a, ulong factor)
+        => new(a.X * factor, a.Y * factor, a.Z * factor);
+
+    public static ULongVector3 operator /(ULongVector3 a, ulong divisor)
+        => new(a.X / divisor, a.Y / divisor, a.Z / divisor);
+}
+public readonly struct LongVector3(long x, long y, long z)
+{
+    public readonly long X = x;
+    public readonly long Y = y;
+    public readonly long Z = z;
+
+    public LongVector3(long xyz) : this(xyz, xyz, xyz) { }
+
+    public ULongVector3 OffsetFrom(LongVector3 min)
+    => new(
+        (ulong)(X - min.X),
+        (ulong)(Y - min.Y),
+        (ulong)(Z - min.Z)
+    );
+
+    public long MaxComponentAbs()
+        => Math.Max(Math.Abs(X), Math.Max(Math.Abs(Y), Math.Abs(Z)));
+
+    public long SumAbs()
+        => Math.Abs(X) + Math.Abs(Y) + Math.Abs(Z);
+
+    public override string ToString() => $"({X}, {Y}, {Z})";
+
+    public override bool Equals(object? obj)
+        => obj is LongVector3 o && this == o;
+
+    public override int GetHashCode()
+        => HashCode.Combine(X, Y, Z);
+
+    public static bool operator ==(LongVector3 a, LongVector3 b)
+        => a.X == b.X && a.Y == b.Y && a.Z == b.Z;
+
+    public static bool operator !=(LongVector3 a, LongVector3 b)
+        => !(a == b);
+
+    public static LongVector3 operator+(LongVector3 a, long b)
+        => new(a.X + b, a.Y + b, a.Z + b);
+    public static LongVector3 operator +(LongVector3 a, LongVector3 b)
+        => new(a.X + b.X, a.Y + b.Y, a.Z + b.Z);
+
+    public static LongVector3 operator -(LongVector3 a, LongVector3 b)
+        => new(a.X - b.X, a.Y - b.Y, a.Z - b.Z);
+
+    public static LongVector3 operator *(LongVector3 a, long factor)
+        => new(a.X * factor, a.Y * factor, a.Z * factor);
+
+    public static LongVector3 operator /(LongVector3 a, long divisor)
+        => new(a.X / divisor, a.Y / divisor, a.Z / divisor);
+
+    public static long Midpoint(long min, long max)
+        => (min & max) + ((min ^ max) >> 1);
+
+    public static LongVector3 Midpoint(LongVector3 min, LongVector3 max)
+        => new(
+            Midpoint(min.X, max.X),
+            Midpoint(min.Y, max.Y),
+            Midpoint(min.Z, max.Z)
+        );
+
+    public static readonly LongVector3 Zero = new(0);
+}
+
+public readonly struct Region
+{
+    public Region(LongVector3 min, LongVector3 max)
+    {
+#if DEBUG
+        if (min.X >= max.X || min.Y >= max.Y || min.Z >= max.Z)
+            throw new ArgumentException("Invalid region bounds for axis alignment");
+#endif
+        Min = min;
+        Max = max;
+        Mid = LongVector3.Midpoint(min, max);
+    }
+
+    public LongVector3 Min { get; }
+    public LongVector3 Max { get; }
+    public LongVector3 Mid { get; }
+    public ULongVector3 Size =>
+        new(
+            (ulong)(Max.X - Min.X),
+            (ulong)(Max.Y - Min.Y),
+            (ulong)(Max.Z - Min.Z)
+        );
+
+    public bool Contains(LongVector3 position)
+        => position.X >= Min.X && position.X < Max.X
+        && position.Y >= Min.Y && position.Y < Max.Y
+        && position.Z >= Min.Z && position.Z < Max.Z;
+
+    public override string ToString() => $"Min={Min}, Max={Max}";
+}
