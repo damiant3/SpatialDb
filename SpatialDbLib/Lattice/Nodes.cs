@@ -189,8 +189,8 @@ public abstract class OctetParentNode
                             occupantsSnapshot);
                     using var s2 = new SlimSyncer(newBranch.m_dependantsSync, SlimSyncer.LockMode.Write);
                     using var s3 = newBranch.LockAllChildren();
-                    frame.Parent.Children[frame.ChildIndex] = newBranch;
                     subdividingleaf.RetireAfterPromotion();
+                    frame.Parent.Children[frame.ChildIndex] = newBranch;
                     current = frame.Parent;
                     continue;
                 }
@@ -259,16 +259,20 @@ public abstract class OccupantLeafNode(Region bounds, ParentNode parent)
 
     public void Occupy(SpatialObject obj)
     {
-        using var s = new SlimSyncer(m_dependantsSync, SlimSyncer.LockMode.UpgradableRead);
-        if (!Occupants.Contains(obj))
-        {
-            s.UpgradeToWriteLock();
-            Occupants.Add(obj);
-        }
+
+#if DEBUG
+        if (!m_dependantsSync.IsWriteLockHeld)
+            throw new InvalidOperationException("Occupy called without leaf write lock");
+#endif
+        Occupants.Add(obj);
     }
 
     public void RetireAfterPromotion()
     {
+#if DEBUG
+        if (!Parent.m_dependantsSync.IsWriteLockHeld)
+            throw new InvalidOperationException("Leaf retired without parent write lock");
+#endif
         using var s = new SlimSyncer(m_dependantsSync, SlimSyncer.LockMode.Write);
         m_isRetired = true;
         Occupants.Clear();
@@ -292,7 +296,7 @@ public abstract class OccupantLeafNode(Region bounds, ParentNode parent)
     }
 
     public virtual int Capacity => 8;
-    protected virtual bool IsUnderPressure()
+    protected virtual bool IsAtCapacity()
     {
         return Occupants.Count >= Capacity;
     }
@@ -319,7 +323,7 @@ public abstract class OccupantLeafNode(Region bounds, ParentNode parent)
             return AdmitResult.EscalateRequest();
 
         using var s = new SlimSyncer(m_dependantsSync, SlimSyncer.LockMode.Write);
-        if (IsUnderPressure())
+        if (IsAtCapacity())
         {
             if (CanSubdivide())
                 return AdmitResult.SubdivideRequest(this);
@@ -349,19 +353,8 @@ public abstract class OccupantLeafNode(Region bounds, ParentNode parent)
                 SlimSyncer oLock = null!;
                 try
                 {
-                DijkstrasNemesis:
                     var obj = Occupants[i];
                     oLock = new SlimSyncer(obj.m_positionLock, SlimSyncer.LockMode.Write);
-
-                    if (Occupants[i] != obj)
-                    {
-                        oLock.Dispose();
-                        if (obj is SpatialObjectProxy proxy && proxy.OriginalObject == Occupants[i])
-                            goto DijkstrasNemesis;
-                        else
-                            throw new Exception("Concurrency Violation: Occupant changed while acquiring lock, not proxy.");
-                    }
-
                     snapshot.Add(obj);
                     locksHeld.Add(oLock);
                 }

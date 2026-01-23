@@ -18,14 +18,13 @@ public abstract class AdmitResult
 
     public sealed class Retry : AdmitResult { }
 
-    public sealed class Subdivide : AdmitResult
+    public sealed class Subdivide(OccupantLeafNode leaf) 
+        : AdmitResult
     {
-        public OccupantLeafNode Leaf { get; }
-
-        public Subdivide(OccupantLeafNode leaf) => Leaf = leaf;
+        public OccupantLeafNode Leaf { get; } = leaf;
     }
 
-    public sealed class Delegate(OccupantLeafNode leaf) 
+    public sealed class Delegate(OccupantLeafNode leaf)
         : AdmitResult
     {
         public OccupantLeafNode Leaf { get; } = leaf;

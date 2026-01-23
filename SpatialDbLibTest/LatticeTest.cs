@@ -183,7 +183,7 @@ namespace SpatialDbLibTest
             {
                 tasks.Add(Task.Run(() =>
                 {
-                    if (InsertedObjects.TryTakeRandom(out var kvp))
+                    if (InsertedObjects.TryTakeRandomFast(out var kvp))
                     {
                         var objToRemove = kvp.Value;
                         try
