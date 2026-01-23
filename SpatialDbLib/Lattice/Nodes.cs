@@ -117,19 +117,36 @@ public abstract class OctetParentNode
             kvp.Key.AdmitMigrants(kvp.Value);
     }
 
+    struct AdmitFrame
+    {
+        public OctetParentNode Parent;
+        public byte ChildIndex;
+        public SpatialNode Child;
+    }
+
     public override AdmitResult Admit(SpatialObject obj, LongVector3 proposedPosition)
     {
         if (!Bounds.Contains(proposedPosition))
             return AdmitResult.RequestEscalate();
 
+        SpatialNode current = this;
+        AdmitFrame frame = new() { Parent = this, ChildIndex = 0, Child = this };
         while (true)
         {
-            if (SelectChild(proposedPosition) is not SelectChildResult selectChildResult)
-                throw new InvalidOperationException("Containment invariant violated");
+            if (current is OctetParentNode parent)
+            {
+                if (parent.SelectChild(proposedPosition) is not SelectChildResult selectChildResult)
+                    throw new InvalidOperationException("Containment invariant violated");
 
-            var childIndex = selectChildResult.IndexInParent;
-            var childRegion = selectChildResult.ChildNode;
-            var admitResult = childRegion.Admit(obj, proposedPosition);
+                frame.Parent = parent;
+                frame.ChildIndex = selectChildResult.IndexInParent;
+                frame.Child = selectChildResult.ChildNode;
+
+                current = frame.Child;
+                continue;
+            }
+            
+            var admitResult = current.Admit(obj, proposedPosition);
 
             switch (admitResult.Response)
             {
@@ -138,21 +155,25 @@ public abstract class OctetParentNode
                 case AdmitResult.AdmitResponse.Escalate:
                     return admitResult;
                 case AdmitResult.AdmitResponse.Retry:
-                    break;
+                    current = frame.Parent;
+                    continue;
                 case AdmitResult.AdmitResponse.Subdivide:
                 case AdmitResult.AdmitResponse.Delegate:
                 {
-                    var subdividingleaf = childRegion as OccupantLeafNode;
+                    var subdividingleaf = frame.Child as OccupantLeafNode;
 #if DEBUG
                     if (subdividingleaf == null)
                         throw new InvalidOperationException("Subdivision requested by non-leaf");
 #endif
-                    using var s = new SlimSyncer(m_dependantsSync, SlimSyncer.LockMode.Write);
-                    if (Children[childIndex] is not OccupantLeafNode)
-                        break;
+                    using var s = new SlimSyncer(frame.Parent.m_dependantsSync, SlimSyncer.LockMode.Write);
                     using var s1 = new SlimSyncer(subdividingleaf.m_dependantsSync, SlimSyncer.LockMode.Write);
+
                     if (subdividingleaf.IsRetired)
-                        break;
+                    {
+                        current = frame.Parent;
+                        continue;
+                    }
+
                     using var occupantScope = subdividingleaf.LockAndSnapshotOccupants();
                     var occupantsSnapshot = occupantScope.Objects;
 #if DEBUG
@@ -160,16 +181,21 @@ public abstract class OctetParentNode
                         throw new InvalidOperationException("Subdivision requested on non full leaf: " + occupantsSnapshot.Count);
 #endif
                     ParentNode newBranch = admitResult.Response == AdmitResult.AdmitResponse.Subdivide
-                        ? new OctetBranchNode(subdividingleaf.Bounds, this, occupantsSnapshot)
-                        : new SubLatticeBranchNode(subdividingleaf.Bounds, this, (byte)(occupantsSnapshot[0].PositionStackDepth), occupantsSnapshot);
+                        ? new OctetBranchNode(subdividingleaf.Bounds, frame.Parent, occupantsSnapshot)
+                        : new SubLatticeBranchNode(
+                            subdividingleaf.Bounds,
+                            frame.Parent,
+                            (byte)(occupantsSnapshot[0].PositionStackDepth),
+                            occupantsSnapshot);
                     using var s2 = new SlimSyncer(newBranch.m_dependantsSync, SlimSyncer.LockMode.Write);
                     using var s3 = newBranch.LockAllChildren();
-                    Children[childIndex] = newBranch;
+                    frame.Parent.Children[frame.ChildIndex] = newBranch;
                     subdividingleaf.RetireAfterPromotion();
-                    break;
+                    current = frame.Parent;
+                    continue;
                 }
                 default:
-                    throw new InvalidOperationException("Unknown ReservationAction");
+                    throw new InvalidOperationException("Unknown AdmitResponse");
             }
         }
     }

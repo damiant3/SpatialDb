@@ -25,15 +25,12 @@ public class SpatialLattice : RootNode
         var admitResult = Admit(obj, obj.LocalPosition);
         if (admitResult.Response == AdmitResult.AdmitResponse.Created)
             admitResult.Proxy!.Commit();
-        else
-            throw new InvalidOperationException("Insertion failed: " + admitResult.Response);
         return admitResult;
     }
 
     public void Remove(SpatialObject obj)
     {
         using var s = new SlimSyncer(obj.m_positionLock, SlimSyncer.LockMode.Write);
-        byte retries = 0;
         while (true)
         {
             var leaf = ResolveOccupyingLeaf(obj);
@@ -42,19 +39,9 @@ public class SpatialLattice : RootNode
             using var s2 = new SlimSyncer(parent.DependantsSync, SlimSyncer.LockMode.Write);
             using var s3 = new SlimSyncer(leaf.DependantsSync, SlimSyncer.LockMode.Write);
             if (leaf.Parent != parent || !leaf.Contains(obj))
-            {
-                if (retries-- > 0)
-                {
-#if DEBUG
-                    throw new Exception("Removal retries exhausted.");
-#else
-                    return;
-#endif
-                }
                 continue;
-            }
             leaf.Leave(obj);
-            break;
+            return;
         }
     }
 
@@ -93,7 +80,6 @@ public class SpatialLattice : RootNode
 
                 case OctetParentNode parent:
                 {
-                    using var s2 = new SlimSyncer(parent.DependantsSync, SlimSyncer.LockMode.Read);
                     var result = parent.SelectChild(pos)
                         ?? throw new InvalidOperationException("Failed to select child during occupation resolution");
                     current = result.ChildNode;
