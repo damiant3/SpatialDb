@@ -23,8 +23,8 @@ public class SpatialLattice : RootNode
     {
         using var s = new SlimSyncer(obj.m_positionLock, SlimSyncer.LockMode.Write);
         var admitResult = Admit(obj, obj.LocalPosition);
-        if (admitResult.Response == AdmitResult.AdmitResponse.Created)
-            admitResult.Proxy!.Commit();
+        if (admitResult is AdmitResult.Created created)
+            created.Proxy.Commit();
         return admitResult;
     }
 

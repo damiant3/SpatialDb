@@ -127,7 +127,7 @@ public abstract class OctetParentNode
     public override AdmitResult Admit(SpatialObject obj, LongVector3 proposedPosition)
     {
         if (!Bounds.Contains(proposedPosition))
-            return AdmitResult.RequestEscalate();
+            return AdmitResult.EscalateRequest();
 
         SpatialNode current = this;
         AdmitFrame frame = new() { Parent = this, ChildIndex = 0, Child = this };
@@ -148,17 +148,17 @@ public abstract class OctetParentNode
             
             var admitResult = current.Admit(obj, proposedPosition);
 
-            switch (admitResult.Response)
+            switch (admitResult)
             {
-                case AdmitResult.AdmitResponse.Created:
-                case AdmitResult.AdmitResponse.Rejected:
-                case AdmitResult.AdmitResponse.Escalate:
+                case AdmitResult.Created:
+                case AdmitResult.Rejected:
+                case AdmitResult.Escalate:
                     return admitResult;
-                case AdmitResult.AdmitResponse.Retry:
+                case AdmitResult.Retry:
                     current = frame.Parent;
                     continue;
-                case AdmitResult.AdmitResponse.Subdivide:
-                case AdmitResult.AdmitResponse.Delegate:
+                case AdmitResult.Subdivide:
+                case AdmitResult.Delegate:
                 {
                     var subdividingleaf = frame.Child as OccupantLeafNode;
 #if DEBUG
@@ -180,7 +180,7 @@ public abstract class OctetParentNode
                     if (occupantsSnapshot.Count != 16)
                         throw new InvalidOperationException("Subdivision requested on non full leaf: " + occupantsSnapshot.Count);
 #endif
-                    ParentNode newBranch = admitResult.Response == AdmitResult.AdmitResponse.Subdivide
+                    ParentNode newBranch = admitResult is AdmitResult.Subdivide
                         ? new OctetBranchNode(subdividingleaf.Bounds, frame.Parent, occupantsSnapshot)
                         : new SubLatticeBranchNode(
                             subdividingleaf.Bounds,
@@ -316,23 +316,23 @@ public abstract class OccupantLeafNode(Region bounds, ParentNode parent)
     public override AdmitResult Admit(SpatialObject obj, LongVector3 proposedPosition)
     {
         if (!Bounds.Contains(proposedPosition))
-            return AdmitResult.RequestEscalate();
+            return AdmitResult.EscalateRequest();
 
         using var s = new SlimSyncer(m_dependantsSync, SlimSyncer.LockMode.Write);
         if (IsUnderPressure())
         {
             if (CanSubdivide())
-                return AdmitResult.RequestSubdivide();
+                return AdmitResult.SubdivideRequest(this);
             else
-                return AdmitResult.RequestDelegate();
+                return AdmitResult.DelegateRequest(this);
         }
 
         if(IsRetired)
-            return AdmitResult.RequestRetry();
+            return AdmitResult.RetryRequest();
 
         var proxy = new SpatialObjectProxy(obj, this, proposedPosition);
         Occupy(proxy);
-        return AdmitResult.Create(this, proxy);
+        return AdmitResult.Create(proxy, this);
     }
 
     public MultiObjectScope<SpatialObject> LockAndSnapshotOccupants()
@@ -417,7 +417,7 @@ public class SubLatticeBranchNode
     public override AdmitResult Admit(SpatialObject obj, LongVector3 proposedPosition)
     {
         if (!Bounds.Contains(proposedPosition))
-            return AdmitResult.RequestEscalate();
+            return AdmitResult.EscalateRequest();
 
 #if DEBUG
         if (obj.LocalPosition != proposedPosition)
