@@ -1,7 +1,7 @@
 ﻿///////////////////////////////
 namespace SpatialDbLib.Lattice;
 
-public class SpatialLattice : RootNode
+public class SpatialLattice : OctetRootNode
 {
     public SpatialLattice()
         : base(LatticeUniverse.RootRegion)
@@ -22,7 +22,7 @@ public class SpatialLattice : RootNode
     public AdmitResult Insert(SpatialObject obj)
     {
         using var s = new SlimSyncer(obj.m_positionLock, SlimSyncer.LockMode.Write);
-        var admitResult = Admit(obj, obj.LocalPosition);
+        var admitResult = Admit(obj, obj.LocalPosition, 0);
         if (admitResult is AdmitResult.Created created)
             created.Proxy.Commit();
         return admitResult;
@@ -36,16 +36,16 @@ public class SpatialLattice : RootNode
             var leaf = ResolveOccupyingLeaf(obj);
             if (leaf == null) return;
             var parent = leaf.Parent;
-            using var s2 = new SlimSyncer(parent.DependantsSync, SlimSyncer.LockMode.Write);
-            using var s3 = new SlimSyncer(leaf.DependantsSync, SlimSyncer.LockMode.Write);
+            using var s2 = new SlimSyncer(parent.Sync, SlimSyncer.LockMode.Write);
+            using var s3 = new SlimSyncer(leaf.Sync, SlimSyncer.LockMode.Write);
             if (leaf.Parent != parent || !leaf.Contains(obj))
                 continue;
-            leaf.Leave(obj);
+            leaf.Vacate(obj);
             return;
         }
     }
 
-    public OccupantLeafNode? ResolveLeafFromOuterLattice(SpatialObject obj)
+    public VenueLeafNode? ResolveLeafFromOuterLattice(SpatialObject obj)
     {
 #if DEBUG
         if(obj.PositionStackDepth <= LatticeDepth)
@@ -56,7 +56,7 @@ public class SpatialLattice : RootNode
         return ResolveLeaf(obj);
     }
 
-    public OccupantLeafNode? ResolveOccupyingLeaf(SpatialObject obj)
+    public VenueLeafNode? ResolveOccupyingLeaf(SpatialObject obj)
     {
         var resolveleaf = ResolveLeaf(obj);
         if (resolveleaf == null) return null;
@@ -67,16 +67,16 @@ public class SpatialLattice : RootNode
         return resolveleaf;
     }
 
-    public OccupantLeafNode? ResolveLeaf(SpatialObject obj)
+    public VenueLeafNode? ResolveLeaf(SpatialObject obj)
     {
         LongVector3 pos = obj.GetPositionStack()[LatticeDepth];
-        SpatialNode current = this;
+        INode current = this;
         while (current != null)
         {
             switch (current)
             {
                 case SubLatticeBranchNode sublatticebranch:
-                    return sublatticebranch.m_subLattice.ResolveLeafFromOuterLattice(obj);
+                    return sublatticebranch.Sublattice.ResolveLeafFromOuterLattice(obj);
 
                 case OctetParentNode parent:
                 {
@@ -85,9 +85,9 @@ public class SpatialLattice : RootNode
                     current = result.ChildNode;
                     break;
                 }
-                case OccupantLeafNode leaf:
+                case VenueLeafNode leaf:
                 {
-                    using var s3 = new SlimSyncer(leaf.DependantsSync, SlimSyncer.LockMode.Read);
+                    using var s3 = new SlimSyncer(leaf.Sync, SlimSyncer.LockMode.Read);
                     return leaf;
                 }
                 default:
@@ -99,17 +99,18 @@ public class SpatialLattice : RootNode
 
     public override void AdmitMigrants(IList<SpatialObject> objs)
     {
-        List<KeyValuePair<SpatialNode, List<SpatialObject>>> migrantsByTargetChild = [];
+        List<KeyValuePair<INode, List<SpatialObject>>> migrantsByTargetChild = [];
         foreach (var obj in objs)
         {
-            obj.SetPositionAtDepth(LatticeDepth, BoundsTransform.OuterToInnerInsertion(obj.LocalPosition, obj.GetDiscriminator()));
+            var innerPosition = BoundsTransform.OuterToInnerInsertion(obj.LocalPosition, obj.GetDiscriminator());
+            obj.AppendPosition(innerPosition);
             if (!Bounds.Contains(obj.LocalPosition)) throw new InvalidOperationException("Migrant has no home.");
             if (SelectChild(obj.LocalPosition) is not SelectChildResult selectChildResult) throw new InvalidOperationException("Containment invariant violated");
             var migrantSubGroup = migrantsByTargetChild.Find(kvp => kvp.Key == selectChildResult.ChildNode);
             if (migrantSubGroup.Key != null && migrantSubGroup.Value != null)
                 migrantSubGroup.Value.Add(obj);
             else
-                migrantsByTargetChild.Add(new KeyValuePair<SpatialNode, List<SpatialObject>>(selectChildResult.ChildNode, [obj]));
+                migrantsByTargetChild.Add(new KeyValuePair<INode, List<SpatialObject>>(selectChildResult.ChildNode, [obj]));
         }
 
         foreach (var kvp in migrantsByTargetChild)

@@ -4,7 +4,7 @@ namespace SpatialDbLibTest;
 
 public class LatticeTestHelpers
 {
-    public static SpatialLattice GetOwningLattice(SpatialNode region)
+    public static SpatialLattice GetOwningLattice(INode region)
     {
         var current = region;
 
@@ -15,7 +15,7 @@ public class LatticeTestHelpers
 
             current = current switch
             {
-                OccupantLeafNode leaf => leaf.Parent,
+                VenueLeafNode leaf => leaf.Parent,
                 OctetBranchNode branch => branch.Parent,
                 _ => throw new InvalidOperationException("Unexpected region type")
             };
@@ -41,14 +41,14 @@ public class LatticeTestHelpers
         return tempObjs;
     }
 
-    public static void AssertAllLeavesEmpty(SpatialNode node)
+    public static void AssertAllLeavesEmpty(INode node)
     {
         switch (node)
         {
             case SubLatticeBranchNode sub:
-                AssertAllLeavesEmpty(sub.m_subLattice);
+                AssertAllLeavesEmpty(sub.Sublattice);
                 break;
-            case OccupantLeafNode leaf:
+            case VenueLeafNode leaf:
                 Assert.AreEqual(0, leaf.Occupants.Count, "Leaf should be empty");
                 break;
             case OctetParentNode parent:

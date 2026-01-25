@@ -5,6 +5,8 @@ public class SpatialObject(LongVector3 initialPosition)
 {
     public Guid Guid { get; } = Guid.NewGuid();
 
+    public readonly ReaderWriterLockSlim m_positionLock = new(LockRecursionPolicy.SupportsRecursion);
+
     IList<LongVector3> m_positionStack = [initialPosition];
 
     public IList<LongVector3> GetPositionStack()
@@ -13,10 +15,10 @@ public class SpatialObject(LongVector3 initialPosition)
         return [.. m_positionStack];
     }
 
-    public void SetPositionStack(IList<LongVector3> newStack)
+    public void AppendPosition(LongVector3 newPosition)
     {
         using var s = new SlimSyncer(m_positionLock, SlimSyncer.LockMode.Write);
-        m_positionStack = newStack;
+        m_positionStack.Add(newPosition);
     }
 
     public void SetLocalPosition(LongVector3 newLocalPos)
@@ -25,50 +27,48 @@ public class SpatialObject(LongVector3 initialPosition)
         m_positionStack[^1] = newLocalPos;
     }
 
-    public void SetPositionAtDepth(int depth, LongVector3 newPos)
+    public void SetPositionStack(IList<LongVector3> newStack)
     {
-
-        if (depth < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(depth), "Depth cannot be negative.");
-        }
-        if (PositionStackDepth < depth - 1)
-        {
-            throw new InvalidOperationException("Object stack not hydrated to depth-1 on set at depth: " + depth);
-        }
         using var s = new SlimSyncer(m_positionLock, SlimSyncer.LockMode.Write);
-        if (PositionStackDepth == depth)
-        {
-            m_positionStack.Add(newPos);
-            return;
-        }
-        m_positionStack[depth] = newPos; // doesn't chop off end, should.
+        m_positionStack = newStack;
     }
 
     public int PositionStackDepth
     {
         get
         {
+            using var s = new SlimSyncer(m_positionLock, SlimSyncer.LockMode.Read);
             return m_positionStack.Count;
         }
     }
+
+    public bool HasPositionAtDepth(int depth)
+    {
+        if (depth < 0)
+            return false;
+
+        using var s = new SlimSyncer(m_positionLock, SlimSyncer.LockMode.Read);
+        return depth < m_positionStack.Count;
+    }
+
+    public LongVector3 GetPositionAtDepth(int depth)
+    {
+        using var s = new SlimSyncer(m_positionLock, SlimSyncer.LockMode.Read);
+
+        if ((uint)depth >= (uint)m_positionStack.Count)
+            throw new ArgumentOutOfRangeException(nameof(depth));
+
+        return m_positionStack[depth];
+    }
+
     public LongVector3 LocalPosition
     {
         get
         {
-//#if DEBUG
-//            if (LatticePositionStackDepth == 0)
-//            {
-//                Debugger.Break();
-//                throw new InvalidOperationException("LatticePositionStack is empty.");
-//            }
-//#endif
+            using var s = new SlimSyncer(m_positionLock, SlimSyncer.LockMode.Read);
             return m_positionStack[^1];
-
         }
     }
-
-    public readonly ReaderWriterLockSlim m_positionLock = new(LockRecursionPolicy.SupportsRecursion);
 
     public ulong GetDiscriminator()
     {
@@ -89,9 +89,9 @@ public class SpatialObjectProxy : SpatialObject
     private ProxyState m_proxyState;
     public bool IsCommitted => ProxyState.Committed == m_proxyState;
     public SpatialObject OriginalObject { get; }
-    public OccupantLeafNode TargetLeaf { get; set; }
+    public VenueLeafNode TargetLeaf { get; set; }
 
-    public SpatialObjectProxy(SpatialObject originalObj, OccupantLeafNode targetleaf, LongVector3 proposedPosition)
+    public SpatialObjectProxy(SpatialObject originalObj, VenueLeafNode targetleaf, LongVector3 proposedPosition)
         : base(proposedPosition)
     {
 #if DEBUG
@@ -121,8 +121,8 @@ public class SpatialObjectProxy : SpatialObject
                 [parent, leaf, OriginalObject, this],
                 [
 
-                    new(parent.m_dependantsSync, SlimSyncer.LockMode.Write),
-                    new(leaf.m_dependantsSync, SlimSyncer.LockMode.Write),
+                    new(parent.Sync, SlimSyncer.LockMode.Write),
+                    new(leaf.Sync, SlimSyncer.LockMode.Write),
                     new(OriginalObject.m_positionLock, SlimSyncer.LockMode.Write),
                     new(m_positionLock, SlimSyncer.LockMode.Write),
                 ]
@@ -152,7 +152,7 @@ public class SpatialObjectProxy : SpatialObject
     public void Rollback()
     {
         if (m_proxyState != ProxyState.Uncommitted) return;
-        TargetLeaf.Leave(this);
+        TargetLeaf.Vacate(this);
         m_proxyState = ProxyState.RolledBack;
     }
 }

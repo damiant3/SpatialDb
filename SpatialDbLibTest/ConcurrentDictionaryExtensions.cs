@@ -1,13 +1,12 @@
 ﻿////////////////////////////////////
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
-using System.Security.Cryptography;
 namespace SpatialDbLibTest;
 
 public static class ConcurrentDictionaryTestExtensions
 {
     private static readonly ThreadLocal<Random> s_rng =
-    new(() => new Random(Environment.TickCount ^ Environment.CurrentManagedThreadId));
+        new(() => new Random(Environment.TickCount ^ Environment.CurrentManagedThreadId));
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static int NextInt(int max) => s_rng.Value!.Next(max);

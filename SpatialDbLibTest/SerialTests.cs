@@ -62,14 +62,14 @@ public class SerialTests
             lattice.Insert(obj);
 
             int count = 0;
-            void Scan(SpatialNode n)
+            void Scan(INode n)
             {
                 switch (n)
                 {
                     case SubLatticeBranchNode s:
-                        Scan(s.m_subLattice);
+                        Scan(s.Sublattice);
                         break;
-                    case OccupantLeafNode l:
+                    case VenueLeafNode l:
                         if (l.Contains(obj)) count++;
                         break;
                     case OctetParentNode p:

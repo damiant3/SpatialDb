@@ -18,30 +18,30 @@ public abstract class AdmitResult
 
     public sealed class Retry : AdmitResult { }
 
-    public sealed class Subdivide(OccupantLeafNode leaf) 
+    public sealed class Subdivide(VenueLeafNode leaf) 
         : AdmitResult
     {
-        public OccupantLeafNode Leaf { get; } = leaf;
+        public VenueLeafNode Leaf { get; } = leaf;
     }
 
-    public sealed class Delegate(OccupantLeafNode leaf)
+    public sealed class Delegate(VenueLeafNode leaf)
         : AdmitResult
     {
-        public OccupantLeafNode Leaf { get; } = leaf;
+        public VenueLeafNode Leaf { get; } = leaf;
     }
 
     public static AdmitResult Create(SpatialObjectProxy proxy, SpatialNode node) => new Created(proxy, node);
     public static AdmitResult Reject() => new Rejected();
     public static AdmitResult EscalateRequest() => new Escalate();
     public static AdmitResult RetryRequest() => new Retry();
-    public static AdmitResult SubdivideRequest(OccupantLeafNode leaf) => new Subdivide(leaf);
-    public static AdmitResult DelegateRequest(OccupantLeafNode leaf) => new Delegate(leaf);
+    public static AdmitResult SubdivideRequest(VenueLeafNode leaf) => new Subdivide(leaf);
+    public static AdmitResult DelegateRequest(VenueLeafNode leaf) => new Delegate(leaf);
 }
 
-public readonly struct SelectChildResult(byte indexInParent, SpatialNode childNode)
+public readonly struct SelectChildResult(byte indexInParent, IChildNode childNode)
 {
     public readonly byte IndexInParent = indexInParent;
-    public readonly SpatialNode ChildNode = childNode;
+    public readonly IChildNode ChildNode = childNode;
 }
 
 
