@@ -1,13 +1,13 @@
 ﻿///////////////////////////////
 namespace SpatialDbLib.Lattice;
 
-public class SpatialObject(LongVector3 initialPosition)
+public class SpatialObject(IList<LongVector3> initialPosition)
 {
     public Guid Guid { get; } = Guid.NewGuid();
 
     public readonly ReaderWriterLockSlim m_positionLock = new(LockRecursionPolicy.SupportsRecursion);
 
-    IList<LongVector3> m_positionStack = [initialPosition];
+    IList<LongVector3> m_positionStack = initialPosition;
 
     public IList<LongVector3> GetPositionStack()
     {
@@ -92,7 +92,7 @@ public class SpatialObjectProxy : SpatialObject
     public VenueLeafNode TargetLeaf { get; set; }
 
     public SpatialObjectProxy(SpatialObject originalObj, VenueLeafNode targetleaf, LongVector3 proposedPosition)
-        : base(proposedPosition)
+        : base([.. originalObj.GetPositionStack()])
     {
 #if DEBUG
         if (originalObj.PositionStackDepth == 0)
@@ -101,9 +101,7 @@ public class SpatialObjectProxy : SpatialObject
         m_proxyState = ProxyState.Uncommitted;
         OriginalObject = originalObj;
         TargetLeaf = targetleaf;
-
-        SetPositionStack(originalObj.GetPositionStack());
-        OriginalObject.SetLocalPosition(proposedPosition);
+        SetLocalPosition(proposedPosition);
     }
 
     public void Commit()

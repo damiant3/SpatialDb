@@ -29,7 +29,7 @@ public class LatticeTestHelpers
         {
             for (int i = 0; i < count; i++)
             {
-                var obj = new SpatialObject(pos);
+                var obj = new SpatialObject([pos]);
                 tempObjs.Add(obj);
                 lattice.Insert(obj);
             }

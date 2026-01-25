@@ -7,6 +7,24 @@ namespace SpatialDbLibTest;
 public class SerialTests
 {
     [TestMethod]
+    public void SerialTests_DeepInsert()
+    {
+        var lattice = new SpatialLattice();
+        List<SpatialObject> insertedObjects = [];
+
+        var obj = new SpatialObject([LongVector3.Zero, LongVector3.Zero]);
+        insertedObjects.Add(obj);
+        var r = lattice.Insert(obj);
+        var created = r as Created;
+        Assert.IsNotNull(created);
+        Assert.IsTrue(created.Proxy.IsCommitted);
+        var leaf = lattice.ResolveOccupyingLeaf(obj);
+        Assert.IsNotNull(leaf);
+        Assert.IsTrue(leaf.Contains(obj));
+        Console.WriteLine("Insert, Proxy, Commit, and leaf.Contains() for uncommited and commited objects passed.");
+    }
+
+    [TestMethod]
     public void SerialTests_Omnibus()
     {
         var lattice = new SpatialLattice();
@@ -24,7 +42,7 @@ public class SerialTests
                 LatticeUniverse.RootRegion.Max - new LongVector3(1),
             };
 
-            var newobjects = positions.Select(a => new SpatialObject(a)).ToList<SpatialObject>();
+            var newobjects = positions.Select(a => new SpatialObject([a])).ToList<SpatialObject>();
             foreach (var p in positions)
             {
                 var inner = t.OuterToInnerCanonical(p);
@@ -37,7 +55,7 @@ public class SerialTests
 
         // === I2 + I3: Insert / committed visibility ===
         {
-            var obj = new SpatialObject(LongVector3.Zero);
+            var obj = new SpatialObject([LongVector3.Zero]);
             insertedObjects.Add(obj);
             var r = lattice.Insert(obj);
             var created = r as Created;
@@ -57,7 +75,7 @@ public class SerialTests
 
         // === I6: Object exists in exactly one leaf ===
         {
-            var obj = new SpatialObject(LongVector3.Zero);
+            var obj = new SpatialObject([LongVector3.Zero]);
             insertedObjects.Add(obj);
             lattice.Insert(obj);
 
@@ -87,7 +105,7 @@ public class SerialTests
 
         // === I7 + I8: Double commit throws, remove removes ===
         {
-            var obj = new SpatialObject(LongVector3.Zero);
+            var obj = new SpatialObject([LongVector3.Zero]);
             insertedObjects.Add(obj);
             var r = lattice.Insert(obj);
             var created = r as Created;
@@ -107,7 +125,7 @@ public class SerialTests
         {
             var pos = new LongVector3(123, 456, -789);
             insertedObjects.AddRange(LatticeTestHelpers.ForceSublattice(lattice, pos));
-            var obj = new SpatialObject(pos);
+            var obj = new SpatialObject([pos]);
             insertedObjects.Add(obj);
             var x = lattice.Insert(obj);
             Assert.IsTrue(x  is Created);

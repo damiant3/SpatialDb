@@ -154,7 +154,7 @@ namespace SpatialDbLibTest
                             Random.Next(-SpaceRange, SpaceRange)
                         );
 
-                        var obj = new SpatialObject(pos);
+                        var obj = new SpatialObject([pos]);
                         Container!.TestInsert(obj);
                         InsertedObjects![obj.Guid] = obj;
 

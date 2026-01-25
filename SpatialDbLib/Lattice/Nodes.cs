@@ -164,9 +164,6 @@ public abstract class OctetParentNode
 
     public override void AdmitMigrants(IList<SpatialObject> objs)
     {
-        if (objs.Count == 0)
-            throw new InvalidOperationException("Concurrency Violation, should be a non-zero length list of migrants.");
-
         List<KeyValuePair<IChildNode, List<SpatialObject>>> migrantsByTargetChild = [];
         foreach (var obj in objs)
         {
@@ -252,7 +249,7 @@ public abstract class OctetParentNode
                         : new SubLatticeBranchNode(
                             subdividingleaf.Bounds,
                             frame.Parent,
-                            (byte)(occupantsSnapshot[0].PositionStackDepth),
+                            latticeDepth,
                             occupantsSnapshot);
                     using var s2 = new SlimSyncer(newBranch.Sync, SlimSyncer.LockMode.Write);
                     using var s3 = newBranch.LockAndSnapshotForMigration();
@@ -393,10 +390,6 @@ public abstract class VenueLeafNode(Region bounds, IParentNode parent)
     public override void AdmitMigrants(IList<SpatialObject> objs)
     {
         using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write);
-#if DEBUG
-        if(Occupants.Any())
-            throw new InvalidOperationException("Cannot admit migrants to non-empty leaf");
-#endif
         foreach (var obj in objs)
         {
             using var s2 = new SlimSyncer(obj.m_positionLock, SlimSyncer.LockMode.Write);
