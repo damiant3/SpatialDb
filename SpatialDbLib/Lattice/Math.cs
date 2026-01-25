@@ -235,8 +235,6 @@ public readonly struct LongVector3(long x, long y, long z)
     public static readonly LongVector3 Zero = new(0);
 }
 
-
-
 public readonly struct Region
 {
     public Region(LongVector3 min, LongVector3 max)
