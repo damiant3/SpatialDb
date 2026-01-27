@@ -36,8 +36,8 @@ public class SpatialLattice : OctetRootNode
             var leaf = ResolveOccupyingLeaf(obj);
             if (leaf == null) return;
             var parent = leaf.Parent;
-            using var s2 = new SlimSyncer(parent.Sync, SlimSyncer.LockMode.Write);
-            using var s3 = new SlimSyncer(leaf.Sync, SlimSyncer.LockMode.Write);
+            using var s2 = new SlimSyncer(((INodeSync)parent).Sync, SlimSyncer.LockMode.Write);
+            using var s3 = new SlimSyncer(((INodeSync)leaf).Sync, SlimSyncer.LockMode.Write);
             if (leaf.Parent != parent || !leaf.Contains(obj))
                 continue;
             leaf.Vacate(obj);
@@ -70,7 +70,7 @@ public class SpatialLattice : OctetRootNode
     public VenueLeafNode? ResolveLeaf(SpatialObject obj)
     {
         LongVector3 pos = obj.GetPositionStack()[LatticeDepth];
-        INode current = this;
+        ISpatialNode current = this;
         while (current != null)
         {
             switch (current)
@@ -87,7 +87,7 @@ public class SpatialLattice : OctetRootNode
                 }
                 case VenueLeafNode leaf:
                 {
-                    using var s3 = new SlimSyncer(leaf.Sync, SlimSyncer.LockMode.Read);
+                    using var s3 = new SlimSyncer(((INodeSync)leaf).Sync, SlimSyncer.LockMode.Read);
                     return leaf;
                 }
                 default:
@@ -99,7 +99,7 @@ public class SpatialLattice : OctetRootNode
 
     public override void AdmitMigrants(IList<SpatialObject> objs)
     {
-        List<KeyValuePair<INode, List<SpatialObject>>> migrantsByTargetChild = [];
+        List<KeyValuePair<ISpatialNode, List<SpatialObject>>> migrantsByTargetChild = [];
         foreach (var obj in objs)
         {
             var innerPosition = BoundsTransform.OuterToInnerInsertion(obj.LocalPosition, obj.GetDiscriminator());
@@ -110,7 +110,7 @@ public class SpatialLattice : OctetRootNode
             if (migrantSubGroup.Key != null && migrantSubGroup.Value != null)
                 migrantSubGroup.Value.Add(obj);
             else
-                migrantsByTargetChild.Add(new KeyValuePair<INode, List<SpatialObject>>(selectChildResult.ChildNode, [obj]));
+                migrantsByTargetChild.Add(new KeyValuePair<ISpatialNode, List<SpatialObject>>(selectChildResult.ChildNode, [obj]));
         }
 
         foreach (var kvp in migrantsByTargetChild)

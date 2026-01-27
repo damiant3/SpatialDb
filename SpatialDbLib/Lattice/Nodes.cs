@@ -11,18 +11,23 @@ public interface IParent
     IChild[] Children { get; }
 }
 
-public interface INode
+internal interface INodeSync
+{
+    ReaderWriterLockSlim Sync { get; }
+}
+
+public interface ISpatialNode
 {
     Region Bounds { get; }
-    ReaderWriterLockSlim Sync { get; }
     AdmitResult Admit(SpatialObject obj, LongVector3 proposedPosition, byte latticeDepth);
     void AdmitMigrants(IList<SpatialObject> obj);
     IDisposable LockAndSnapshotForMigration();
+
 }
 
 public interface IParentNode
     : IParent,
-      INode
+      ISpatialNode
 {
     void ReplaceChildAt(byte index, IChildNode newChild);
     SelectChildResult? SelectChild(LongVector3 pos);
@@ -30,7 +35,7 @@ public interface IParentNode
 
 public interface IChildNode
     : IChild,
-      INode { }
+      ISpatialNode { }
 
 public interface IBranchNode
     : IParentNode,
@@ -68,10 +73,16 @@ public interface ISeedNode
 }
 
 public abstract class SpatialNode(Region bounds)
-    : INode
+    : ISpatialNode,
+      INodeSync
 {
-    public Region Bounds { get; } = bounds;
-    public ReaderWriterLockSlim Sync { get; } = new(LockRecursionPolicy.SupportsRecursion);
+    private readonly Region m_Bounds = bounds;
+    public Region Bounds => m_Bounds;
+
+    private readonly ReaderWriterLockSlim m_sync = new(LockRecursionPolicy.SupportsRecursion);
+    protected ReaderWriterLockSlim Sync => m_sync;
+    ReaderWriterLockSlim INodeSync.Sync => m_sync;
+
     public abstract AdmitResult Admit(SpatialObject obj, LongVector3 proposedPosition, byte latticeDepth);
     public abstract void AdmitMigrants(IList<SpatialObject> obj);
     public abstract IDisposable LockAndSnapshotForMigration();
@@ -97,7 +108,7 @@ public abstract class OctetParentNode
 
     public override IChildNode[] Children { get; } = new IChildNode[8];
 
-    internal void CreateChildLeafNodes()
+    public void CreateChildLeafNodes()
     {
         var min = Bounds.Min;
         var max = Bounds.Max;
@@ -142,7 +153,7 @@ public abstract class OctetParentNode
         {
             foreach (var child in Children)
             {
-                var childLock = new SlimSyncer(child.Sync, SlimSyncer.LockMode.Write);
+                var childLock = new SlimSyncer(((INodeSync)child).Sync, SlimSyncer.LockMode.Write);
                 locksHeld.Add(childLock);
                 nodesLocked.Add(child);
             }
@@ -188,7 +199,7 @@ public abstract class OctetParentNode
     {
         public IParentNode Parent;
         public byte ChildIndex;
-        public INode ChildINode;
+        public ISpatialNode ChildINode;
         public byte LatticeDepth;
     }
 
@@ -197,7 +208,7 @@ public abstract class OctetParentNode
         if (!Bounds.Contains(proposedPosition))
             return AdmitResult.EscalateRequest();
 
-        INode current = this;
+        ISpatialNode current = this;
         AdmitFrame frame = new() { Parent = this, ChildIndex = 0, ChildINode = this, LatticeDepth = latticeDepth };
         while (true)
         {
@@ -233,8 +244,8 @@ public abstract class OctetParentNode
                     if (subdividingleaf == null)
                         throw new InvalidOperationException("Subdivision requested by non-venueleaf");
 #endif
-                    using var s = new SlimSyncer(frame.Parent.Sync, SlimSyncer.LockMode.Write);
-                    using var s1 = new SlimSyncer(subdividingleaf.Sync, SlimSyncer.LockMode.Write);
+                    using var s = new SlimSyncer(((INodeSync)frame.Parent).Sync, SlimSyncer.LockMode.Write);
+                    using var s1 = new SlimSyncer(((INodeSync)subdividingleaf).Sync, SlimSyncer.LockMode.Write);
 
                     if (subdividingleaf.IsRetired)
                     {
@@ -251,7 +262,7 @@ public abstract class OctetParentNode
                             frame.Parent,
                             latticeDepth,
                             occupantsSnapshot);
-                    using var s2 = new SlimSyncer(newBranch.Sync, SlimSyncer.LockMode.Write);
+                    using var s2 = new SlimSyncer(((INodeSync)newBranch).Sync, SlimSyncer.LockMode.Write);
                     using var s3 = newBranch.LockAndSnapshotForMigration();
                     subdividingleaf.Retire();
                     frame.Parent.Children[frame.ChildIndex] = newBranch;
@@ -356,7 +367,7 @@ public abstract class VenueLeafNode(Region bounds, IParentNode parent)
     public override void Retire()
     {
 #if DEBUG
-        if (!Parent.Sync.IsWriteLockHeld)
+        if (!((INodeSync)Parent).Sync.IsWriteLockHeld)
             throw new InvalidOperationException("Leaf retired without parent write lock");
 #endif
         using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write);
@@ -367,7 +378,7 @@ public abstract class VenueLeafNode(Region bounds, IParentNode parent)
     public override void Replace(SpatialObjectProxy proxy)
     {
 #if DEBUG
-        if (!Parent.Sync.IsWriteLockHeld)
+        if (!((INodeSync)Parent).Sync.IsWriteLockHeld)
             throw new InvalidOperationException(
                 "Replace called without parent write lock");
 
@@ -501,10 +512,10 @@ public class SubLatticeBranchNode
         var nodesLocked = new List<IChildNode>();
         try
         {
-            locksHeld.Add(new(Sublattice.Sync, SlimSyncer.LockMode.Write));
+            locksHeld.Add(new(((INodeSync)Sublattice).Sync, SlimSyncer.LockMode.Write));
             foreach (var child in Sublattice.Children)
             {
-                var childLock = new SlimSyncer(child.Sync, SlimSyncer.LockMode.Write);
+                var childLock = new SlimSyncer(((INodeSync)child).Sync, SlimSyncer.LockMode.Write);
                 locksHeld.Add(childLock);
                 nodesLocked.Add(child);
             }

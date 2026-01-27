@@ -119,8 +119,8 @@ public class SpatialObjectProxy : SpatialObject
                 [parent, leaf, OriginalObject, this],
                 [
 
-                    new(parent.Sync, SlimSyncer.LockMode.Write),
-                    new(leaf.Sync, SlimSyncer.LockMode.Write),
+                    new(((INodeSync)parent).Sync, SlimSyncer.LockMode.Write),
+                    new(((INodeSync)leaf).Sync, SlimSyncer.LockMode.Write),
                     new(OriginalObject.m_positionLock, SlimSyncer.LockMode.Write),
                     new(m_positionLock, SlimSyncer.LockMode.Write),
                 ]

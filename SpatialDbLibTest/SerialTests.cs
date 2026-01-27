@@ -80,7 +80,7 @@ public class SerialTests
             lattice.Insert(obj);
 
             int count = 0;
-            void Scan(INode n)
+            void Scan(ISpatialNode n)
             {
                 switch (n)
                 {

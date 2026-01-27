@@ -1,6 +1,6 @@
-﻿namespace SpatialDb
+﻿namespace SpatialDbApp
 {
-    partial class Form1
+    partial class MainForm
     {
         /// <summary>
         ///  Required designer variable.
@@ -28,12 +28,32 @@
         /// </summary>
         private void InitializeComponent()
         {
-            this.components = new System.ComponentModel.Container();
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(800, 450);
-            this.Text = "Form1";
+            rtbTypeSummary = new RichTextBox();
+            SuspendLayout();
+            // 
+            // rtbTypeSummary
+            // 
+            rtbTypeSummary.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            rtbTypeSummary.Location = new Point(12, 12);
+            rtbTypeSummary.Name = "rtbTypeSummary";
+            rtbTypeSummary.Size = new Size(776, 426);
+            rtbTypeSummary.TabIndex = 0;
+            rtbTypeSummary.Text = "";
+            rtbTypeSummary.MouseDoubleClick += rtbTypeSummary_MouseDoubleClick;
+            // 
+            // MainForm
+            // 
+            AutoScaleDimensions = new SizeF(7F, 15F);
+            AutoScaleMode = AutoScaleMode.Font;
+            ClientSize = new Size(800, 450);
+            Controls.Add(rtbTypeSummary);
+            Name = "MainForm";
+            Text = "Form1";
+            ResumeLayout(false);
         }
 
         #endregion
+
+        private RichTextBox rtbTypeSummary;
     }
 }

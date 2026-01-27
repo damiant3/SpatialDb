@@ -1,0 +1,302 @@
+    - AdmitFrame (SpatialDbLib.Lattice.OctetParentNode+AdmitFrame) - Access: Internal
+
+
+- AdmitResult (SpatialDbLib.Lattice.AdmitResult) - Access: Public
+    - Method: Create() - Return Type: AdmitResult - Access: Public
+    - Method: Reject() - Return Type: AdmitResult - Access: Public
+    - Method: EscalateRequest() - Return Type: AdmitResult - Access: Public
+    - Method: RetryRequest() - Return Type: AdmitResult - Access: Public
+    - Method: SubdivideRequest() - Return Type: AdmitResult - Access: Public
+    - Method: DelegateRequest() - Return Type: AdmitResult - Access: Public
+
+
+- ChildNode (SpatialDbLib.Lattice.ChildNode) - Access: Public
+    - Property: Parent - Type: IParent - Access: Public
+    - Property: Bounds - Type: Region - Access: Public
+    - Property: Sync - Type: ReaderWriterLockSlim - Access: Public
+    - Method: CanSubdivide() - Return Type: Boolean - Access: Public
+
+
+- Created (SpatialDbLib.Lattice.AdmitResult+Created) - Access: Internal
+    - Property: Proxy - Type: SpatialObjectProxy - Access: Public
+    - Property: Node - Type: SpatialNode - Access: Public
+
+
+- Delegate (SpatialDbLib.Lattice.AdmitResult+Delegate) - Access: Internal
+    - Property: Leaf - Type: VenueLeafNode - Access: Public
+
+
+- Escalate (SpatialDbLib.Lattice.AdmitResult+Escalate) - Access: Internal
+
+
+- IBranchNode (SpatialDbLib.Lattice.IBranchNode) - Access: Public
+
+
+- IChild (SpatialDbLib.Lattice.IChild) - Access: Public
+    - Property: Parent - Type: IParent - Access: Public
+
+
+- IChildNode (SpatialDbLib.Lattice.IChildNode) - Access: Public
+
+
+- ILatticeCoordinateTransform (SpatialDbLib.Lattice.ILatticeCoordinateTransform) - Access: Public
+    - Method: OuterToInnerCanonical() - Return Type: LongVector3 - Access: Public
+    - Method: OuterToInnerInsertion() - Return Type: LongVector3 - Access: Public
+    - Method: InnerToOuter() - Return Type: LongVector3 - Access: Public
+    - Method: ContainsOuter() - Return Type: Boolean - Access: Public
+    - Method: ContainsInner() - Return Type: Boolean - Access: Public
+
+
+- ILeafNode (SpatialDbLib.Lattice.ILeafNode) - Access: Public
+    - Property: IsRetired - Type: Boolean - Access: Public
+    - Method: CanSubdivide() - Return Type: Boolean - Access: Public
+    - Method: Retire() - Return Type: Void - Access: Public
+
+
+- INode (SpatialDbLib.Lattice.INode) - Access: Public
+    - Property: Bounds - Type: Region - Access: Public
+    - Property: Sync - Type: ReaderWriterLockSlim - Access: Public
+    - Method: Admit() - Return Type: AdmitResult - Access: Public
+    - Method: AdmitMigrants() - Return Type: Void - Access: Public
+    - Method: LockAndSnapshotForMigration() - Return Type: IDisposable - Access: Public
+
+
+- IParent (SpatialDbLib.Lattice.IParent) - Access: Public
+    - Property: Children - Type: IChild[] - Access: Public
+
+
+- IParentNode (SpatialDbLib.Lattice.IParentNode) - Access: Public
+    - Method: ReplaceChildAt() - Return Type: Void - Access: Public
+    - Method: SelectChild() - Return Type: Nullable`1 - Access: Public
+
+
+- ISeed (SpatialDbLib.Lattice.ISeed) - Access: Public
+    - Property: Sublattice - Type: SpatialLattice - Access: Public
+
+
+- ISeedNode (SpatialDbLib.Lattice.ISeedNode) - Access: Public
+
+
+- IVenueParent (SpatialDbLib.Lattice.IVenueParent) - Access: Public
+    - Property: Occupants - Type: IList`1 - Access: Public
+    - Method: HasAnyOccupants() - Return Type: Boolean - Access: Public
+    - Method: IsAtCapacity() - Return Type: Boolean - Access: Public
+    - Method: Contains() - Return Type: Boolean - Access: Public
+    - Method: Vacate() - Return Type: Void - Access: Public
+    - Method: Occupy() - Return Type: Void - Access: Public
+    - Method: Replace() - Return Type: Void - Access: Public
+
+
+- LargeLeafNode (SpatialDbLib.Lattice.LargeLeafNode) - Access: Public
+    - Property: Capacity - Type: Int32 - Access: Public
+    - Property: Occupants - Type: IList`1 - Access: Public
+    - Property: IsRetired - Type: Boolean - Access: Public
+    - Property: Parent - Type: IParentNode - Access: Public
+    - Property: Parent - Type: IParent - Access: Public
+    - Property: Bounds - Type: Region - Access: Public
+    - Property: Sync - Type: ReaderWriterLockSlim - Access: Public
+
+
+- LatticeUniverse (SpatialDbLib.Lattice.LatticeUniverse) - Access: Public
+
+
+- LeafNode (SpatialDbLib.Lattice.LeafNode) - Access: Public
+    - Property: Parent - Type: IParentNode - Access: Public
+    - Property: Occupants - Type: IList`1 - Access: Public
+    - Property: IsRetired - Type: Boolean - Access: Public
+    - Property: Capacity - Type: Int32 - Access: Public
+    - Property: Parent - Type: IParent - Access: Public
+    - Property: Bounds - Type: Region - Access: Public
+    - Property: Sync - Type: ReaderWriterLockSlim - Access: Public
+    - Method: Contains() - Return Type: Boolean - Access: Public
+    - Method: HasAnyOccupants() - Return Type: Boolean - Access: Public
+    - Method: Vacate() - Return Type: Void - Access: Public
+    - Method: Occupy() - Return Type: Void - Access: Public
+    - Method: Replace() - Return Type: Void - Access: Public
+    - Method: Retire() - Return Type: Void - Access: Public
+    - Method: IsAtCapacity() - Return Type: Boolean - Access: Public
+
+
+- LockMode (SpatialDbLib.Lattice.SlimSyncer+LockMode) - Access: Internal
+
+
+- LongVector3 (SpatialDbLib.Lattice.LongVector3) - Access: Public
+    - Method: OffsetFrom() - Return Type: ULongVector3 - Access: Public
+    - Method: MaxComponentAbs() - Return Type: Int64 - Access: Public
+    - Method: SumAbs() - Return Type: Int64 - Access: Public
+    - Method: ToString() - Return Type: String - Access: Public
+    - Method: Equals() - Return Type: Boolean - Access: Public
+    - Method: GetHashCode() - Return Type: Int32 - Access: Public
+    - Method: Midpoint() - Return Type: Int64 - Access: Public
+    - Method: Midpoint() - Return Type: LongVector3 - Access: Public
+
+
+- MultiObjectScope`1 (SpatialDbLib.Lattice.MultiObjectScope`1) - Access: Public
+    - Property: Objects - Type: List`1 - Access: Public
+    - Method: Dispose() - Return Type: Void - Access: Public
+
+
+- OctetBranchBase (SpatialDbLib.Lattice.OctetBranchBase) - Access: Public
+    - Property: Parent - Type: IParent - Access: Public
+    - Property: Children - Type: IChildNode[] - Access: Public
+    - Property: Children - Type: IChild[] - Access: Public
+    - Property: Bounds - Type: Region - Access: Public
+    - Property: Sync - Type: ReaderWriterLockSlim - Access: Public
+
+
+- OctetBranchNode (SpatialDbLib.Lattice.OctetBranchNode) - Access: Public
+    - Property: Parent - Type: IParentNode - Access: Public
+    - Property: Parent - Type: IParent - Access: Public
+    - Property: Children - Type: IChildNode[] - Access: Public
+    - Property: Children - Type: IChild[] - Access: Public
+    - Property: Bounds - Type: Region - Access: Public
+    - Property: Sync - Type: ReaderWriterLockSlim - Access: Public
+
+
+- OctetParentNode (SpatialDbLib.Lattice.OctetParentNode) - Access: Public
+    - Property: Children - Type: IChildNode[] - Access: Public
+    - Property: Children - Type: IChild[] - Access: Public
+    - Property: Bounds - Type: Region - Access: Public
+    - Property: Sync - Type: ReaderWriterLockSlim - Access: Public
+    - Method: SelectChild() - Return Type: Nullable`1 - Access: Public
+    - Method: LockAndSnapshotForMigration() - Return Type: MultiObjectScope`1 - Access: Public
+    - Method: ReplaceChildAt() - Return Type: Void - Access: Public
+    - Method: AdmitMigrants() - Return Type: Void - Access: Public
+    - Method: Admit() - Return Type: AdmitResult - Access: Public
+
+
+- OctetRootNode (SpatialDbLib.Lattice.OctetRootNode) - Access: Public
+    - Property: Children - Type: IChildNode[] - Access: Public
+    - Property: Children - Type: IChild[] - Access: Public
+    - Property: Bounds - Type: Region - Access: Public
+    - Property: Sync - Type: ReaderWriterLockSlim - Access: Public
+
+
+- ParentNode (SpatialDbLib.Lattice.ParentNode) - Access: Public
+    - Property: Children - Type: IChild[] - Access: Public
+    - Property: Bounds - Type: Region - Access: Public
+    - Property: Sync - Type: ReaderWriterLockSlim - Access: Public
+    - Method: ReplaceChildAt() - Return Type: Void - Access: Public
+    - Method: SelectChild() - Return Type: Nullable`1 - Access: Public
+
+
+- ParentToSubLatticeTransform (SpatialDbLib.Lattice.ParentToSubLatticeTransform) - Access: Public
+    - Property: OuterLatticeBounds - Type: Region - Access: Public
+    - Property: InnerLatticeBounds - Type: Region - Access: Public
+    - Method: ContainsOuter() - Return Type: Boolean - Access: Public
+    - Method: ContainsInner() - Return Type: Boolean - Access: Public
+    - Method: OuterToInnerInsertion() - Return Type: LongVector3 - Access: Public
+    - Method: OuterToInnerCanonical() - Return Type: LongVector3 - Access: Public
+    - Method: InnerToOuter() - Return Type: LongVector3 - Access: Public
+
+
+- ProxyState (SpatialDbLib.Lattice.SpatialObjectProxy+ProxyState) - Access: Internal
+
+
+- Region (SpatialDbLib.Lattice.Region) - Access: Public
+    - Property: Min - Type: LongVector3 - Access: Public
+    - Property: Max - Type: LongVector3 - Access: Public
+    - Property: Mid - Type: LongVector3 - Access: Public
+    - Property: Size - Type: ULongVector3 - Access: Public
+    - Method: Contains() - Return Type: Boolean - Access: Public
+    - Method: ToString() - Return Type: String - Access: Public
+
+
+- Rejected (SpatialDbLib.Lattice.AdmitResult+Rejected) - Access: Internal
+
+
+- Retry (SpatialDbLib.Lattice.AdmitResult+Retry) - Access: Internal
+
+
+- SelectChildResult (SpatialDbLib.Lattice.SelectChildResult) - Access: Public
+
+
+- SlimSyncer (SpatialDbLib.Lattice.SlimSyncer) - Access: Public
+    - Method: UpgradeToWriteLock() - Return Type: Void - Access: Public
+    - Method: Dispose() - Return Type: Void - Access: Public
+
+
+- SpatialLattice (SpatialDbLib.Lattice.SpatialLattice) - Access: Public
+    - Property: Children - Type: IChildNode[] - Access: Public
+    - Property: Children - Type: IChild[] - Access: Public
+    - Property: Bounds - Type: Region - Access: Public
+    - Property: Sync - Type: ReaderWriterLockSlim - Access: Public
+    - Method: Insert() - Return Type: AdmitResult - Access: Public
+    - Method: Remove() - Return Type: Void - Access: Public
+    - Method: ResolveLeafFromOuterLattice() - Return Type: VenueLeafNode - Access: Public
+    - Method: ResolveOccupyingLeaf() - Return Type: VenueLeafNode - Access: Public
+    - Method: ResolveLeaf() - Return Type: VenueLeafNode - Access: Public
+    - Method: AdmitMigrants() - Return Type: Void - Access: Public
+
+
+- SpatialNode (SpatialDbLib.Lattice.SpatialNode) - Access: Public
+    - Property: Bounds - Type: Region - Access: Public
+    - Property: Sync - Type: ReaderWriterLockSlim - Access: Public
+    - Method: Admit() - Return Type: AdmitResult - Access: Public
+    - Method: AdmitMigrants() - Return Type: Void - Access: Public
+    - Method: LockAndSnapshotForMigration() - Return Type: IDisposable - Access: Public
+
+
+- SpatialObject (SpatialDbLib.Lattice.SpatialObject) - Access: Public
+    - Property: Guid - Type: Guid - Access: Public
+    - Property: PositionStackDepth - Type: Int32 - Access: Public
+    - Property: LocalPosition - Type: LongVector3 - Access: Public
+    - Method: GetPositionStack() - Return Type: IList`1 - Access: Public
+    - Method: AppendPosition() - Return Type: Void - Access: Public
+    - Method: SetLocalPosition() - Return Type: Void - Access: Public
+    - Method: SetPositionStack() - Return Type: Void - Access: Public
+    - Method: HasPositionAtDepth() - Return Type: Boolean - Access: Public
+    - Method: GetPositionAtDepth() - Return Type: LongVector3 - Access: Public
+    - Method: GetDiscriminator() - Return Type: UInt64 - Access: Public
+
+
+- SpatialObjectProxy (SpatialDbLib.Lattice.SpatialObjectProxy) - Access: Public
+    - Property: IsCommitted - Type: Boolean - Access: Public
+    - Property: OriginalObject - Type: SpatialObject - Access: Public
+    - Property: TargetLeaf - Type: VenueLeafNode - Access: Public
+    - Property: Guid - Type: Guid - Access: Public
+    - Property: PositionStackDepth - Type: Int32 - Access: Public
+    - Property: LocalPosition - Type: LongVector3 - Access: Public
+    - Method: Commit() - Return Type: Void - Access: Public
+    - Method: Rollback() - Return Type: Void - Access: Public
+
+
+- Subdivide (SpatialDbLib.Lattice.AdmitResult+Subdivide) - Access: Internal
+    - Property: Leaf - Type: VenueLeafNode - Access: Public
+
+
+- SubLatticeBranchNode (SpatialDbLib.Lattice.SubLatticeBranchNode) - Access: Public
+    - Property: Sublattice - Type: SpatialLattice - Access: Public
+    - Property: Parent - Type: IParentNode - Access: Public
+    - Property: Parent - Type: IParent - Access: Public
+    - Property: Bounds - Type: Region - Access: Public
+    - Property: Sync - Type: ReaderWriterLockSlim - Access: Public
+    - Method: AdmitMigrants() - Return Type: Void - Access: Public
+    - Method: Admit() - Return Type: AdmitResult - Access: Public
+    - Method: LockAndSnapshotForMigration() - Return Type: MultiObjectScope`1 - Access: Public
+
+
+- ULongVector3 (SpatialDbLib.Lattice.ULongVector3) - Access: Public
+    - Method: ToString() - Return Type: String - Access: Public
+    - Method: Equals() - Return Type: Boolean - Access: Public
+    - Method: GetHashCode() - Return Type: Int32 - Access: Public
+
+
+- VenueLeafNode (SpatialDbLib.Lattice.VenueLeafNode) - Access: Public
+    - Property: Occupants - Type: IList`1 - Access: Public
+    - Property: IsRetired - Type: Boolean - Access: Public
+    - Property: Capacity - Type: Int32 - Access: Public
+    - Property: Parent - Type: IParentNode - Access: Public
+    - Property: Parent - Type: IParent - Access: Public
+    - Property: Bounds - Type: Region - Access: Public
+    - Property: Sync - Type: ReaderWriterLockSlim - Access: Public
+    - Method: Contains() - Return Type: Boolean - Access: Public
+    - Method: HasAnyOccupants() - Return Type: Boolean - Access: Public
+    - Method: Vacate() - Return Type: Void - Access: Public
+    - Method: Occupy() - Return Type: Void - Access: Public
+    - Method: Retire() - Return Type: Void - Access: Public
+    - Method: Replace() - Return Type: Void - Access: Public
+    - Method: IsAtCapacity() - Return Type: Boolean - Access: Public
+    - Method: AdmitMigrants() - Return Type: Void - Access: Public
+    - Method: Admit() - Return Type: AdmitResult - Access: Public
+    - Method: LockAndSnapshotForMigration() - Return Type: MultiObjectScope`1 - Access: Public

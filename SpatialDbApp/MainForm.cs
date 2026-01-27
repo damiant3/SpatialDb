@@ -1,10 +1,17 @@
-namespace SpatialDb
+using SpatialDbLib.Lattice;
+
+namespace SpatialDbApp
 {
-    public partial class Form1 : Form
+    public partial class MainForm : Form
     {
-        public Form1()
+        public MainForm()
         {
             InitializeComponent();
+        }
+
+        private void rtbTypeSummary_MouseDoubleClick(object sender, MouseEventArgs e)
+        {
+            rtbTypeSummary.Text = AssemblyTypeReport.ReportAssembly(typeof(SpatialLattice));
         }
     }
 }

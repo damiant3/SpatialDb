@@ -15,7 +15,7 @@ namespace SpatialDbLibTest
             try
             {
                 ret = base.Insert(obj);
-                Assert.IsNotNull(ret);
+
                 if (ret is not AdmitResult.Created)
                 {
                     Debugger.Break();

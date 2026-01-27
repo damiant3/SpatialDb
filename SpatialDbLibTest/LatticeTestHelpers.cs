@@ -4,7 +4,7 @@ namespace SpatialDbLibTest;
 
 public class LatticeTestHelpers
 {
-    public static SpatialLattice GetOwningLattice(INode region)
+    public static SpatialLattice GetOwningLattice(ISpatialNode region)
     {
         var current = region;
 
@@ -41,7 +41,7 @@ public class LatticeTestHelpers
         return tempObjs;
     }
 
-    public static void AssertAllLeavesEmpty(INode node)
+    public static void AssertAllLeavesEmpty(ISpatialNode node)
     {
         switch (node)
         {
