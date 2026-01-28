@@ -2,34 +2,36 @@
 namespace SpatialDbLib.Lattice;
 
 public class SpatialObject(IList<LongVector3> initialPosition)
+    : ISync
 {
     public Guid Guid { get; } = Guid.NewGuid();
 
-    public readonly ReaderWriterLockSlim m_positionLock = new(LockRecursionPolicy.SupportsRecursion);
+    protected ReaderWriterLockSlim Sync = new(LockRecursionPolicy.SupportsRecursion);
+    ReaderWriterLockSlim ISync.Sync => Sync;
 
     IList<LongVector3> m_positionStack = initialPosition;
 
     public IList<LongVector3> GetPositionStack()
     {
-        using var s = new SlimSyncer(m_positionLock, SlimSyncer.LockMode.Read);
+        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Read);
         return [.. m_positionStack];
     }
 
     public void AppendPosition(LongVector3 newPosition)
     {
-        using var s = new SlimSyncer(m_positionLock, SlimSyncer.LockMode.Write);
+        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write);
         m_positionStack.Add(newPosition);
     }
 
     public void SetLocalPosition(LongVector3 newLocalPos)
     {
-        using var s = new SlimSyncer(m_positionLock, SlimSyncer.LockMode.Write);
+        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write);
         m_positionStack[^1] = newLocalPos;
     }
 
     public void SetPositionStack(IList<LongVector3> newStack)
     {
-        using var s = new SlimSyncer(m_positionLock, SlimSyncer.LockMode.Write);
+        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write);
         m_positionStack = newStack;
     }
 
@@ -37,7 +39,7 @@ public class SpatialObject(IList<LongVector3> initialPosition)
     {
         get
         {
-            using var s = new SlimSyncer(m_positionLock, SlimSyncer.LockMode.Read);
+            using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Read);
             return m_positionStack.Count;
         }
     }
@@ -47,13 +49,13 @@ public class SpatialObject(IList<LongVector3> initialPosition)
         if (depth < 0)
             return false;
 
-        using var s = new SlimSyncer(m_positionLock, SlimSyncer.LockMode.Read);
+        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Read);
         return depth < m_positionStack.Count;
     }
 
     public LongVector3 GetPositionAtDepth(int depth)
     {
-        using var s = new SlimSyncer(m_positionLock, SlimSyncer.LockMode.Read);
+        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Read);
 
         if ((uint)depth >= (uint)m_positionStack.Count)
             throw new ArgumentOutOfRangeException(nameof(depth));
@@ -65,7 +67,7 @@ public class SpatialObject(IList<LongVector3> initialPosition)
     {
         get
         {
-            using var s = new SlimSyncer(m_positionLock, SlimSyncer.LockMode.Read);
+            using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Read);
             return m_positionStack[^1];
         }
     }
@@ -119,10 +121,10 @@ public class SpatialObjectProxy : SpatialObject
                 [parent, leaf, OriginalObject, this],
                 [
 
-                    new(((INodeSync)parent).Sync, SlimSyncer.LockMode.Write),
-                    new(((INodeSync)leaf).Sync, SlimSyncer.LockMode.Write),
-                    new(OriginalObject.m_positionLock, SlimSyncer.LockMode.Write),
-                    new(m_positionLock, SlimSyncer.LockMode.Write),
+                    new(((ISync)parent).Sync, SlimSyncer.LockMode.Write),
+                    new(((ISync)leaf).Sync, SlimSyncer.LockMode.Write),
+                    new(((ISync)OriginalObject).Sync, SlimSyncer.LockMode.Write),
+                    new(Sync, SlimSyncer.LockMode.Write),
                 ]
             );
 
