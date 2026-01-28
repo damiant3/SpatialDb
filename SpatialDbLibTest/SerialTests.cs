@@ -7,24 +7,6 @@ namespace SpatialDbLibTest;
 public class SerialTests
 {
     [TestMethod]
-    public void SerialTests_DeepInsert()
-    {
-        var lattice = new SpatialLattice();
-        List<SpatialObject> insertedObjects = [];
-
-        var obj = new SpatialObject([LongVector3.Zero, LongVector3.Zero]);
-        insertedObjects.Add(obj);
-        var r = lattice.Insert(obj);
-        var created = r as Created;
-        Assert.IsNotNull(created);
-        Assert.IsTrue(created.Proxy.IsCommitted);
-        var leaf = lattice.ResolveOccupyingLeaf(obj);
-        Assert.IsNotNull(leaf);
-        Assert.IsTrue(leaf.Contains(obj));
-        Console.WriteLine("Insert, Proxy, Commit, and leaf.Contains() for uncommited and commited objects passed.");
-    }
-
-    [TestMethod]
     public void SerialTests_Omnibus()
     {
         var lattice = new SpatialLattice();
@@ -135,6 +117,19 @@ public class SerialTests
             var projected = owning.BoundsTransform.InnerToOuter(obj.LocalPosition);
             Assert.AreEqual(pos, projected);
             Console.WriteLine("Local lattice projection matches original passed.");
+        }
+        // === I9: Deep Insertion ===
+        {
+            var obj = new SpatialObject([LongVector3.Zero, LongVector3.Zero]);
+            insertedObjects.Add(obj);
+            var r = lattice.Insert(obj);
+            var created = r as Created;
+            Assert.IsNotNull(created);
+            Assert.IsTrue(created.Proxy.IsCommitted);
+            var leaf = lattice.ResolveOccupyingLeaf(obj);
+            Assert.IsNotNull(leaf);
+            Assert.IsTrue(leaf.Contains(obj));
+            Console.WriteLine("Object insert deeply into lattice.");
         }
 
         // validate all objects where lattice position stacks depth > 1 inner to outer transform works.

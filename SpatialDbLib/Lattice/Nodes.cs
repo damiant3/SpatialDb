@@ -8,52 +8,25 @@ internal interface ISync
 
 public interface ISpatialNode
 {
-    Region Bounds { get; }
     AdmitResult Admit(SpatialObject obj, LongVector3 proposedPosition, byte latticeDepth);
     void AdmitMigrants(IList<SpatialObject> obj);
     IDisposable LockAndSnapshotForMigration();
-
 }
 
-public interface IParentNode
-    : ISpatialNode
+public interface IParentNode : ISpatialNode
 {
-    void ReplaceChildAt(byte index, IChildNode newChild);
-    SelectChildResult? SelectChild(LongVector3 pos);
 }
 
-public interface IChildNode
-    : ISpatialNode
+public interface IChildNode : ISpatialNode
 {
-    IParentNode Parent { get; }
-}
-
-public interface IVenueParent
-{
-    bool HasAnyOccupants();
-    bool IsAtCapacity();
-    bool Contains(SpatialObject obj);
-    void Vacate(SpatialObject obj);
-    void Occupy(SpatialObject obj);
-    void Replace(SpatialObjectProxy proxy);
-    bool IsRetired { get; }
-    void Retire();
-}
-
-public interface ILeafNode
-    : IChildNode,
-      IVenueParent
-{
-    bool CanSubdivide();
 }
 
 public abstract class SpatialNode(Region bounds)
-    : ISpatialNode,
-      ISync
+    : ISync
 {
     public Region Bounds { get; } = bounds;
 
-    protected ReaderWriterLockSlim Sync  = new(LockRecursionPolicy.SupportsRecursion);
+    protected readonly ReaderWriterLockSlim Sync  = new(LockRecursionPolicy.SupportsRecursion);
     ReaderWriterLockSlim ISync.Sync => Sync;
 
     public abstract AdmitResult Admit(SpatialObject obj, LongVector3 proposedPosition, byte latticeDepth);
@@ -272,8 +245,7 @@ public class OctetBranchNode
 
 public abstract class LeafNode(Region bounds, IParentNode parent)
     : SpatialNode(bounds),
-      IChildNode,
-      ILeafNode
+      IChildNode
 {
     public IParentNode Parent { get; } = parent;
     public abstract bool IsRetired { get; }
@@ -295,9 +267,7 @@ public abstract class VenueLeafNode(Region bounds, IParentNode parent)
     : LeafNode(bounds, parent)
 {
     internal IList<SpatialObject> Occupants { get; } = [];
-    internal 
-        //volatile 
-        bool m_isRetired = false;
+    internal bool m_isRetired = false;
     public override bool IsRetired => m_isRetired;
 
     public override bool Contains(SpatialObject obj)
