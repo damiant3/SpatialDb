@@ -91,7 +91,7 @@ public class SpatialLattice : OctetRootNode
                     return leaf;
                 }
                 default:
-                    throw new InvalidOperationException("Unknown region type during occupation resolution");
+                    throw new InvalidOperationException("Unknown node type during occupation resolution");
             }
         }
         return null;

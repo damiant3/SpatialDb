@@ -106,11 +106,6 @@ public abstract class OctetParentNode
         }
     }
 
-    public void ReplaceChildAt(byte index, IChildNode newChild)
-    {
-        Children[index] = newChild;
-    }
-
     public override void AdmitMigrants(IList<SpatialObject> objs)
     {
         List<KeyValuePair<IChildNode, List<SpatialObject>>> migrantsByTargetChild = [];
