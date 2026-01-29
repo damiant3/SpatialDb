@@ -5,11 +5,17 @@ public abstract class AdmitResult
 {
     private AdmitResult() { }
 
-    public sealed class Created(SpatialObjectProxy proxy, LeafNode node)
+    public sealed class BulkCreated(List<SpatialObjectProxy> proxies, List<SpatialObject>? duplicateObjects = null)
+        : AdmitResult
+    {
+        public List<SpatialObjectProxy> Proxies { get; } = proxies;
+        public List<SpatialObject> DuplicateObjects { get; } = duplicateObjects ?? [];
+    }
+
+    public sealed class Created(SpatialObjectProxy proxy)
         : AdmitResult
     {
         public SpatialObjectProxy Proxy { get; } = proxy;
-        public LeafNode Node { get; } = node;
     }
 
     public sealed class Rejected : AdmitResult { }
@@ -30,12 +36,15 @@ public abstract class AdmitResult
         public LeafNode Venue { get; } = vendue;
     }
 
-    public static AdmitResult Create(SpatialObjectProxy proxy, LeafNode vendue) => new Created(proxy, vendue);
+    public static AdmitResult BulkCreate(List<SpatialObjectProxy> proxies, List<SpatialObject>? duplicateObjects) => new BulkCreated(proxies, duplicateObjects);
+    public static AdmitResult BulkCreate(List<SpatialObjectProxy> proxies) => new BulkCreated(proxies);
+    public static AdmitResult Create(SpatialObjectProxy proxy) => new Created(proxy);
     public static AdmitResult Reject() => new Rejected();
     public static AdmitResult EscalateRequest() => new Escalate();
     public static AdmitResult RetryRequest() => new Retry();
-    public static AdmitResult SubdivideRequest(LeafNode vendue) => new Subdivide(vendue);
-    public static AdmitResult DelegateRequest(LeafNode vendue) => new Delegate(vendue);
+    public static AdmitResult SubdivideRequest(LeafNode leaf) => new Subdivide(leaf);
+    public static AdmitResult DelegateRequest(LeafNode leaf) => new Delegate(leaf);
+
 }
 
 public readonly struct SelectChildResult(byte indexInParent, IChildNode childNode)

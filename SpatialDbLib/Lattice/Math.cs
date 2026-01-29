@@ -16,7 +16,7 @@ public static class LatticeUniverse
 public interface ILatticeCoordinateTransform
 {
     LongVector3 OuterToInnerCanonical(LongVector3 outerPosition);
-    LongVector3 OuterToInnerInsertion(LongVector3 outerPosition, ulong discriminator);
+    LongVector3 OuterToInnerInsertion(LongVector3 outerPosition, Guid guid);
     LongVector3 InnerToOuter(LongVector3 innerPosition);
     bool ContainsOuter(LongVector3 outerPosition);
     bool ContainsInner(LongVector3 innerPosition);
@@ -34,7 +34,7 @@ public class ParentToSubLatticeTransform(Region outerBounds)
     public bool ContainsInner(LongVector3 innerPosition)
         => InnerLatticeBounds.Contains(innerPosition);
 
-    public LongVector3 OuterToInnerInsertion(LongVector3 outer, ulong discriminator)
+    public LongVector3 OuterToInnerInsertion(LongVector3 outer, Guid guid)
     {
 #if DEBUG
         if (!ContainsOuter(outer))
@@ -47,24 +47,96 @@ public class ParentToSubLatticeTransform(Region outerBounds)
             return outer;
 
         return outerSize.X == 1
-            ? OuterToInnerFromSizeOne(discriminator)
-            : OuterToInnerFromLarge(outer, discriminator, innerSize, outerSize);
+            ? OuterToInnerFromSizeOne(guid)
+            : OuterToInnerFromLarge(outer, guid.GetDiscriminator(), innerSize, outerSize);
 
-        static LongVector3 OuterToInnerFromSizeOne(ulong discriminator)
+        static ulong SplitMix64(ref ulong x)
         {
-            int octant = (int)(discriminator & 0b111);
-            long signX = (octant & 0b001) != 0 ? +1 : -1;
-            long signY = (octant & 0b010) != 0 ? +1 : -1;
-            long signZ = (octant & 0b100) != 0 ? +1 : -1;
+            x += 0x9E3779B97F4A7C15UL;
+            ulong z = x;
+            z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
+            z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
+            return z ^ (z >> 31);
+        }
+
+        static LongVector3 OuterToInnerFromSizeOne(Guid g)
+        {
+            // get 128 bits from the guid
+            Span<byte> bytes = stackalloc byte[16];
+            g.TryWriteBytes(bytes);
+
+            ulong s0 = BitConverter.ToUInt64(bytes[..8]);
+            ulong s1 = BitConverter.ToUInt64(bytes[8..]);
+
+            // combine into a 64-bit seed with full avalanche
+            ulong state = s0 ^ (s1 * 0x9E3779B97F4A7C15UL);
 
             long half = LatticeUniverse.HalfExtent;
 
+            long NextCoord()
+            {
+                // 64 random bits
+                ulong r = SplitMix64(ref state);
+
+                // keep 63 bits -> uniform in [0, 2^63)
+                ulong u63 = r >> 1;
+
+                // reinterpret as signed offset in [-2^62, +2^62)
+                return (long)u63 - half;
+            }
+
             return new LongVector3(
-                signX > 0 ? half - 1 : -half,
-                signY > 0 ? half - 1 : -half,
-                signZ > 0 ? half - 1 : -half
+                NextCoord(),
+                NextCoord(),
+                NextCoord()
             );
         }
+
+        //static LongVector3 OuterToInnerFromSizeOne(ulong discriminator)
+        //{
+        //    long half = LatticeUniverse.HalfExtent;
+
+        //    // Split the discriminator into 3 independent streams
+        //    // Using 21 bits per axis (63 bits total)
+        //    const int bitsPerAxis = 21;
+        //    const ulong mask = (1UL << bitsPerAxis) - 1;
+
+        //    ulong xBits = (discriminator >> 0) & mask;
+        //    ulong yBits = (discriminator >> bitsPerAxis) & mask;
+        //    ulong zBits = (discriminator >> (bitsPerAxis * 2)) & mask;
+
+        //    // Map [0, 2^bits) -> [-half, half)
+        //    long Map(ulong v)
+        //    {
+        //        // scale without floating point
+        //        // result in [0, 2*half)
+        //        ulong range = (ulong)(half * 2);
+        //        ulong scaled = (v * range) >> bitsPerAxis;
+        //        return (long)scaled - half;
+        //    }
+
+        //    return new LongVector3(
+        //        Map(xBits),
+        //        Map(yBits),
+        //        Map(zBits)
+        //    );
+        //}
+
+        //static LongVector3 OuterToInnerFromSizeOneFast(ulong discriminator)
+        //{
+        //    int octant = (int)(discriminator & 0b111);
+        //    long signX = (octant & 0b001) != 0 ? +1 : -1;
+        //    long signY = (octant & 0b010) != 0 ? +1 : -1;
+        //    long signZ = (octant & 0b100) != 0 ? +1 : -1;
+
+        //    long half = LatticeUniverse.HalfExtent;
+
+        //    return new LongVector3(
+        //        signX > 0 ? half - 1 : -half,
+        //        signY > 0 ? half - 1 : -half,
+        //        signZ > 0 ? half - 1 : -half
+        //    );
+        //}
 
         LongVector3 OuterToInnerFromLarge(LongVector3 outer, ulong discriminator, ULongVector3 innerSize, ULongVector3 outerSize)
         {
@@ -264,4 +336,14 @@ public readonly struct Region
         && position.Z >= Min.Z && position.Z < Max.Z;
 
     public override string ToString() => $"Min={Min}, Max={Max}";
+}
+
+public static class GuidExtensions
+{
+    public static ulong GetDiscriminator(this Guid guid)
+    {
+        Span<byte> bytes = stackalloc byte[16];
+        guid.TryWriteBytes(bytes);
+        return BitConverter.ToUInt64(bytes);
+    }
 }

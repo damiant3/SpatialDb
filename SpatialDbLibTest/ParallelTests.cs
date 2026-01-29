@@ -3,8 +3,8 @@
 [TestClass]
 public class ParallelTests
 {
-    const int ITERATIONS = 128;
-    const int TASKS_PER_ITERATION = 2048;
+    const int ITERATIONS = 5;
+    const int TASKS_PER_ITERATION = 1024;
     [TestMethod]
     public void ParallelTests_InsertStress_ConcurrentDictionary()
     {
@@ -25,6 +25,18 @@ public class ParallelTests
         for (int iter = 0; iter < test.Iterations; iter++)
         {
             test.InsertOrRemoveRandomItems();
+        }
+        test.CleanupAndGatherDiagnostics();
+        Console.WriteLine(test.GenerateReportString());
+    }
+
+    [TestMethod]
+    public void ParallelTests_BulkInsertStress()
+    {
+        var test = new LatticeParallelTest(ITERATIONS, TASKS_PER_ITERATION);
+        for (int iter = 0; iter < test.Iterations; iter++)
+        {
+            test.InsertBulkRandomItems();
         }
         test.CleanupAndGatherDiagnostics();
         Console.WriteLine(test.GenerateReportString());

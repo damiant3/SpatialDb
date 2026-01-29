@@ -71,14 +71,7 @@ public class SpatialObject(IList<LongVector3> initialPosition)
             return m_positionStack[^1];
         }
     }
-
-    public ulong GetDiscriminator()
-    {
-        Span<byte> bytes = stackalloc byte[16];
-        Guid.TryWriteBytes(bytes);
-        return BitConverter.ToUInt64(bytes);
-    }
-}
+ }
 
 public class SpatialObjectProxy : SpatialObject
 {
@@ -115,6 +108,7 @@ public class SpatialObjectProxy : SpatialObject
         {
             var leaf = TargetLeaf;
             var parent = leaf.Parent;
+
 
             using var s = new MultiObjectScope<object>
             (

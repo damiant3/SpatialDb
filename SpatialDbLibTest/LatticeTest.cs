@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace SpatialDbLibTest
 {
@@ -9,13 +10,31 @@ namespace SpatialDbLibTest
         : SpatialLattice,
           ITestCatalog
     {
+
+        public void TestBulkInsert(IEnumerable<SpatialObject> objs)
+        {
+            AdmitResult ret;
+            try
+            {
+                ret = Insert(objs);
+                if (ret is not AdmitResult.BulkCreated)
+                {
+                    Debugger.Break();
+                }
+            }
+            catch (Exception ex)
+            {
+                Exceptions[Guid.NewGuid()] = ex;
+                Debugger.Break();
+                throw;
+            }
+        }
         public void TestInsert(SpatialObject obj)
         {
             AdmitResult ret;
             try
             {
-                ret = base.Insert(obj);
-                Assert.IsNotNull(ret);
+                ret = Insert(obj);
                 if (ret is not AdmitResult.Created)
                 {
                     Debugger.Break();
@@ -33,7 +52,7 @@ namespace SpatialDbLibTest
         {
             try
             {
-                base.Remove(obj);
+                Remove(obj);
             }
             catch (Exception ex)
             {
@@ -43,7 +62,7 @@ namespace SpatialDbLibTest
             }
         }
 
-        ConcurrentDictionary<Guid, Exception> Exceptions = [];
+        readonly ConcurrentDictionary<Guid, Exception> Exceptions = [];
         public string GenerateExceptionReport()
         {
             if (Exceptions.IsEmpty)
@@ -62,6 +81,26 @@ namespace SpatialDbLibTest
         : ConcurrentDictionary<Guid, SpatialObject>,
           ITestCatalog
     {
+        public void TestBulkInsert(IEnumerable<SpatialObject> objs)
+        {
+            SpatialObject? obj = null;
+            try
+            {
+                for(var i = 0; i < objs.Count(); i++)
+                {
+                    obj = objs.ElementAt(i);
+                    this[obj.Guid] = obj;
+                }
+            }
+            catch (Exception ex)
+            {
+                if(obj != null)
+                    Exceptions[obj.Guid] = ex;
+                Debugger.Break();
+                throw;
+            }
+        }
+
         public void TestInsert(SpatialObject obj)
         {
             try
@@ -74,7 +113,8 @@ namespace SpatialDbLibTest
                 Debugger.Break();
                 throw;
             }
-}
+        }
+
         public void TestRemove(SpatialObject obj)
         {
             try
@@ -134,7 +174,45 @@ namespace SpatialDbLibTest
                 else
                     RemoveRandomItems();
             }
+        }
 
+        public void InsertBulkRandomItems()
+        {
+            var tasks = new List<Task>();
+            var numToAdd = 1000;
+            
+            var swInsert = Stopwatch.StartNew();
+            for (int j = 0; j < TaskCount; j++)
+            {
+                tasks.Add(Task.Run(() =>
+                {
+                    var objsToInsert = new List<SpatialObject>();
+                    for (int j = 0; j < numToAdd; j++)
+                    {
+                        var pos = new LongVector3(
+                            FastRandom.NextInt(-SpaceRange, SpaceRange),
+                            FastRandom.NextInt(-SpaceRange, SpaceRange),
+                            FastRandom.NextInt(-SpaceRange, SpaceRange)
+                        );
+                        var obj = new SpatialObject([pos]);
+                        objsToInsert.Add(obj);
+                    }
+                    try
+                    {
+                        Container!.TestBulkInsert(objsToInsert);
+                        Interlocked.Add(ref Inserts, numToAdd);
+                    }
+                    catch
+                    {
+                        Interlocked.Add(ref FailedInserts, numToAdd);
+                    }
+                }));
+            }
+
+            Task.WaitAll([.. tasks]);
+
+            swInsert.Stop();
+            TotalInsertTicks += swInsert.ElapsedTicks;
         }
 
         public void InsertRandomItems()
@@ -149,9 +227,9 @@ namespace SpatialDbLibTest
                     try
                     {
                         var pos = new LongVector3(
-                            Random.Next(-SpaceRange, SpaceRange),
-                            Random.Next(-SpaceRange, SpaceRange),
-                            Random.Next(-SpaceRange, SpaceRange)
+                            FastRandom.NextInt(-SpaceRange, SpaceRange),
+                            FastRandom.NextInt(-SpaceRange, SpaceRange),
+                            FastRandom.NextInt(-SpaceRange, SpaceRange)
                         );
 
                         var obj = new SpatialObject([pos]);
@@ -176,7 +254,7 @@ namespace SpatialDbLibTest
         {
             if(InsertedObjects!.Count < 8) return;
 
-            int removeCount = Random.Next(1, (int)Math.Log2( InsertedObjects!.Count));
+            int removeCount = Random.Next(1, (int)Math.Log2(InsertedObjects!.Count));
             var tasks = new List<Task>();
             var swRemove = Stopwatch.StartNew();
             for (int r = 0; r < removeCount; r++)
@@ -198,7 +276,7 @@ namespace SpatialDbLibTest
                     }
                 }));
             }
-            Task.WaitAll(tasks.ToArray());
+            Task.WaitAll([.. tasks]);
 
             swRemove.Stop();
             TotalRemoveTicks = swRemove.ElapsedTicks;

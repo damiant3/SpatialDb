@@ -131,8 +131,30 @@ public class SerialTests
             Assert.IsTrue(leaf.Contains(obj));
             Console.WriteLine("Object insert deeply into lattice.");
         }
+        {
+            // test bulk insert
+            List<SpatialObject> tmp = [];
+            for (int i = 0; i < 1000; i++)
+            {
+                var objtmp = new SpatialObject([new (44456543789), new(-122224456789),new(5678900000987)]);
+                tmp.Add(objtmp);
+            }
 
-        // validate all objects where lattice position stacks depth > 1 inner to outer transform works.
+            var r = lattice.Insert(tmp);
+
+            Assert.IsTrue(r is BulkCreated);
+            foreach (var obj in tmp)
+            {
+                insertedObjects.Add(obj);
+                var leaf = lattice.ResolveOccupyingLeaf(obj);
+                Assert.IsNotNull(leaf);
+                Assert.IsTrue(leaf.Contains(obj));
+            }
+            
+            Console.WriteLine("Bulk insert deeply into lattice.");
+        }
+
+        // Final validate all objects where lattice position stacks depth > 1 inner to outer transform works.
         {
             bool atLeastOne = false;
             foreach (var obj in insertedObjects)
@@ -145,7 +167,7 @@ public class SerialTests
                     var objLattice = LatticeTestHelpers.GetOwningLattice(objLeaf);
                     Assert.IsNotNull(objLattice);
                     var projected = objLattice.BoundsTransform.InnerToOuter(obj.LocalPosition);
-                    Assert.AreEqual(obj.GetPositionStack()[obj.PositionStackDepth-2], projected, $"Object {obj} failed inner to outer transform validation.");
+                    Assert.AreEqual(obj.GetPositionStack()[obj.PositionStackDepth - 2], projected, $"Object {obj} failed inner to outer transform validation.");
                 }
             }
 

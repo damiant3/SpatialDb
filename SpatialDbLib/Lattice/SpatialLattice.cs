@@ -1,4 +1,6 @@
 ﻿///////////////////////////////
+using System.Diagnostics;
+
 namespace SpatialDbLib.Lattice;
 
 public class SpatialLattice : OctetRootNode
@@ -19,10 +21,44 @@ public class SpatialLattice : OctetRootNode
     public readonly ParentToSubLatticeTransform BoundsTransform;
     public readonly byte LatticeDepth;
 
+    public static MultiObjectScope<(SpatialObject, IList<LongVector3>)> LockAndSnapshot(IEnumerable<SpatialObject> objects)
+    {
+        var lockedObjects = new List<(SpatialObject, IList<LongVector3>)>();
+        var acquiredLocks = new List<SlimSyncer>();
+
+        foreach (var obj in objects)
+        {
+            if (((ISync)obj).Sync.IsWriteLockHeld) continue;
+            var s = new SlimSyncer(((ISync)obj).Sync, SlimSyncer.LockMode.Write);
+            acquiredLocks.Add(s);
+            lockedObjects.Add(new (obj, obj.GetPositionStack()));
+        }
+
+        return new MultiObjectScope<(SpatialObject, IList<LongVector3>)>(lockedObjects, acquiredLocks);
+    }
+
+    public AdmitResult Insert(IEnumerable<SpatialObject> objs)
+    {
+        using var s = LockAndSnapshot(objs);
+        var admitResult = Admit([.. objs], LatticeDepth);
+        if (admitResult is AdmitResult.BulkCreated created)
+        {
+            foreach (var proxy in created.Proxies)
+            {
+                if (proxy.IsCommitted)
+                {
+                    throw new InvalidOperationException("Proxy is already committed during bulk insert commit.");
+                }
+                proxy.Commit();
+            }
+        }
+        return admitResult;
+    }
+
     public AdmitResult Insert(SpatialObject obj)
     {
         using var s = new SlimSyncer(((ISync)obj).Sync, SlimSyncer.LockMode.Write);
-        var admitResult = Admit(obj, obj.LocalPosition, 0);
+        var admitResult = Admit(obj, obj.LocalPosition, LatticeDepth);
         if (admitResult is AdmitResult.Created created)
             created.Proxy.Commit();
         return admitResult;
@@ -100,9 +136,18 @@ public class SpatialLattice : OctetRootNode
     public override void AdmitMigrants(IList<SpatialObject> objs)
     {
         List<KeyValuePair<ISpatialNode, List<SpatialObject>>> migrantsByTargetChild = [];
+
+#if DEBUG
+        if (objs.Any(a => a.PositionStackDepth > LatticeDepth + 1))
+        {
+            Debugger.Break();
+            throw new InvalidOperationException($"Occupant has depth > lattice");
+        }
+#endif
+
         foreach (var obj in objs)
         {
-            var innerPosition = BoundsTransform.OuterToInnerInsertion(obj.LocalPosition, obj.GetDiscriminator());
+            var innerPosition = BoundsTransform.OuterToInnerInsertion(obj.LocalPosition, obj.Guid);
             obj.AppendPosition(innerPosition);
             if (!Bounds.Contains(obj.LocalPosition)) throw new InvalidOperationException("Migrant has no home.");
             if (SelectChild(obj.LocalPosition) is not SelectChildResult selectChildResult) throw new InvalidOperationException("Containment invariant violated");
