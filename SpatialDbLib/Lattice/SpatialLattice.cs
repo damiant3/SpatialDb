@@ -29,9 +29,9 @@ public class SpatialLattice : OctetRootNode
 
         foreach (var obj in objects)
         {
-            var s = new SlimSyncer(((ISync)obj).Sync, SlimSyncer.LockMode.Write, "SpatialLattice.LockAndSnapshot: Object");
+            var s = new SlimSyncer(((ISync)obj).Sync, SlimSyncer.LockMode.Write, $"SpatialLattice.LockAndSnapshot: Object({obj.Guid})");
             acquiredLocks.Add(s);
-            lockedObjects.Add(new (obj, obj.GetPositionStack()));
+            //lockedObjects.Add(new (obj, obj.GetPositionStack()));
         }
 
         return new MultiObjectScope<(SpatialObject, IList<LongVector3>)>(lockedObjects, acquiredLocks);

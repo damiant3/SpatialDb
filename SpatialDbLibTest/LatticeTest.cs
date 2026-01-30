@@ -181,7 +181,7 @@ namespace SpatialDbLibTest
         {
             var tasks = new List<Task>();
 
-            SlimSyncerDiagnostics.Enabled = false;
+            SlimSyncerDiagnostics.Enabled = true;
             var objsToInsert = new Dictionary<int, List<SpatialObject>>();
             for (int i = 0; i < TaskCount; i++)
             {
@@ -249,7 +249,7 @@ namespace SpatialDbLibTest
         public void InsertRandomItems()
         {
             var tasks = new List<Task>();
-
+            SlimSyncerDiagnostics.Enabled = true;
             var swInsert = Stopwatch.StartNew();
             for (int j = 0; j < TaskCount; j++)
             {
