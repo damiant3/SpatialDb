@@ -1,4 +1,5 @@
 ﻿///////////////////////////////
+using SpatialDbLib.Synchronize;
 using System.Diagnostics;
 
 namespace SpatialDbLib.Lattice;
@@ -28,8 +29,7 @@ public class SpatialLattice : OctetRootNode
 
         foreach (var obj in objects)
         {
-            if (((ISync)obj).Sync.IsWriteLockHeld) continue;
-            var s = new SlimSyncer(((ISync)obj).Sync, SlimSyncer.LockMode.Write);
+            var s = new SlimSyncer(((ISync)obj).Sync, SlimSyncer.LockMode.Write, "SpatialLattice.LockAndSnapshot: Object");
             acquiredLocks.Add(s);
             lockedObjects.Add(new (obj, obj.GetPositionStack()));
         }
@@ -57,7 +57,7 @@ public class SpatialLattice : OctetRootNode
 
     public AdmitResult Insert(SpatialObject obj)
     {
-        using var s = new SlimSyncer(((ISync)obj).Sync, SlimSyncer.LockMode.Write);
+        using var s = new SlimSyncer(((ISync)obj).Sync, SlimSyncer.LockMode.Write, "SpatialLattice.Insert: Object");
         var admitResult = Admit(obj, obj.LocalPosition, LatticeDepth);
         if (admitResult is AdmitResult.Created created)
             created.Proxy.Commit();
@@ -66,14 +66,14 @@ public class SpatialLattice : OctetRootNode
 
     public void Remove(SpatialObject obj)
     {
-        using var s = new SlimSyncer(((ISync)obj).Sync, SlimSyncer.LockMode.Write);
+        using var s = new SlimSyncer(((ISync)obj).Sync, SlimSyncer.LockMode.Write, "SpatialLattice.Remove: Object");
         while (true)
         {
             var leaf = ResolveOccupyingLeaf(obj);
             if (leaf == null) return;
             var parent = leaf.Parent;
-            using var s2 = new SlimSyncer(((ISync)parent).Sync, SlimSyncer.LockMode.Write);
-            using var s3 = new SlimSyncer(((ISync)leaf).Sync, SlimSyncer.LockMode.Write);
+            using var s2 = new SlimSyncer(((ISync)parent).Sync, SlimSyncer.LockMode.Write, "SpatialLattice.Remove: Parent");
+            using var s3 = new SlimSyncer(((ISync)leaf).Sync, SlimSyncer.LockMode.Write, "SpatialLattice.Remove: Leaf");
             if (leaf.Parent != parent || !leaf.Contains(obj))
                 continue;
             leaf.Vacate(obj);
@@ -123,7 +123,7 @@ public class SpatialLattice : OctetRootNode
                 }
                 case VenueLeafNode leaf:
                 {
-                    using var s3 = new SlimSyncer(((ISync)leaf).Sync, SlimSyncer.LockMode.Read);
+                    using var s3 = new SlimSyncer(((ISync)leaf).Sync, SlimSyncer.LockMode.Read, "SpatialLattice.ResolveLeaf: Leaf");
                     return leaf;
                 }
                 default:

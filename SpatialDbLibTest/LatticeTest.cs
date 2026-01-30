@@ -1,9 +1,9 @@
-﻿using SpatialDbLib.Lattice;
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
-using System.Threading.Tasks;
-
+using SpatialDbLib.Lattice;
+using SpatialDbLib.Synchronize;
+//////////////////////////
 namespace SpatialDbLibTest
 {
     public class TestSpatialLattice
@@ -146,19 +146,20 @@ namespace SpatialDbLibTest
         public void Cleanup() => Clear();
     }
 
-    public class LatticeParallelTest(int iterations = 1, int taskCount = 1)
-        : ParallelContainerTestDiagnostic<TestSpatialLattice>(iterations, taskCount) { };
+    public class LatticeParallelTest(int iterations = 1, int taskCount = 1, int batchSize = 1)
+        : ParallelContainerTestDiagnostic<TestSpatialLattice>(iterations, taskCount, batchSize) { };
 
-    public class ConcurrentDictionaryParallelTest(int iterations = 1, int taskCount = 1)
-    : ParallelContainerTestDiagnostic<TestConcurrentDictionary>(iterations, taskCount) { };
+    public class ConcurrentDictionaryParallelTest(int iterations = 1, int taskCount = 1, int batchSize = 1)
+    : ParallelContainerTestDiagnostic<TestConcurrentDictionary>(iterations, taskCount, batchSize) { };
 
-    public class ParallelContainerTestDiagnostic<T>(int iterations, int taskCount = 1)
+    public class ParallelContainerTestDiagnostic<T>(int iterations, int taskCount = 1, int batchSize = 1)
         : ContainerTestDiagnostics<T>(iterations)
         where T :  class,
                    ITestCatalog,
                    new ()
     {
         public int TaskCount = taskCount;
+        public int BatchSize = batchSize;
 
         int insertHeadStart = 5;
         public void InsertOrRemoveRandomItems()
@@ -179,38 +180,68 @@ namespace SpatialDbLibTest
         public void InsertBulkRandomItems()
         {
             var tasks = new List<Task>();
-            var numToAdd = 1000;
-            
+
+            SlimSyncerDiagnostics.Enabled = false;
+            var objsToInsert = new Dictionary<int, List<SpatialObject>>();
+            for (int i = 0; i < TaskCount; i++)
+            {
+                objsToInsert.Add(i, []);
+                for (int j = 0; j < BatchSize; j++)
+                {
+                    objsToInsert[i].Add(new SpatialObject([new LongVector3(
+                        FastRandom.NextInt(-SpaceRange, SpaceRange),
+                        FastRandom.NextInt(-SpaceRange, SpaceRange),
+                        FastRandom.NextInt(-SpaceRange, SpaceRange)
+                    )]));
+                }
+            }
+            Task monitor;  // we need to find a way to stop this task cleanly from the outside.
+            var cts = new CancellationTokenSource();
+
+
+            if (SlimSyncerDiagnostics.Enabled)
+                monitor = Task.Run(() =>
+                {
+                    var sw = Stopwatch.StartNew();
+
+                    while (sw.ElapsedMilliseconds < 2000)
+                        Thread.Sleep(2000);
+
+                    while (true)
+                    {
+                        var snapshot = tasks.ToArray();
+                        if (snapshot.Length == TaskCount && snapshot.All(t => t.IsCompleted))
+                            break;
+
+                        Debug.WriteLine(LockTracker.DumpHeldLocks());
+                        Thread.Sleep(1000);
+                        if(cts.Token.IsCancellationRequested)
+                            break;
+                    }
+                }, cts.Token);
+
             var swInsert = Stopwatch.StartNew();
             for (int j = 0; j < TaskCount; j++)
             {
+                var k = j; // Capture loop variable, i think necessary, but not sure.
                 tasks.Add(Task.Run(() =>
                 {
-                    var objsToInsert = new List<SpatialObject>();
-                    for (int j = 0; j < numToAdd; j++)
-                    {
-                        var pos = new LongVector3(
-                            FastRandom.NextInt(-SpaceRange, SpaceRange),
-                            FastRandom.NextInt(-SpaceRange, SpaceRange),
-                            FastRandom.NextInt(-SpaceRange, SpaceRange)
-                        );
-                        var obj = new SpatialObject([pos]);
-                        objsToInsert.Add(obj);
-                    }
                     try
                     {
-                        Container!.TestBulkInsert(objsToInsert);
-                        Interlocked.Add(ref Inserts, numToAdd);
+                        Container!.TestBulkInsert(objsToInsert[k]);
+                        Interlocked.Add(ref Inserts, BatchSize);
                     }
                     catch
                     {
-                        Interlocked.Add(ref FailedInserts, numToAdd);
+                        Interlocked.Add(ref FailedInserts, BatchSize);
                     }
                 }));
             }
 
             Task.WaitAll([.. tasks]);
-
+            // stop the monitor
+            cts.Cancel();
+            SlimSyncerDiagnostics.FlushAll();
             swInsert.Stop();
             TotalInsertTicks += swInsert.ElapsedTicks;
         }
