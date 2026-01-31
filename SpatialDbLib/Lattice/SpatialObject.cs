@@ -58,7 +58,6 @@ public class SpatialObject(IList<LongVector3> initialPosition)
     public LongVector3 GetPositionAtDepth(int depth)
     {
         using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Read, "SpatialObject.GetPositionAtDepth");
-
         if ((uint)depth >= (uint)m_positionStack.Count)
             throw new ArgumentOutOfRangeException(nameof(depth));
 
@@ -98,6 +97,10 @@ public class SpatialObjectProxy : SpatialObject
         m_proxyState = ProxyState.Uncommitted;
         OriginalObject = originalObj;
         TargetLeaf = targetleaf;
+#if DEBUG
+        if (TargetLeaf.IsRetired)
+            throw new InvalidOperationException("Target leaf is retired.");
+#endif
         SetLocalPosition(proposedPosition);
     }
 
@@ -109,34 +112,12 @@ public class SpatialObjectProxy : SpatialObject
         while (true)
         {
             var leaf = TargetLeaf;
-            var parent = leaf.Parent;
 
-
-            using var s = new MultiObjectScope<object>
-            (
-                [parent, leaf, OriginalObject, this],
-                [
-
-                    new(((ISync)parent).Sync, SlimSyncer.LockMode.Write, "SpatialObjectProxy.Commit: Parent"),
-                    new(((ISync)leaf).Sync, SlimSyncer.LockMode.Write, "SpatialObjectProxy.Commit: Leaf"),
-                    new(((ISync)OriginalObject).Sync, SlimSyncer.LockMode.Write, "SpatialObjectProxy.Commit: OriginalObject"),
-                    new(Sync, SlimSyncer.LockMode.Write, "SpatialObjectProxy.Commit: Proxy"),
-                ]
-            );
+            using var s = new SlimSyncer(((ISync)leaf).Sync, SlimSyncer.LockMode.Write, "SpatialObjectProxy.Commit: Leaf");
 
             if (leaf.IsRetired)
-            {
-                if (!ReferenceEquals(TargetLeaf, leaf))
-                    continue;
-                throw new InvalidOperationException("Target leaf is retired.");
-            }
+                continue;
 
-            if (!leaf.Contains(this))
-            {
-                if (!ReferenceEquals(leaf, TargetLeaf))
-                    continue;
-                throw new InvalidOperationException("Target leaf does not contain this proxy.");
-            }
             OriginalObject.SetPositionStack(GetPositionStack());
             leaf.Replace(this);
             SetPositionStack([]);

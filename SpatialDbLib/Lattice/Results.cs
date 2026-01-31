@@ -5,11 +5,10 @@ public abstract class AdmitResult
 {
     private AdmitResult() { }
 
-    public sealed class BulkCreated(List<SpatialObjectProxy> proxies, List<SpatialObject>? duplicateObjects = null)
+    public sealed class BulkCreated(List<SpatialObjectProxy> proxies)
         : AdmitResult
     {
         public List<SpatialObjectProxy> Proxies { get; } = proxies;
-        public List<SpatialObject> DuplicateObjects { get; } = duplicateObjects ?? [];
     }
 
     public sealed class Created(SpatialObjectProxy proxy)
@@ -24,19 +23,18 @@ public abstract class AdmitResult
 
     public sealed class Retry : AdmitResult { }
 
-    public sealed class Subdivide(LeafNode vendue)
+    public sealed class Subdivide(LeafNode leaf)
         : AdmitResult
     {
-        public LeafNode Venue { get; } = vendue;
+        public LeafNode Leaf { get; } = leaf;
     }
 
-    public sealed class Delegate(LeafNode vendue)
+    public sealed class Delegate(LeafNode leaf)
         : AdmitResult
     {
-        public LeafNode Venue { get; } = vendue;
+        public LeafNode Leaf { get; } = leaf;
     }
 
-    public static AdmitResult BulkCreate(List<SpatialObjectProxy> proxies, List<SpatialObject>? duplicateObjects) => new BulkCreated(proxies, duplicateObjects);
     public static AdmitResult BulkCreate(List<SpatialObjectProxy> proxies) => new BulkCreated(proxies);
     public static AdmitResult Create(SpatialObjectProxy proxy) => new Created(proxy);
     public static AdmitResult Reject() => new Rejected();

@@ -271,7 +271,6 @@ public abstract class OctetParentNode
         public OctetBucketList Buckets = OctetBucketList.Bucketize(parent, objs, latticeDepth);
         public int NextBucketIndex = 0;
         public readonly List<SpatialObjectProxy> Proxies = [];
-        public readonly List<SpatialObject> DuplicateObjects = [];
         public void Rebucket()
         {
             var remaining = new List<SpatialObject>();
@@ -339,12 +338,11 @@ public abstract class OctetParentNode
                     {
                         var parentFrame = stack.Peek();
                         parentFrame.Proxies.AddRange(frame.Proxies);
-                        parentFrame.DuplicateObjects.AddRange(frame.DuplicateObjects);
                         continue;
                     }
                     else
                     {
-                        topResult = new AdmitResult.BulkCreated(frame.Proxies, frame.DuplicateObjects);
+                        topResult = new AdmitResult.BulkCreated(frame.Proxies);
                         break;
                     }
                 }
@@ -379,7 +377,6 @@ public abstract class OctetParentNode
                 {
                     case AdmitResult.BulkCreated bulk:
                         frame.Proxies.AddRange(bulk.Proxies);
-                        frame.DuplicateObjects.AddRange(bulk.DuplicateObjects);
                         frame.NextBucketIndex++;
                         break;
 
@@ -397,7 +394,6 @@ public abstract class OctetParentNode
                             SubdivideAndMigrate(frame.Parent, venueLeaf, frame.LatticeDepth, bucket.Frame.ChildIndex, result is AdmitResult.Subdivide);
 
                         frame.Rebucket();
-                        Volatile.Write(ref venueLeaf.m_subdivisionOwnerThreadId, 0);  // to reduce racing to subdivide between competing threads, we declare winners early instead through this.
                         break;
                     }
                     default:
@@ -417,103 +413,6 @@ public abstract class OctetParentNode
             throw;
         }
     }
-//    public override AdmitResult Admit(IReadOnlyList<SpatialObject> objs, byte latticeDepth)
-//    {
-//        var stack = new Stack<AdmitWorkFrame>();
-//        stack.Push(new AdmitWorkFrame(this, objs, latticeDepth));
-
-//        AdmitResult.BulkCreated? topResult = null;
-
-//        try
-//        {
-//            while (stack.Count > 0)
-//            {
-//                var frame = stack.Peek();
-//                if (frame.NextBucketIndex == 8)
-//                {
-//                    stack.Pop();
-
-//                    if (stack.Count > 0)
-//                    {
-//                        var parentFrame = stack.Peek();
-//                        parentFrame.Proxies.AddRange(frame.Proxies);
-//                        continue;
-//                    }
-//                    else
-//                    {
-//                        topResult = new AdmitResult.BulkCreated(frame.Proxies);
-//                        break;
-//                    }
-//                }
-
-//                var bucket = frame.Buckets[frame.NextBucketIndex];
-//                if (bucket.Objects.Count == 0)
-//                {
-//                    frame.NextBucketIndex++;
-//                    continue;
-//                }
-
-//                var child = bucket.Frame.ChildNode!;
-//                if (child is OctetParentNode parent)
-//                {
-//                    stack.Push(new AdmitWorkFrame(parent, bucket.Objects, frame.LatticeDepth));
-//                    frame.NextBucketIndex++;
-//                    continue;
-//                }
-
-//                var leaf = (SpatialNode)child;
-//                var result = leaf.Admit(bucket.Objects, frame.LatticeDepth);
-
-//                switch (result)
-//                {
-//                    case AdmitResult.BulkCreated bulk:
-//                        frame.Proxies.AddRange(bulk.Proxies);
-//                        frame.NextBucketIndex++;
-//                        break;
-//                    case AdmitResult.Retry:
-//                        frame.Rebucket();
-//                        break;
-//                    case AdmitResult.Subdivide:
-//                    case AdmitResult.Delegate:
-//                    {
-//                        if (leaf is not VenueLeafNode venueLeaf)
-//                            throw new InvalidOperationException("Subdivision requested by non-venueleaf");
-
-//                        using var s = new SlimSyncer(((ISync)frame.Parent).Sync, SlimSyncer.LockMode.Write);
-//                        using var s1 = new SlimSyncer(((ISync)leaf).Sync, SlimSyncer.LockMode.Write);
-
-//                        if (!venueLeaf.IsRetired)
-//                        {
-//#if DEBUG
-//                            if (venueLeaf.Occupants.Any(a => a.PositionStackDepth > latticeDepth + 1))
-//                            {
-//                                Debugger.Break();
-//                                throw new InvalidOperationException($"Occupant has depth > lattice");
-//                            }
-//#endif
-//                            var subd = SubdivideAndMigrate(frame.Parent, venueLeaf, frame.LatticeDepth, result is AdmitResult.Subdivide);
-//                            using var subdlock = subd.Item1;
-//                            frame.Parent.Children[bucket.Frame.ChildIndex] = subd.Item2;
-//                        }
-
-//                        frame.Rebucket();
-//                        break;
-//                    }
-//                    default:
-//                        throw new InvalidOperationException("Unknown AdmitResult");
-//                }
-//            }
-
-//            return topResult!;
-//        }
-//        catch
-//        {
-//            foreach (var frame in stack)
-//                foreach (var proxy in frame.Proxies)
-//                    proxy.Rollback();
-//            throw;
-//        }
-//    }
 }
     public class OctetRootNode(Region localBounds)
     : OctetParentNode(localBounds)
@@ -580,33 +479,20 @@ public abstract class VenueLeafNode(Region bounds, IParentNode parent)
 
     public override void Occupy(SpatialObject obj)
     {
-
-#if DEBUG
-        if (!Sync.IsWriteLockHeld)
-            throw new InvalidOperationException("Occupy called without leaf write lock");
-#endif
+        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "Venue.Occupy: Leaf");
         Occupants.Add(obj);
     }
 
     public override void Retire()
     {
-#if DEBUG
-        if (!((ISync)Parent).Sync.IsWriteLockHeld)
-            throw new InvalidOperationException("Leaf retired without parent write lock");
-#endif
         using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "Retire");
-        m_isRetired = true;
         Occupants.Clear();
+        m_isRetired = true;
     }
 
     public override void Replace(SpatialObjectProxy proxy)
     {
-#if DEBUG
-        if (!((ISync)Parent).Sync.IsWriteLockHeld) throw new InvalidOperationException("Replace called without parent write lock");
-        if (!Sync.IsWriteLockHeld) throw new InvalidOperationException("Replace called without leaf write lock");
-        if (!((ISync)proxy).Sync.IsWriteLockHeld) throw new InvalidOperationException("Replace called without proxy write lock");
-        if (!((ISync)proxy.OriginalObject).Sync.IsWriteLockHeld) throw new InvalidOperationException("Replace called without proxy write lock");
-#endif
+        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "Venue.Occupy: Leaf");
         int index = Occupants.IndexOf(proxy);
         if (index == -1)
             throw new InvalidOperationException($"Proxy not found during Replace. Occupant Count: {Occupants.Count}");
@@ -687,87 +573,36 @@ public abstract class VenueLeafNode(Region bounds, IParentNode parent)
         }
         catch
         {
-            foreach (var l in locksAcquired.Reverse<SlimSyncer>())
+            foreach (var l in locksAcquired)
                 try { l.Dispose(); } catch { }
             throw;
         }
     }
 
-    internal int m_subdivisionOwnerThreadId; // 0 = none
     public override AdmitResult Admit(IReadOnlyList<SpatialObject> objs, byte latticeDepth)
     {
         using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "Venue.AdmitList: Leaf");
+        if (IsRetired)
+            return AdmitResult.RetryRequest();
 
-        // Quick capacity check or over-depth check
         if (IsAtCapacity(objs.Count) || objs.Any(obj => obj.PositionStackDepth > latticeDepth + 1))
         {
-            int me = Environment.CurrentManagedThreadId;
-
-            if (Interlocked.CompareExchange(ref m_subdivisionOwnerThreadId, me, 0) != 0)
-            {
-                // someone else is already subdividing this leaf
-                // back off and retry from parent
-                Thread.Yield(); // or SpinWait
-                return AdmitResult.RetryRequest();
-            }
-
             return CanSubdivide()
                 ? AdmitResult.SubdivideRequest(this)
                 : AdmitResult.DelegateRequest(this);
         }
 
-        if (IsRetired)
-            return AdmitResult.RetryRequest();
-
         var outProxies = new List<SpatialObjectProxy>();
-        var duplicates = new List<SpatialObject>();
 
         foreach (var obj in objs)
         {
-            if (Contains(obj))
-            {
-                // Already in this leaf — skip and optionally track
-                duplicates.Add(obj);
-                continue;
-            }
-
-            // Create proxy and occupy leaf
             var proxy = new SpatialObjectProxy(obj, this, obj.LocalPosition);
             Occupy(proxy);
             outProxies.Add(proxy);
         }
 
-        if (duplicates.Count > 0)
-            return new AdmitResult.BulkCreated(outProxies, duplicates);
-
         return AdmitResult.BulkCreate(outProxies);
     }
-
-
-    //public override AdmitResult Admit(IReadOnlyList<SpatialObject> objs, byte latticeDepth)
-    //{
-    //    using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write);
-    //    if (IsAtCapacity(objs.Count) || objs.Any(obj => obj.PositionStackDepth > latticeDepth + 1))
-    //    {
-    //        return CanSubdivide()
-    //            ? AdmitResult.SubdivideRequest(this)
-    //            : AdmitResult.DelegateRequest(this);
-    //    }
-
-    //    if (IsRetired)
-    //        return AdmitResult.RetryRequest();
-
-    //    var outList = new List<SpatialObjectProxy>();
-
-    //    foreach (var obj in objs)
-    //    {
-    //        var proxy = new SpatialObjectProxy(obj, this, obj.LocalPosition);
-    //        Occupy(proxy);
-    //        outList.Add(proxy);
-    //    }
-
-    //    return AdmitResult.BulkCreate(outList);
-    //}
 }
 
 public class LargeLeafNode(Region bounds, OctetParentNode parent)
@@ -837,7 +672,7 @@ public class SubLatticeBranchNode
         }
         catch
         {
-            foreach (var l in locksAcquired.Reverse<SlimSyncer>())
+            foreach (var l in locksAcquired)
                 l.Dispose();
             throw;
         }
