@@ -1,4 +1,5 @@
 ﻿using SpatialDbLib.Lattice;
+using SpatialDbLib.Synchronize;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
@@ -28,8 +29,9 @@ public class ContainerTestDiagnostics<T>
     public long TotalRemoveTicks;
     public Stopwatch TotalTestsWatch = new();
 
-    public ContainerTestDiagnostics(int iterations = 1)
+    public ContainerTestDiagnostics(int iterations, bool benchmarkTest)
     {
+        SlimSyncerDiagnostics.Enabled = !benchmarkTest;
         Iterations = iterations;
         Initialize();
     }

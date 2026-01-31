@@ -37,22 +37,25 @@ public class SpatialLattice : OctetRootNode
         return new MultiObjectScope<(SpatialObject, IList<LongVector3>)>(lockedObjects, acquiredLocks);
     }
 
-    public AdmitResult Insert(IEnumerable<SpatialObject> objs)
+    readonly object m_batchLocker = new();
+    public AdmitResult Insert(List<SpatialObject> objs)
     {
-        using var s = LockAndSnapshot(objs);
-        var admitResult = Admit([.. objs], LatticeDepth);
-        if (admitResult is AdmitResult.BulkCreated created)
+        lock (m_batchLocker)
         {
-            foreach (var proxy in created.Proxies)
+            var admitResult = Admit(objs, LatticeDepth);
+            if (admitResult is AdmitResult.BulkCreated created)
             {
-                if (proxy.IsCommitted)
+                foreach (var proxy in created.Proxies)
                 {
-                    throw new InvalidOperationException("Proxy is already committed during bulk insert commit.");
+                    if (proxy.IsCommitted)
+                    {
+                        throw new InvalidOperationException("Proxy is already committed during bulk insert commit.");
+                    }
+                    proxy.Commit();
                 }
-                proxy.Commit();
             }
+            return admitResult;
         }
-        return admitResult;
     }
 
     public AdmitResult Insert(SpatialObject obj)

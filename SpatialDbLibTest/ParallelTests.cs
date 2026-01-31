@@ -3,14 +3,14 @@
 [TestClass]
 public class ParallelTests
 {
-    const int ITERATIONS = 1;
-    const int TASKS_PER_ITERATION = 1;
-    const int BATCH_SIZE = 1;
+    const int ITERATIONS = 4;
+    const int TASKS_PER_ITERATION = 8;
+    const int BATCH_SIZE = 10000;
 
     [TestMethod]
     public void ParallelTests_BulkInsertStress()
     {
-        var test = new LatticeParallelTest(ITERATIONS, TASKS_PER_ITERATION, BATCH_SIZE);
+        var test = new LatticeParallelTest(ITERATIONS, TASKS_PER_ITERATION, BATCH_SIZE, benchmarkTest: true);
         for (int iter = 0; iter < test.Iterations; iter++)
         {
             test.InsertBulkRandomItems();
@@ -22,10 +22,10 @@ public class ParallelTests
     [TestMethod]
     public void ParallelTests_InsertStress_ConcurrentDictionary()
     {
-        var test = new ConcurrentDictionaryParallelTest(ITERATIONS, TASKS_PER_ITERATION);
+        var test = new ConcurrentDictionaryParallelTest(ITERATIONS, TASKS_PER_ITERATION, BATCH_SIZE, benchmarkTest: true);
         for (int iter = 0; iter < test.Iterations; iter++)
         {
-            test.InsertOrRemoveRandomItems();
+            test.InsertRandomItems();
         }
         test.CleanupAndGatherDiagnostics();
         Console.WriteLine(test.GenerateReportString());
@@ -34,7 +34,7 @@ public class ParallelTests
     [TestMethod]
     public void ParallelTests_InsertStress()
     {
-        var test = new LatticeParallelTest(ITERATIONS, TASKS_PER_ITERATION);
+        var test = new LatticeParallelTest(ITERATIONS, TASKS_PER_ITERATION, BATCH_SIZE, benchmarkTest: true);
         for (int iter = 0; iter < test.Iterations; iter++)
         {
             test.InsertRandomItems();

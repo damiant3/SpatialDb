@@ -11,7 +11,7 @@ namespace SpatialDbLibTest
           ITestCatalog
     {
 
-        public void TestBulkInsert(IEnumerable<SpatialObject> objs)
+        public void TestBulkInsert(List<SpatialObject> objs)
         {
             AdmitResult ret;
             try
@@ -81,7 +81,7 @@ namespace SpatialDbLibTest
         : ConcurrentDictionary<Guid, SpatialObject>,
           ITestCatalog
     {
-        public void TestBulkInsert(IEnumerable<SpatialObject> objs)
+        public void TestBulkInsert(List<SpatialObject> objs)
         {
             SpatialObject? obj = null;
             try
@@ -146,14 +146,14 @@ namespace SpatialDbLibTest
         public void Cleanup() => Clear();
     }
 
-    public class LatticeParallelTest(int iterations = 1, int taskCount = 1, int batchSize = 1)
-        : ParallelContainerTestDiagnostic<TestSpatialLattice>(iterations, taskCount, batchSize) { };
+    public class LatticeParallelTest(int iterations = 1, int taskCount = 1, int batchSize = 1, bool benchmarkTest = false)
+        : ParallelContainerTestDiagnostic<TestSpatialLattice>(iterations, taskCount, batchSize, benchmarkTest) { };
 
-    public class ConcurrentDictionaryParallelTest(int iterations = 1, int taskCount = 1, int batchSize = 1)
-    : ParallelContainerTestDiagnostic<TestConcurrentDictionary>(iterations, taskCount, batchSize) { };
+    public class ConcurrentDictionaryParallelTest(int iterations = 1, int taskCount = 1, int batchSize = 1, bool benchmarkTest = false)
+    : ParallelContainerTestDiagnostic<TestConcurrentDictionary>(iterations, taskCount, batchSize, benchmarkTest) { };
 
-    public class ParallelContainerTestDiagnostic<T>(int iterations, int taskCount = 1, int batchSize = 1)
-        : ContainerTestDiagnostics<T>(iterations)
+    public class ParallelContainerTestDiagnostic<T>(int iterations, int taskCount = 1, int batchSize = 1, bool benchmarkTest = false)
+        : ContainerTestDiagnostics<T>(iterations, benchmarkTest)
         where T :  class,
                    ITestCatalog,
                    new ()
@@ -162,6 +162,7 @@ namespace SpatialDbLibTest
         public int BatchSize = batchSize;
 
         int insertHeadStart = 5;
+        
         public void InsertOrRemoveRandomItems()
         {
             if (insertHeadStart-- > 0)
@@ -181,7 +182,6 @@ namespace SpatialDbLibTest
         {
             var tasks = new List<Task>();
 
-            SlimSyncerDiagnostics.Enabled = true;
             var objsToInsert = new Dictionary<int, List<SpatialObject>>();
             for (int i = 0; i < TaskCount; i++)
             {
@@ -195,7 +195,7 @@ namespace SpatialDbLibTest
                     )]));
                 }
             }
-            Task monitor;  // we need to find a way to stop this task cleanly from the outside.
+            Task monitor;
             var cts = new CancellationTokenSource();
 
 
@@ -206,6 +206,7 @@ namespace SpatialDbLibTest
 
                     while (sw.ElapsedMilliseconds < 2000)
                         Thread.Sleep(2000);
+                    sw.Stop();
 
                     while (true)
                     {
@@ -249,36 +250,44 @@ namespace SpatialDbLibTest
         public void InsertRandomItems()
         {
             var tasks = new List<Task>();
-            SlimSyncerDiagnostics.Enabled = true;
-            var swInsert = Stopwatch.StartNew();
-            for (int j = 0; j < TaskCount; j++)
+
+            for (int i = 0; i < BatchSize; i++)// for singleton inserts, do BatchSize rounds
             {
-                tasks.Add(Task.Run(() =>
+                ConcurrentDictionary<int, SpatialObject> objectsPerTask = [];
+                for (int j = 0; j < TaskCount; j++)
                 {
-                    try
-                    {
-                        var pos = new LongVector3(
-                            FastRandom.NextInt(-SpaceRange, SpaceRange),
-                            FastRandom.NextInt(-SpaceRange, SpaceRange),
-                            FastRandom.NextInt(-SpaceRange, SpaceRange)
-                        );
+                    objectsPerTask[j] = new SpatialObject([new LongVector3(
+                    FastRandom.NextInt(-SpaceRange, SpaceRange),
+                    FastRandom.NextInt(-SpaceRange, SpaceRange),
+                    FastRandom.NextInt(-SpaceRange, SpaceRange)
+                )]);
+                }
 
-                        var obj = new SpatialObject([pos]);
-                        Container!.TestInsert(obj);
-                        InsertedObjects![obj.Guid] = obj;
-
-                        Interlocked.Increment(ref Inserts);
-                    }
-                    catch
+                var swInsert = Stopwatch.StartNew();
+                for (int j = 0; j < TaskCount; j++)
+                {
+                    var k = j; // Capture loop variable, i think necessary, but not sure.
+                    tasks.Add(Task.Run(() =>
                     {
-                        Interlocked.Increment(ref FailedInserts);
-                    }
-                }));
+                        var obj = objectsPerTask[k];
+                        try
+                        {
+                            Container!.TestInsert(obj);
+                            InsertedObjects![obj.Guid] = obj;
+
+                            Interlocked.Increment(ref Inserts);
+                        }
+                        catch
+                        {
+                            Interlocked.Increment(ref FailedInserts);
+                        }
+                    }));
+                }
+
+                Task.WaitAll([.. tasks]);
+                swInsert.Stop();
+                TotalInsertTicks += swInsert.ElapsedTicks;
             }
-
-            Task.WaitAll(tasks.ToArray());
-            swInsert.Stop();
-            TotalInsertTicks += swInsert.ElapsedTicks;
         }
 
         public void RemoveRandomItems()

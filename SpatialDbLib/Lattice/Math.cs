@@ -91,76 +91,31 @@ public class ParentToSubLatticeTransform(Region outerBounds)
                 NextCoord()
             );
         }
-
-        //static LongVector3 OuterToInnerFromSizeOne(ulong discriminator)
-        //{
-        //    long half = LatticeUniverse.HalfExtent;
-
-        //    // Split the discriminator into 3 independent streams
-        //    // Using 21 bits per axis (63 bits total)
-        //    const int bitsPerAxis = 21;
-        //    const ulong mask = (1UL << bitsPerAxis) - 1;
-
-        //    ulong xBits = (discriminator >> 0) & mask;
-        //    ulong yBits = (discriminator >> bitsPerAxis) & mask;
-        //    ulong zBits = (discriminator >> (bitsPerAxis * 2)) & mask;
-
-        //    // Map [0, 2^bits) -> [-half, half)
-        //    long Map(ulong v)
-        //    {
-        //        // scale without floating point
-        //        // result in [0, 2*half)
-        //        ulong range = (ulong)(half * 2);
-        //        ulong scaled = (v * range) >> bitsPerAxis;
-        //        return (long)scaled - half;
-        //    }
-
-        //    return new LongVector3(
-        //        Map(xBits),
-        //        Map(yBits),
-        //        Map(zBits)
-        //    );
-        //}
-
-        //static LongVector3 OuterToInnerFromSizeOneFast(ulong discriminator)
-        //{
-        //    int octant = (int)(discriminator & 0b111);
-        //    long signX = (octant & 0b001) != 0 ? +1 : -1;
-        //    long signY = (octant & 0b010) != 0 ? +1 : -1;
-        //    long signZ = (octant & 0b100) != 0 ? +1 : -1;
-
-        //    long half = LatticeUniverse.HalfExtent;
-
-        //    return new LongVector3(
-        //        signX > 0 ? half - 1 : -half,
-        //        signY > 0 ? half - 1 : -half,
-        //        signZ > 0 ? half - 1 : -half
-        //    );
-        //}
-
-        LongVector3 OuterToInnerFromLarge(LongVector3 outer, ulong discriminator, ULongVector3 innerSize, ULongVector3 outerSize)
-        {
-            var outerOffset = outer.OffsetFrom(OuterLatticeBounds.Min);
-
-            var scaleX = innerSize.X / outerSize.X;
-            var scaleY = innerSize.Y / outerSize.Y;
-            var scaleZ = innerSize.Z / outerSize.Z;
-
-            var baseX = (ulong)InnerLatticeBounds.Min.X + outerOffset.X * scaleX;
-            var baseY = (ulong)InnerLatticeBounds.Min.Y + outerOffset.Y * scaleY;
-            var baseZ = (ulong)InnerLatticeBounds.Min.Z + outerOffset.Z * scaleZ;
-
-            var repX = baseX + (discriminator % scaleX);
-            var repY = baseY + ((discriminator >> 21) % scaleY);
-            var repZ = baseZ + ((discriminator >> 42) % scaleZ);
-
-            return new LongVector3(
-                unchecked((long)repX),
-                unchecked((long)repY),
-                unchecked((long)repZ)
-            );
-        }
     }
+
+    public LongVector3 OuterToInnerFromLarge(LongVector3 outer, ulong discriminator, ULongVector3 innerSize, ULongVector3 outerSize)
+    {
+        var outerOffset = outer.OffsetFrom(OuterLatticeBounds.Min);
+
+        var scaleX = innerSize.X / outerSize.X;
+        var scaleY = innerSize.Y / outerSize.Y;
+        var scaleZ = innerSize.Z / outerSize.Z;
+
+        var baseX = (ulong)InnerLatticeBounds.Min.X + outerOffset.X * scaleX;
+        var baseY = (ulong)InnerLatticeBounds.Min.Y + outerOffset.Y * scaleY;
+        var baseZ = (ulong)InnerLatticeBounds.Min.Z + outerOffset.Z * scaleZ;
+
+        var repX = baseX + (discriminator % scaleX);
+        var repY = baseY + ((discriminator >> 21) % scaleY);
+        var repZ = baseZ + ((discriminator >> 42) % scaleZ);
+
+        return new LongVector3(
+            unchecked((long)repX),
+            unchecked((long)repY),
+            unchecked((long)repZ)
+        );
+    }
+
     public LongVector3 OuterToInnerCanonical(LongVector3 outerPosition)
     {
 #if DEBUG
@@ -305,6 +260,20 @@ public readonly struct LongVector3(long x, long y, long z)
         );
 
     public static readonly LongVector3 Zero = new(0);
+}
+
+public class LongVector3Comparer : IComparer<LongVector3>
+{
+    public int Compare(LongVector3 a, LongVector3 b)
+    {
+        int cmp = a.X.CompareTo(b.X);
+        if (cmp != 0) return cmp;
+
+        cmp = a.Y.CompareTo(b.Y);
+        if (cmp != 0) return cmp;
+
+        return a.Z.CompareTo(b.Z);
+    }
 }
 
 public readonly struct Region
