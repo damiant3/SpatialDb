@@ -40,7 +40,7 @@ public class SpatialLattice : OctetRootNode
     readonly object m_batchLocker = new();
     public AdmitResult Insert(List<SpatialObject> objs)
     {
-        lock (m_batchLocker)
+        //lock (m_batchLocker)
         {
             var admitResult = Admit(objs, LatticeDepth);
             if (admitResult is AdmitResult.BulkCreated created)
@@ -74,11 +74,6 @@ public class SpatialLattice : OctetRootNode
         {
             var leaf = ResolveOccupyingLeaf(obj);
             if (leaf == null) return;
-            var parent = leaf.Parent;
-            using var s2 = new SlimSyncer(((ISync)parent).Sync, SlimSyncer.LockMode.Write, "SpatialLattice.Remove: Parent");
-            using var s3 = new SlimSyncer(((ISync)leaf).Sync, SlimSyncer.LockMode.Write, "SpatialLattice.Remove: Leaf");
-            if (leaf.Parent != parent || !leaf.Contains(obj))
-                continue;
             leaf.Vacate(obj);
             return;
         }

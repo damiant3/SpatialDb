@@ -114,7 +114,6 @@ public class SpatialObjectProxy : SpatialObject
             var leaf = TargetLeaf;
 
             using var s = new SlimSyncer(((ISync)leaf).Sync, SlimSyncer.LockMode.Write, "SpatialObjectProxy.Commit: Leaf");
-
             if (leaf.IsRetired)
                 continue;
 
