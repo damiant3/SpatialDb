@@ -266,6 +266,7 @@ public abstract class OctetParentNode
         public (int Start, int Length)[] Buckets; // length = 8
         public int OriginalStart;
         public int OriginalLength;
+        public byte[] BucketChildIndex;
 
         public List<SpatialObjectProxy> Proxies = [];
 
@@ -279,6 +280,7 @@ public abstract class OctetParentNode
             OriginalLength = length;
             LatticeDepth = latticeDepth;
             Buckets = new (int, int)[8];
+            BucketChildIndex = new byte[8];
             Partition();
         }
 
@@ -286,13 +288,12 @@ public abstract class OctetParentNode
         {
             Span<int> counts = stackalloc int[8];
 
-            var span = Buffer.AsSpan(Start, Length);
-
-            foreach (var obj in span)
+            var objectSpan = Buffer.AsSpan(Start, Length);
+            var childAssignments = new SelectChildResult[Length];
+            for (int i = 0; i < objectSpan.Length; i++)
             {
-                var pos = obj.GetPositionAtDepth(LatticeDepth);
-                var sel = Parent.SelectChild(pos) ?? throw new InvalidOperationException("Containment invariant violated");
-                counts[sel.IndexInParent]++;
+                childAssignments[i] = Parent.SelectChild(objectSpan[i].GetPositionAtDepth(LatticeDepth)) ?? throw new InvalidOperationException("Containment invariant violated");
+                counts[childAssignments[i].IndexInParent]++;
             }
 
             Span<int> offsets = stackalloc int[8];
@@ -307,6 +308,7 @@ public abstract class OctetParentNode
 
                 offsets[i] = running;
                 Buckets[nextIdx] = (Start + running, count);
+                BucketChildIndex[nextIdx] = (byte)i;
 
                 running += count;
                 nextIdx++;
@@ -317,21 +319,18 @@ public abstract class OctetParentNode
             var temp = ArrayPool<SpatialObject>.Shared.Rent(Length);
             try
             {
-                foreach (var obj in span)
+                for (int i = 0; i < objectSpan.Length; i++)
                 {
-                    var pos = obj.GetPositionAtDepth(LatticeDepth);
-                    var sel = Parent.SelectChild(pos) ?? throw new InvalidOperationException("Containment invariant violated");
-                    temp[offsets[sel.IndexInParent]++] = obj;
+                    temp[offsets[childAssignments[i].IndexInParent]++] = objectSpan[i];
                 }
 
-                temp.AsSpan(0, Length).CopyTo(span);
+                temp.AsSpan(0, Length).CopyTo(objectSpan);
             }
             finally
             {
                 ArrayPool<SpatialObject>.Shared.Return(temp, clearArray: false);
             }
         }
-
     }
 
     public override AdmitResult Admit(IReadOnlyList<SpatialObject> objs, byte latticeDepth)
@@ -374,11 +373,7 @@ public abstract class OctetParentNode
                 }
 
                 // Determine child *at time of descent*
-                var sample = frame.Buffer[start];
-                var pos = sample.GetPositionAtDepth(frame.LatticeDepth);
-                var select = frame.Parent.SelectChild(pos) ?? throw new InvalidOperationException("Containment invariant violated");
-
-                var child = select.ChildNode;
+                var child = frame.Parent.Children[frame.BucketChildIndex[frame.NextBucket]];
 
                 // descend
                 if (child is OctetParentNode parent)
@@ -421,7 +416,7 @@ public abstract class OctetParentNode
                                 frame.Parent,
                                 venueLeaf,
                                 frame.LatticeDepth,
-                                select.IndexInParent,
+                                frame.BucketChildIndex[frame.NextBucket],
                                 result is AdmitResult.Subdivide);
 
                         break;
