@@ -1,14 +1,13 @@
 ﻿///////////////////////////////
 using SpatialDbLib.Synchronize;
 using System.Buffers;
-using System.Diagnostics;
 
 namespace SpatialDbLib.Lattice;
 
 public interface ISpatialNode
 {
-    AdmitResult Admit(SpatialObject obj, LongVector3 proposedPosition, byte latticeDepth);
-    AdmitResult Admit(Span<SpatialObject> buffer, byte latticeDepth);
+    AdmitResult Admit(SpatialObject obj, LongVector3 proposedPosition);
+    AdmitResult Admit(Span<SpatialObject> buffer);
     void AdmitMigrants(IList<SpatialObject> obj);
     IDisposable LockAndSnapshotForMigration();
 }
@@ -29,32 +28,11 @@ public abstract class SpatialNode(Region bounds)
     protected readonly ReaderWriterLockSlim Sync  = new(LockRecursionPolicy.SupportsRecursion);
     ReaderWriterLockSlim ISync.Sync => Sync;
 
-    public abstract AdmitResult Admit(SpatialObject obj, LongVector3 proposedPosition, byte latticeDepth);
     public abstract void AdmitMigrants(IList<SpatialObject> obj);
     public abstract IDisposable LockAndSnapshotForMigration();
 
-    public virtual AdmitResult Admit(Span<SpatialObject> buffer, byte latticeDepth)
-    {
-        // Fallback: scalar path, preserves semantics
-        List<AdmitResult> results = [];
-        foreach (var obj in buffer)
-        {
-            var result = Admit(obj, obj.LocalPosition, latticeDepth);
-            results.Add(result);
-
-            if (result is not AdmitResult.Created)
-            {
-                Rollback(results);
-                return result;
-            }
-        }
-
-        return new AdmitResult.BulkCreated(
-            [.. results
-                .OfType<AdmitResult.Created>()
-                .Select(r => r.Proxy)]);
-    }
-
+    public abstract AdmitResult Admit(SpatialObject obj, LongVector3 proposedPosition);
+    public abstract AdmitResult Admit(Span<SpatialObject> buffer);
     protected static void Rollback(IEnumerable<AdmitResult> results)
     {
         foreach (var r in results)
@@ -169,16 +147,15 @@ public abstract class OctetParentNode
         public OctetParentNode? Parent;
         public IChildNode? ChildNode;
         public byte ChildIndex;
-        public byte LatticeDepth;
     }
 
-    public override AdmitResult Admit(SpatialObject obj, LongVector3 proposedPosition, byte latticeDepth)
+    public override AdmitResult Admit(SpatialObject obj, LongVector3 proposedPosition)
     {
         if (!Bounds.Contains(proposedPosition))
             return AdmitResult.EscalateRequest();
 
         ISpatialNode current = this;
-        AdmitFrame frame = new() { LatticeDepth = latticeDepth };
+        AdmitFrame frame = new();
         while (true)
         {
             if (current is OctetParentNode parent)
@@ -197,43 +174,49 @@ public abstract class OctetParentNode
             if(current == null)
                 throw new InvalidOperationException("Current node is null during Admit");
 #endif
-            var admitResult = current.Admit(obj, proposedPosition, frame.LatticeDepth);
+            if (current is not LeafNode leaf)
+                throw new InvalidOperationException("Current node is not a LeafNode during Admit");
+            
+            var admitResult = current is VenueLeafNode venue && obj.PositionStackDepth > ((SpatialLattice)this).LatticeDepth + 1 // deep insert
+                ? venue.CanSubdivide() ? AdmitResult.SubdivideRequest(venue) : AdmitResult.DelegateRequest(venue)
+                : leaf.Admit(obj, proposedPosition);
 
-            switch (admitResult)
-            {
-                case AdmitResult.Created:
-                case AdmitResult.Rejected:
-                case AdmitResult.Escalate:
-                    return admitResult;
-                case AdmitResult.Retry:
-#if DEBUG
-                if(frame.Parent == null)
-                    throw new InvalidOperationException("Retry requested at root node");
-#endif
-                    current = frame.Parent;
-                    continue;
-                case AdmitResult.Subdivide:
-                case AdmitResult.Delegate:
+                switch (admitResult)
                 {
-                    var subdividingleaf = frame.ChildNode as VenueLeafNode;
+                    case AdmitResult.Created:
+                    case AdmitResult.Rejected:
+                    case AdmitResult.Escalate:
+                        return admitResult;
+                    case AdmitResult.Retry:
 #if DEBUG
-                    if (subdividingleaf == null)
-                        throw new InvalidOperationException("Subdivision requested by non-venueleaf");
-                    if (frame.Parent == null)
-                        throw new InvalidOperationException("Subdivision requested at root node");
+                        if (frame.Parent == null)
+                            throw new InvalidOperationException("Retry requested at root node");
 #endif
-                    if (subdividingleaf.IsRetired)
+                        current = frame.Parent;
+                        continue;
+                    case AdmitResult.Subdivide:
+                    case AdmitResult.Delegate:
                     {
+                        var subdividingleaf = frame.ChildNode as VenueLeafNode;
+#if DEBUG
+                        if (subdividingleaf == null)
+                            throw new InvalidOperationException("Subdivision requested by non-venueleaf");
+                        if (frame.Parent == null)
+                            throw new InvalidOperationException("Subdivision requested at root node");
+#endif
+                        if (subdividingleaf.IsRetired)
+                        {
+                            current = frame.Parent;
+                            continue;
+                        }
+
+                        SubdivideAndMigrate(frame.Parent, subdividingleaf, ((SpatialLattice)this).LatticeDepth, frame.ChildIndex, admitResult is AdmitResult.Subdivide);
                         current = frame.Parent;
                         continue;
                     }
-                    SubdivideAndMigrate(frame.Parent, subdividingleaf, latticeDepth, frame.ChildIndex, admitResult is AdmitResult.Subdivide);
-                    current = frame.Parent;
-                    continue;
+                    default:
+                        throw new InvalidOperationException("Unknown AdmitResponse");
                 }
-                default:
-                    throw new InvalidOperationException("Unknown AdmitResponse");
-            }
         }
     }
 
@@ -267,7 +250,6 @@ public abstract class OctetParentNode
     internal sealed class AdmitWorkFrame
     {
         public OctetParentNode Parent;
-        public byte LatticeDepth;
         public BufferSlice WorkingSlice;
         public int BucketCount;// byteify
         public int NextBucket;// byteify
@@ -281,16 +263,15 @@ public abstract class OctetParentNode
         {
             Parent = parent;
             WorkingSlice = workingSlice;
-            LatticeDepth = latticeDepth;
             NextBucket = 0;
             BucketCount = 0;
             Buckets = new BufferSlice[8];
             BucketChildIndex = new byte[8];
             Proxies = [];
-            PartitionInPlace(workingSlice.GetSpan(rootBuffer));
+            PartitionInPlace(workingSlice.GetSpan(rootBuffer), latticeDepth);
         }
 
-        void PartitionInPlace(Span<SpatialObject> span)
+        void PartitionInPlace(Span<SpatialObject> span, byte latticeDepth)
         {
             var mid = Parent.Bounds.Mid;
             var octants = ArrayPool<byte>.Shared.Rent(span.Length);
@@ -298,7 +279,7 @@ public abstract class OctetParentNode
             {
                 for (int i = 0; i < span.Length; i++)
                 {
-                    var pos = span[i].GetPositionAtDepth(LatticeDepth);
+                    var pos = span[i].GetPositionAtDepth(latticeDepth);
                     octants[i] = (byte)(
                         ((pos.X >= mid.X) ? 4 : 0) |
                         ((pos.Y >= mid.Y) ? 2 : 0) |
@@ -307,8 +288,7 @@ public abstract class OctetParentNode
                 Span<int> counts = stackalloc int[8];
                 for (int i = 0; i < span.Length; i++)
                     counts[octants[i]]++;
-                
-                //Span<int> positions = stackalloc int[8];
+
                 int runningOffset = 0;
                 int bucketIdx = 0;
                 for (int i = 0; i < 8; i++)
@@ -316,7 +296,6 @@ public abstract class OctetParentNode
                     if (counts[i] == 0)
                         continue;
 
-                    //positions[i] = runningOffset;
                     Buckets[bucketIdx] = new (WorkingSlice.Start + runningOffset, counts[i]);
                     BucketChildIndex[bucketIdx] = (byte)i;
                     bucketIdx++;
@@ -367,10 +346,10 @@ public abstract class OctetParentNode
         }
     }
 
-    public override AdmitResult Admit(Span<SpatialObject> buffer, byte latticeDepth)
+    public override AdmitResult Admit(Span<SpatialObject> buffer)
     {
         var stack = new Stack<AdmitWorkFrame>();
-        stack.Push(new AdmitWorkFrame(this, buffer, new BufferSlice(0, buffer.Length), latticeDepth));
+        stack.Push(new AdmitWorkFrame(this, buffer, new BufferSlice(0, buffer.Length), ((SpatialLattice)this).LatticeDepth));
 
         AdmitResult.BulkCreated? topResult = null;
 
@@ -408,15 +387,18 @@ public abstract class OctetParentNode
                 // descend
                 if (child is OctetParentNode parent)
                 {
-                    stack.Push(new AdmitWorkFrame(parent, buffer, bucket, frame.LatticeDepth));
+                    stack.Push(new AdmitWorkFrame(parent, buffer, bucket, ((SpatialLattice)this).LatticeDepth));
                     frame.NextBucket++;
                     continue;
                 }
 
+    
                 // leaf path
-                var leaf = (SpatialNode)child;
+                var leaf = (LeafNode)child;
                 var slice = bucket.GetSpan(buffer);
-                var result = leaf.Admit(slice, frame.LatticeDepth);
+                var result = leaf is VenueLeafNode venue && NeedsDeeper(slice) // deep insert
+                    ? venue.CanSubdivide() ? AdmitResult.SubdivideRequest(venue) : AdmitResult.DelegateRequest(venue)
+                    : leaf.Admit(slice);
 
                 switch (result)
                 {
@@ -438,7 +420,7 @@ public abstract class OctetParentNode
                             SubdivideAndMigrate(
                                 frame.Parent,
                                 venueLeaf,
-                                frame.LatticeDepth,
+                                ((SpatialLattice)this).LatticeDepth,
                                 frame.BucketChildIndex[frame.NextBucket],
                                 result is AdmitResult.Subdivide);
 
@@ -460,6 +442,14 @@ public abstract class OctetParentNode
                     proxy.Rollback();
             }
             throw;
+        }
+
+        bool NeedsDeeper(Span<SpatialObject> slice)
+        {
+            foreach (var obj in slice)
+                if (obj.PositionStackDepth > ((SpatialLattice)this).LatticeDepth + 1)
+                    return true;
+            return false;
         }
     }
 }
@@ -487,11 +477,7 @@ public abstract class LeafNode(Region bounds, IParentNode parent)
       IChildNode
 {
     public IParentNode Parent { get; } = parent;
-    public abstract bool IsRetired { get; }
-    public abstract bool Contains(SpatialObject obj);
-    public abstract bool HasAnyOccupants();
-    public abstract int Capacity { get; }
-    public abstract bool IsAtCapacity(int toAdd);
+
     public virtual bool CanSubdivide()
     {
         return Bounds.Size.X > 1 && Bounds.Size.Y > 1 && Bounds.Size.Z > 1;
@@ -503,14 +489,14 @@ public abstract class VenueLeafNode(Region bounds, IParentNode parent)
 {
     internal IList<SpatialObject> Occupants { get; } = [];
     internal bool m_isRetired = false;
-    public override bool IsRetired => m_isRetired;
+    public bool IsRetired => m_isRetired;
 
-    public override bool Contains(SpatialObject obj)
+    public bool Contains(SpatialObject obj)
     {
         using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Read, "Venue.Contains: Leaf");
         return Occupants.Contains(obj);
     }
-    public override bool HasAnyOccupants()
+    public bool HasAnyOccupants()
     {
         using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Read, "Venue.HasAnyOccupants: Leaf");
         return Occupants.Count > 0;
@@ -541,8 +527,8 @@ public abstract class VenueLeafNode(Region bounds, IParentNode parent)
         Occupants[index] = ((SpatialObjectProxy)Occupants[index]).OriginalObject;  // this is intended to hard fail if the occupant is not the proxy
     }
 
-    public override int Capacity => 8;
-    public override bool IsAtCapacity(int toAdd = 1)
+    public virtual int Capacity => 8;
+    public bool IsAtCapacity(int toAdd = 1)
     {
         return Occupants.Count + toAdd > Capacity;
     }
@@ -557,7 +543,7 @@ public abstract class VenueLeafNode(Region bounds, IParentNode parent)
         }
     }
 
-    public override AdmitResult Admit(SpatialObject obj, LongVector3 proposedPosition, byte latticeDepth)
+    public override AdmitResult Admit(SpatialObject obj, LongVector3 proposedPosition)
     {
         if (!Bounds.Contains(proposedPosition))
             return AdmitResult.EscalateRequest();
@@ -566,7 +552,7 @@ public abstract class VenueLeafNode(Region bounds, IParentNode parent)
         if (IsRetired)
             return AdmitResult.RetryRequest();
 
-        if (IsAtCapacity(1) || obj.PositionStackDepth > latticeDepth + 1)
+        if (IsAtCapacity(1))
         {
             return CanSubdivide()
                 ? AdmitResult.SubdivideRequest(this)
@@ -578,23 +564,14 @@ public abstract class VenueLeafNode(Region bounds, IParentNode parent)
         return AdmitResult.Create(proxy);
     }
 
-    public override AdmitResult Admit(Span<SpatialObject> buffer, byte latticeDepth)
+    public override AdmitResult Admit(Span<SpatialObject> buffer)
     {
         using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "Venue.AdmitList: Leaf");
         if (IsRetired)
             return AdmitResult.RetryRequest();
 
-        bool needsDeeper = false;
-        foreach (var obj in buffer)
-        {
-            if (obj.PositionStackDepth > latticeDepth + 1)
-            {
-                needsDeeper = true;
-                break;
-            }
-        }
 
-        if (IsAtCapacity(buffer.Length) || needsDeeper)
+        if (IsAtCapacity(buffer.Length))
         {
             return CanSubdivide()
                 ? AdmitResult.SubdivideRequest(this)
@@ -664,15 +641,12 @@ public class LargeLeafNode(Region bounds, OctetParentNode parent)
 }
 
 public class SubLatticeBranchNode
-    : SpatialNode,
-      IChildNode
+    : LeafNode
 {
     public SpatialLattice Sublattice { get; }
-    public IParentNode Parent { get; }
     public SubLatticeBranchNode(Region bounds, IParentNode parent, byte latticeDepth, IList<SpatialObject> migrants)
-        : base(bounds)
+        : base(bounds, parent)
     {
-        Parent = parent;
         Sublattice = new(bounds, latticeDepth);
 #if DEBUG
         if (migrants.Any(a => a.PositionStackDepth > latticeDepth + 1))
@@ -686,7 +660,7 @@ public class SubLatticeBranchNode
     {
         Sublattice.AdmitMigrants(objs);
     }
-    public override AdmitResult Admit(SpatialObject obj, LongVector3 proposedPosition, byte latticeDepth)
+    public override AdmitResult Admit(SpatialObject obj, LongVector3 proposedPosition)
     {
         if (!Bounds.Contains(proposedPosition))
             return AdmitResult.EscalateRequest();
@@ -697,7 +671,7 @@ public class SubLatticeBranchNode
             obj.AppendPosition(sublatticeFramedPosition);
         }
         var subFramePosition = obj.GetPositionAtDepth(Sublattice.LatticeDepth);
-        return Sublattice.Admit(obj, subFramePosition, (byte)(latticeDepth+1));
+        return Sublattice.Admit(obj, subFramePosition);
     }
 
     public override MultiObjectScope<IChildNode> LockAndSnapshotForMigration()
@@ -731,12 +705,12 @@ public class SubLatticeBranchNode
     }
 
 
-    public override AdmitResult Admit(Span<SpatialObject> buffer, byte latticeDepth)
+    public override AdmitResult Admit(Span<SpatialObject> buffer)
     {
 #if DEBUG
         foreach (var obj in buffer)
         {
-            var proposedPosition = obj.GetPositionAtDepth(latticeDepth);
+            var proposedPosition = obj.GetPositionAtDepth(Sublattice.LatticeDepth - 1);
             if (!Bounds.Contains(proposedPosition))
                 throw new InvalidOperationException($"Object outside SublatticeBranch bounds: {proposedPosition}");
         }
@@ -745,12 +719,12 @@ public class SubLatticeBranchNode
         foreach (var obj in buffer)
             if (!obj.HasPositionAtDepth(Sublattice.LatticeDepth))
             {
-                var proposedPosition = obj.GetPositionAtDepth(latticeDepth);
+                var proposedPosition = obj.GetPositionAtDepth(Sublattice.LatticeDepth -1);
                 var framedPosition = Sublattice.BoundsTransform.OuterToInnerInsertion(proposedPosition, obj.Guid);
                 obj.AppendPosition(framedPosition);
             }
 
-        return Sublattice.Admit(buffer, (byte)(latticeDepth + 1));
+        return Sublattice.Admit(buffer);
     }
 }
 

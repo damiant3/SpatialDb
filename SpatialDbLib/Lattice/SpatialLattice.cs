@@ -42,7 +42,7 @@ public class SpatialLattice : OctetRootNode
         List<AdmitResult> results = [];
         foreach (var obj in objs)
         {
-            var admitResult = Admit(obj, obj.LocalPosition, LatticeDepth);
+            var admitResult = Admit(obj, obj.LocalPosition);
             if (admitResult is AdmitResult.Created created)
                 results.Add(admitResult);
             else
@@ -71,7 +71,7 @@ public class SpatialLattice : OctetRootNode
 
     public AdmitResult Insert(SpatialObject[] objs)
     {
-        var admitResult = Admit(objs, LatticeDepth);
+        var admitResult = Admit(objs);
         if (admitResult is AdmitResult.BulkCreated created)
         {
             foreach (var proxy in created.Proxies)
@@ -90,7 +90,7 @@ public class SpatialLattice : OctetRootNode
     public AdmitResult Insert(SpatialObject obj)
     {
         using var s = new SlimSyncer(((ISync)obj).Sync, SlimSyncer.LockMode.Write, "SpatialLattice.Insert: Object");
-        var admitResult = Admit(obj, obj.LocalPosition, LatticeDepth);
+        var admitResult = Admit(obj, obj.LocalPosition);
         if (admitResult is AdmitResult.Created created)
             created.Proxy.Commit();
         return admitResult;
