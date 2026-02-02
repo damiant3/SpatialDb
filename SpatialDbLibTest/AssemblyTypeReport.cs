@@ -10,6 +10,25 @@ namespace SpatialDbLibTest
     [TestClass]
     public class AssemblyTypeReport
     {
+        public static string ReportAssembly(Type exampleType)
+        {
+            var assembly = exampleType.Assembly;
+            return ReportAssembly(assembly);
+        }
+        public static string ReportAssembly(Assembly assembly)
+        {
+
+            var sb = new StringBuilder();
+            foreach (var type in assembly.GetTypes()
+                .Where(t => t.Namespace?.StartsWith("SpatialDbLib") == true)
+                .Where(ShouldReportType)
+                .OrderBy(t => t.FullName))
+            {
+                sb.Append(ReportType(type));
+            }
+            return sb.ToString();
+        }
+
         [TestMethod]
         public void AssemblyTypeReport_GenerateReport()
         {
@@ -209,7 +228,7 @@ namespace SpatialDbLibTest
         {
             return accessibility switch
             {
-                Accessibility.Private => false,
+                Accessibility.Private => true,
 
                 // PrivateProtected is still visible across the hierarchy
                 // and should be reviewed in encapsulation passes
@@ -244,24 +263,7 @@ namespace SpatialDbLibTest
             };
         }
 
-        public static string ReportAssembly(Type exampleType)
-        {
-            var assembly = exampleType.Assembly;
-            return ReportAssembly(assembly);
-        }
-        public static string ReportAssembly(Assembly assembly)
-        {
-            
-            var sb = new StringBuilder();
-            foreach (var type in assembly.GetTypes()
-                .Where(t => t.Namespace?.StartsWith("SpatialDbLib") == true)
-                .Where(ShouldReportType)
-                .OrderBy(t => t.FullName))
-            {
-                sb.Append(ReportType(type));
-            }
-            return sb.ToString();
-        }
+
 
     }
 }

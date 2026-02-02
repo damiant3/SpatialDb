@@ -8,7 +8,7 @@ namespace SpatialDbLib.Lattice;
 public interface ISpatialNode
 {
     AdmitResult Admit(SpatialObject obj, LongVector3 proposedPosition, byte latticeDepth);
-    AdmitResult Admit(IReadOnlyList<SpatialObject> objs, byte latticeDepth);
+    AdmitResult Admit(Span<SpatialObject> buffer, byte latticeDepth);
     void AdmitMigrants(IList<SpatialObject> obj);
     IDisposable LockAndSnapshotForMigration();
 }
@@ -33,11 +33,11 @@ public abstract class SpatialNode(Region bounds)
     public abstract void AdmitMigrants(IList<SpatialObject> obj);
     public abstract IDisposable LockAndSnapshotForMigration();
 
-    public virtual AdmitResult Admit(IReadOnlyList<SpatialObject> objs, byte latticeDepth)
+    public virtual AdmitResult Admit(Span<SpatialObject> buffer, byte latticeDepth)
     {
         // Fallback: scalar path, preserves semantics
         List<AdmitResult> results = [];
-        foreach (var obj in objs)
+        foreach (var obj in buffer)
         {
             var result = Admit(obj, obj.LocalPosition, latticeDepth);
             results.Add(result);
@@ -253,46 +253,50 @@ public abstract class OctetParentNode
         migrationSnapshot.Dispose();
     }
 
+    internal sealed class BufferSlice(int start, int length)
+    {
+        public int Start { get; } = start;
+        public int Length { get; } = length;
+
+        public Span<SpatialObject> GetSpan(Span<SpatialObject> rootBuffer)
+        {
+            return rootBuffer.Slice(Start, Length);
+        }
+    }
+
     internal sealed class AdmitWorkFrame
     {
         public OctetParentNode Parent;
         public byte LatticeDepth;
-        public int Start;
-        public int Length;
-        public int BucketCount;
-        public int NextBucket;
+        public BufferSlice WorkingSlice;
+        public int BucketCount;// byteify
+        public int NextBucket;// byteify
 
-        public (int Start, int Length)[] Buckets;
+        public BufferSlice[] Buckets;
         public byte[] BucketChildIndex;
 
         public List<SpatialObjectProxy> Proxies;
 
-        public AdmitWorkFrame(OctetParentNode parent, SpatialObject[] buffer, int start, int length, byte latticeDepth)
+        public AdmitWorkFrame(OctetParentNode parent, Span<SpatialObject> rootBuffer, BufferSlice workingSlice, byte latticeDepth)
         {
             Parent = parent;
-            Start = start;
-            Length = length;
+            WorkingSlice = workingSlice;
             LatticeDepth = latticeDepth;
             NextBucket = 0;
             BucketCount = 0;
-
-            Buckets ??= new (int, int)[8];
-            BucketChildIndex ??= new byte[8];
-
+            Buckets = new BufferSlice[8];
+            BucketChildIndex = new byte[8];
             Proxies = [];
-            PartitionInPlace(buffer);
+            PartitionInPlace(workingSlice.GetSpan(rootBuffer));
         }
 
-        void PartitionInPlace(SpatialObject[] buffer)
+        void PartitionInPlace(Span<SpatialObject> span)
         {
             var mid = Parent.Bounds.Mid;
-            var span = buffer.AsSpan(Start, Length);
-
-            // Compute octant index for each object once
-            var octants = ArrayPool<byte>.Shared.Rent(Length);
+            var octants = ArrayPool<byte>.Shared.Rent(span.Length);
             try
             {
-                for (int i = 0; i < Length; i++)
+                for (int i = 0; i < span.Length; i++)
                 {
                     var pos = span[i].GetPositionAtDepth(LatticeDepth);
                     octants[i] = (byte)(
@@ -300,53 +304,44 @@ public abstract class OctetParentNode
                         ((pos.Y >= mid.Y) ? 2 : 0) |
                         ((pos.Z >= mid.Z) ? 1 : 0));
                 }
-
-                // Count occurrences
                 Span<int> counts = stackalloc int[8];
-                for (int i = 0; i < Length; i++)
+                for (int i = 0; i < span.Length; i++)
                     counts[octants[i]]++;
-
-                // Build bucket metadata and compute target positions
-                Span<int> positions = stackalloc int[8];
-                int running = 0;
+                
+                //Span<int> positions = stackalloc int[8];
+                int runningOffset = 0;
                 int bucketIdx = 0;
-
                 for (int i = 0; i < 8; i++)
                 {
                     if (counts[i] == 0)
                         continue;
 
-                    positions[i] = running;
-                    Buckets[bucketIdx] = (Start + running, counts[i]);
+                    //positions[i] = runningOffset;
+                    Buckets[bucketIdx] = new (WorkingSlice.Start + runningOffset, counts[i]);
                     BucketChildIndex[bucketIdx] = (byte)i;
                     bucketIdx++;
-                    running += counts[i];
+                    runningOffset += counts[i];
                 }
-
                 BucketCount = bucketIdx;
 
-                // Build octant -> compacted bucket lookup
+                Span<int> bucketStart = stackalloc int[BucketCount];
+                Span<int> bucketEnd = stackalloc int[BucketCount];
+                for (int i = 0; i < BucketCount; i++)
+                {
+                    bucketStart[i] = Buckets[i].Start - WorkingSlice.Start;
+                    bucketEnd[i] = bucketStart[i] + Buckets[i].Length;
+                }
+
                 Span<int> octantToBucket = stackalloc int[8];
                 octantToBucket.Fill(-1);
                 for (int i = 0; i < BucketCount; i++)
                     octantToBucket[BucketChildIndex[i]] = i;
 
-                // Compute compacted bucket ranges (relative to span)
-                Span<int> bucketStart = stackalloc int[BucketCount];
-                Span<int> bucketEnd = stackalloc int[BucketCount];
 
-                for (int i = 0; i < BucketCount; i++)
-                {
-                    bucketStart[i] = Buckets[i].Start - Start;
-                    bucketEnd[i] = bucketStart[i] + Buckets[i].Length;
-                }
-
-                // In-place permutation using compacted buckets
                 for (int b = 0; b < BucketCount; b++)
                 {
                     int pos = bucketStart[b];
                     byte octant = BucketChildIndex[b];
-
                     while (pos < bucketEnd[b])
                     {
                         byte targetOctant = octants[pos];
@@ -372,13 +367,10 @@ public abstract class OctetParentNode
         }
     }
 
-    public override AdmitResult Admit(IReadOnlyList<SpatialObject> objs, byte latticeDepth)
+    public override AdmitResult Admit(Span<SpatialObject> buffer, byte latticeDepth)
     {
-        // Single materialization, once per root .
-        var buffer = objs as SpatialObject[] ?? objs.ToArray();
-
         var stack = new Stack<AdmitWorkFrame>();
-        stack.Push(new AdmitWorkFrame(this, buffer, 0, buffer.Length, latticeDepth));
+        stack.Push(new AdmitWorkFrame(this, buffer, new BufferSlice(0, buffer.Length), latticeDepth));
 
         AdmitResult.BulkCreated? topResult = null;
 
@@ -403,9 +395,8 @@ public abstract class OctetParentNode
                     break;
                 }
 
-                var (start, length) = frame.Buckets[frame.NextBucket];
-
-                if (length == 0)
+                var bucket = frame.Buckets[frame.NextBucket];
+                if (bucket.Length == 0)
                 {
                     frame.NextBucket++;
                     continue;
@@ -417,21 +408,14 @@ public abstract class OctetParentNode
                 // descend
                 if (child is OctetParentNode parent)
                 {
-                    stack.Push(
-                        new AdmitWorkFrame(
-                            parent,
-                            buffer,
-                            start,
-                            length,
-                            frame.LatticeDepth));
+                    stack.Push(new AdmitWorkFrame(parent, buffer, bucket, frame.LatticeDepth));
                     frame.NextBucket++;
                     continue;
                 }
 
                 // leaf path
                 var leaf = (SpatialNode)child;
-                var slice = new ArraySegment<SpatialObject>(buffer, start, length);
-
+                var slice = bucket.GetSpan(buffer);
                 var result = leaf.Admit(slice, frame.LatticeDepth);
 
                 switch (result)
@@ -594,13 +578,23 @@ public abstract class VenueLeafNode(Region bounds, IParentNode parent)
         return AdmitResult.Create(proxy);
     }
 
-    public override AdmitResult Admit(IReadOnlyList<SpatialObject> objs, byte latticeDepth)
+    public override AdmitResult Admit(Span<SpatialObject> buffer, byte latticeDepth)
     {
         using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "Venue.AdmitList: Leaf");
         if (IsRetired)
             return AdmitResult.RetryRequest();
 
-        if (IsAtCapacity(objs.Count) || objs.Any(obj => obj.PositionStackDepth > latticeDepth + 1))
+        bool needsDeeper = false;
+        foreach (var obj in buffer)
+        {
+            if (obj.PositionStackDepth > latticeDepth + 1)
+            {
+                needsDeeper = true;
+                break;
+            }
+        }
+
+        if (IsAtCapacity(buffer.Length) || needsDeeper)
         {
             return CanSubdivide()
                 ? AdmitResult.SubdivideRequest(this)
@@ -609,7 +603,7 @@ public abstract class VenueLeafNode(Region bounds, IParentNode parent)
 
         var outProxies = new List<SpatialObjectProxy>();
 
-        foreach (var obj in objs)
+        foreach (var obj in buffer)
         {
             var proxy = new SpatialObjectProxy(obj, this, obj.LocalPosition);
             Occupy(proxy);
@@ -737,10 +731,10 @@ public class SubLatticeBranchNode
     }
 
 
-    public override AdmitResult Admit(IReadOnlyList<SpatialObject> objs, byte latticeDepth)
+    public override AdmitResult Admit(Span<SpatialObject> buffer, byte latticeDepth)
     {
 #if DEBUG
-        foreach (var obj in objs)
+        foreach (var obj in buffer)
         {
             var proposedPosition = obj.GetPositionAtDepth(latticeDepth);
             if (!Bounds.Contains(proposedPosition))
@@ -748,7 +742,7 @@ public class SubLatticeBranchNode
         }
 #endif
 
-        foreach (var obj in objs)
+        foreach (var obj in buffer)
             if (!obj.HasPositionAtDepth(Sublattice.LatticeDepth))
             {
                 var proposedPosition = obj.GetPositionAtDepth(latticeDepth);
@@ -756,7 +750,7 @@ public class SubLatticeBranchNode
                 obj.AppendPosition(framedPosition);
             }
 
-        return Sublattice.Admit(objs, (byte)(latticeDepth + 1));
+        return Sublattice.Admit(buffer, (byte)(latticeDepth + 1));
     }
 }
 

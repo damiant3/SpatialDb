@@ -64,25 +64,27 @@ public class SpatialLattice : OctetRootNode
         }
         return AdmitResult.BulkCreate([.. results.Cast<AdmitResult.Created>().Select(r => r.Proxy)]);
     }
-    readonly object m_batchLocker = new();
     public AdmitResult Insert(List<SpatialObject> objs)
     {
-        //lock (m_batchLocker)
+        return Insert(objs.ToArray());
+    }
+
+    public AdmitResult Insert(SpatialObject[] objs)
+    {
+        var admitResult = Admit(objs, LatticeDepth);
+        if (admitResult is AdmitResult.BulkCreated created)
         {
-            var admitResult = Admit(objs, LatticeDepth);
-            if (admitResult is AdmitResult.BulkCreated created)
+            foreach (var proxy in created.Proxies)
             {
-                foreach (var proxy in created.Proxies)
+                if (proxy.IsCommitted)
                 {
-                    if (proxy.IsCommitted)
-                    {
-                        throw new InvalidOperationException("Proxy is already committed during bulk insert commit.");
-                    }
-                    proxy.Commit();
+                    throw new InvalidOperationException("Proxy is already committed during bulk insert commit.");
                 }
+                proxy.Commit();
             }
-            return admitResult;
         }
+        return admitResult;
+
     }
 
     public AdmitResult Insert(SpatialObject obj)
