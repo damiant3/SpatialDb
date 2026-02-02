@@ -1,6 +1,7 @@
 ﻿///////////////////////////////
 using SpatialDbLib.Synchronize;
 using System.Buffers;
+using System.Diagnostics;
 
 namespace SpatialDbLib.Lattice;
 
@@ -256,86 +257,124 @@ public abstract class OctetParentNode
     {
         public OctetParentNode Parent;
         public byte LatticeDepth;
-
-        public SpatialObject[] Buffer;
         public int Start;
         public int Length;
-
         public int BucketCount;
         public int NextBucket;
-        public (int Start, int Length)[] Buckets; // length = 8
-        public int OriginalStart;
-        public int OriginalLength;
+
+        public (int Start, int Length)[] Buckets;
         public byte[] BucketChildIndex;
 
-        public List<SpatialObjectProxy> Proxies = [];
+        public List<SpatialObjectProxy> Proxies;
 
         public AdmitWorkFrame(OctetParentNode parent, SpatialObject[] buffer, int start, int length, byte latticeDepth)
         {
             Parent = parent;
-            Buffer = buffer;
             Start = start;
             Length = length;
-            OriginalStart = start;
-            OriginalLength = length;
             LatticeDepth = latticeDepth;
-            Buckets = new (int, int)[8];
-            BucketChildIndex = new byte[8];
-            Partition();
+            NextBucket = 0;
+            BucketCount = 0;
+
+            Buckets ??= new (int, int)[8];
+            BucketChildIndex ??= new byte[8];
+
+            Proxies = [];
+            PartitionInPlace(buffer);
         }
 
-        void Partition()
+        void PartitionInPlace(SpatialObject[] buffer)
         {
-            Span<int> counts = stackalloc int[8];
+            var mid = Parent.Bounds.Mid;
+            var span = buffer.AsSpan(Start, Length);
 
-            var objectSpan = Buffer.AsSpan(Start, Length);
-            var childAssignments = new SelectChildResult[Length];
-            for (int i = 0; i < objectSpan.Length; i++)
-            {
-                childAssignments[i] = Parent.SelectChild(objectSpan[i].GetPositionAtDepth(LatticeDepth)) ?? throw new InvalidOperationException("Containment invariant violated");
-                counts[childAssignments[i].IndexInParent]++;
-            }
-
-            Span<int> offsets = stackalloc int[8];
-            int running = 0;
-            int nextIdx = 0;
-
-            for (int i = 0; i < 8; i++)
-            {
-                int count = counts[i];
-                if (count == 0)
-                    continue;
-
-                offsets[i] = running;
-                Buckets[nextIdx] = (Start + running, count);
-                BucketChildIndex[nextIdx] = (byte)i;
-
-                running += count;
-                nextIdx++;
-            }
-
-            BucketCount = nextIdx;
-
-            var temp = ArrayPool<SpatialObject>.Shared.Rent(Length);
+            // Compute octant index for each object once
+            var octants = ArrayPool<byte>.Shared.Rent(Length);
             try
             {
-                for (int i = 0; i < objectSpan.Length; i++)
+                for (int i = 0; i < Length; i++)
                 {
-                    temp[offsets[childAssignments[i].IndexInParent]++] = objectSpan[i];
+                    var pos = span[i].GetPositionAtDepth(LatticeDepth);
+                    octants[i] = (byte)(
+                        ((pos.X >= mid.X) ? 4 : 0) |
+                        ((pos.Y >= mid.Y) ? 2 : 0) |
+                        ((pos.Z >= mid.Z) ? 1 : 0));
                 }
 
-                temp.AsSpan(0, Length).CopyTo(objectSpan);
+                // Count occurrences
+                Span<int> counts = stackalloc int[8];
+                for (int i = 0; i < Length; i++)
+                    counts[octants[i]]++;
+
+                // Build bucket metadata and compute target positions
+                Span<int> positions = stackalloc int[8];
+                int running = 0;
+                int bucketIdx = 0;
+
+                for (int i = 0; i < 8; i++)
+                {
+                    if (counts[i] == 0)
+                        continue;
+
+                    positions[i] = running;
+                    Buckets[bucketIdx] = (Start + running, counts[i]);
+                    BucketChildIndex[bucketIdx] = (byte)i;
+                    bucketIdx++;
+                    running += counts[i];
+                }
+
+                BucketCount = bucketIdx;
+
+                // Build octant -> compacted bucket lookup
+                Span<int> octantToBucket = stackalloc int[8];
+                octantToBucket.Fill(-1);
+                for (int i = 0; i < BucketCount; i++)
+                    octantToBucket[BucketChildIndex[i]] = i;
+
+                // Compute compacted bucket ranges (relative to span)
+                Span<int> bucketStart = stackalloc int[BucketCount];
+                Span<int> bucketEnd = stackalloc int[BucketCount];
+
+                for (int i = 0; i < BucketCount; i++)
+                {
+                    bucketStart[i] = Buckets[i].Start - Start;
+                    bucketEnd[i] = bucketStart[i] + Buckets[i].Length;
+                }
+
+                // In-place permutation using compacted buckets
+                for (int b = 0; b < BucketCount; b++)
+                {
+                    int pos = bucketStart[b];
+                    byte octant = BucketChildIndex[b];
+
+                    while (pos < bucketEnd[b])
+                    {
+                        byte targetOctant = octants[pos];
+
+                        if (targetOctant == octant)
+                        {
+                            pos++;
+                            continue;
+                        }
+
+                        int targetBucket = octantToBucket[targetOctant];
+                        int swapPos = bucketStart[targetBucket]++;
+
+                        (span[pos], span[swapPos]) = (span[swapPos], span[pos]);
+                        (octants[pos], octants[swapPos]) = (octants[swapPos], octants[pos]);
+                    }
+                }
             }
             finally
             {
-                ArrayPool<SpatialObject>.Shared.Return(temp, clearArray: false);
+                ArrayPool<byte>.Shared.Return(octants, clearArray: false);
             }
         }
     }
 
     public override AdmitResult Admit(IReadOnlyList<SpatialObject> objs, byte latticeDepth)
     {
-        // Single materialization, once.
+        // Single materialization, once per root .
         var buffer = objs as SpatialObject[] ?? objs.ToArray();
 
         var stack = new Stack<AdmitWorkFrame>();
@@ -381,7 +420,7 @@ public abstract class OctetParentNode
                     stack.Push(
                         new AdmitWorkFrame(
                             parent,
-                            frame.Buffer,
+                            buffer,
                             start,
                             length,
                             frame.LatticeDepth));
@@ -391,7 +430,7 @@ public abstract class OctetParentNode
 
                 // leaf path
                 var leaf = (SpatialNode)child;
-                var slice = new ArraySegment<SpatialObject>(frame.Buffer, start, length);
+                var slice = new ArraySegment<SpatialObject>(buffer, start, length);
 
                 var result = leaf.Admit(slice, frame.LatticeDepth);
 

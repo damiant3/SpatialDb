@@ -276,6 +276,27 @@ public class LongVector3Comparer : IComparer<LongVector3>
     }
 }
 
+sealed class OctantComparer(LongVector3 midPoint)
+    : IComparer<LongVector3>
+{
+    readonly LongVector3 m_mid = midPoint;
+
+    public int Compare(LongVector3 a, LongVector3 b)
+    {
+        byte xIdx = (byte)(
+            ((a.X >= m_mid.X) ? 4 : 0) |
+            ((a.Y >= m_mid.Y) ? 2 : 0) |
+            ((a.Z >= m_mid.Z) ? 1 : 0));
+
+        byte yIdx = (byte)(
+            ((b.X >= m_mid.X) ? 4 : 0) |
+            ((b.Y >= m_mid.Y) ? 2 : 0) |
+            ((b.Z >= m_mid.Z) ? 1 : 0));
+
+        return xIdx.CompareTo(yIdx);
+    }
+}
+
 public readonly struct Region
 {
     public Region(LongVector3 min, LongVector3 max)

@@ -170,6 +170,39 @@ public class ParallelContainerTestDiagnostic<T>(int taskCount = 1, int batchSize
     }
 
 
+    public void InsertAsOne(Dictionary<int, List<SpatialObject>> objsToInsert)
+    {
+        var tasks = new List<Task>();
+        for (int j = 0; j < TaskCount; j++)
+        {
+            var k = j;  // capture value for closure below
+            tasks.Add(new Task(() =>
+            {
+                try
+                {
+                    Container!.TestInsertAsOne(objsToInsert[k]);
+                    Interlocked.Add(ref Inserts, BatchSize);
+                }
+                catch
+                {
+                    Interlocked.Add(ref FailedInserts, BatchSize);
+                }
+            }));
+        }
+
+        var cts = StartDiagnosticMonitorTask(tasks);
+        var swInsert = Stopwatch.StartNew();
+        foreach (var task in tasks)
+        {
+            task.Start();
+        }
+        Task.WaitAll([.. tasks]);
+        swInsert.Stop();
+        cts.Cancel();
+        SlimSyncerDiagnostics.FlushAll();
+        TotalInsertTicks += swInsert.ElapsedTicks;
+    }
+
 
     private CancellationTokenSource StartDiagnosticMonitorTask(List<Task> tasks)
     {

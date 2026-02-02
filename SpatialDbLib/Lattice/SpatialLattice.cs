@@ -37,6 +37,33 @@ public class SpatialLattice : OctetRootNode
         return new MultiObjectScope<(SpatialObject, IList<LongVector3>)>(lockedObjects, acquiredLocks);
     }
 
+    public AdmitResult InsertAsOne(List<SpatialObject> objs)
+    {
+        List<AdmitResult> results = [];
+        foreach (var obj in objs)
+        {
+            var admitResult = Admit(obj, obj.LocalPosition, LatticeDepth);
+            if (admitResult is AdmitResult.Created created)
+                results.Add(admitResult);
+            else
+            {
+                foreach (var result in results)
+                {
+                    if (result is AdmitResult.Created createdRollback)
+                    {
+                        createdRollback.Proxy.Rollback();
+                    }
+                }
+                return admitResult;
+            }
+        }
+        foreach (var result in results)
+        {
+            if (result is AdmitResult.Created created)
+                created.Proxy.Commit();
+        }
+        return AdmitResult.BulkCreate([.. results.Cast<AdmitResult.Created>().Select(r => r.Proxy)]);
+    }
     readonly object m_batchLocker = new();
     public AdmitResult Insert(List<SpatialObject> objs)
     {

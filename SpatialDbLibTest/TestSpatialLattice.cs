@@ -27,6 +27,26 @@ public class TestSpatialLattice
             throw;
         }
     }
+
+    public void TestInsertAsOne(List<SpatialObject> objs)
+    {
+        AdmitResult ret;
+        try
+        {
+            ret = InsertAsOne(objs);
+            if (ret is not AdmitResult.BulkCreated)
+            {
+                Debugger.Break();
+            }
+        }
+        catch (Exception ex)
+        {
+            Exceptions[Guid.NewGuid()] = ex;
+            Debugger.Break();
+            throw;
+        }
+    }
+
     public void TestInsert(SpatialObject obj)
     {
         AdmitResult ret;
@@ -81,6 +101,23 @@ public class TestConcurrentDictionary
 {
     public void TestBulkInsert(List<SpatialObject> objs)
     {
+        try
+        {
+            foreach (var obj in objs)
+            {
+                this[obj.Guid] = obj;
+            }
+        }
+        catch (Exception ex)
+        {
+            Exceptions[Guid.NewGuid()] = ex;
+            Debugger.Break();
+            throw;
+        }
+    }
+
+    public void TestInsertAsOne(List<SpatialObject> objs)
+    {   // In ConcurrentDictionary, this is the same as bulk insert, as there are no transactional guarantees made
         try
         {
             foreach (var obj in objs)

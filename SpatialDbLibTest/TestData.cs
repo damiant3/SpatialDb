@@ -1,15 +1,66 @@
 ﻿using SpatialDbLib.Lattice;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
+///////////////////////////
 namespace SpatialDbLibTest;
 
 public partial class ParallelTests
 {
     public int SpaceRange = int.MaxValue;
+
+    public Dictionary<int, List<SpatialObject>> GetTinyClusteredObjects()
+    {
+        var objsToInsert = new Dictionary<int, List<SpatialObject>>();
+        for (int i = 0; i < TASKS_PER_ITERATION; i++)
+        {
+            objsToInsert.Add(i, []);
+
+            // Pick a random cluster center for this batch
+            var clusterCenter = new LongVector3(
+                FastRandom.NextInt(-SpaceRange, SpaceRange),
+                FastRandom.NextInt(-SpaceRange, SpaceRange),
+                FastRandom.NextInt(-SpaceRange, SpaceRange));
+
+            // 12 objects tightly clustered around that center (fits in one leaf)
+            for (int j = 0; j < 10000; j++)
+            {
+                // Small offset from cluster center (within same leaf bounds)
+                var offset = new LongVector3(
+                    FastRandom.NextInt(-100, 100),
+                    FastRandom.NextInt(-100, 100),
+                    FastRandom.NextInt(-100, 100));
+
+                objsToInsert[i].Add(
+                    new SpatialObject([
+                        new LongVector3(
+                        clusterCenter.X + offset.X,
+                        clusterCenter.Y + offset.Y,
+                        clusterCenter.Z + offset.Z)
+                    ]));
+            }
+        }
+        return objsToInsert;
+    }
+
+    public Dictionary<int, List<SpatialObject>> GetTinyDispersedObjects()
+    {
+        var objsToInsert = new Dictionary<int, List<SpatialObject>>();
+        for (int i = 0; i < TASKS_PER_ITERATION; i++)
+        {
+            objsToInsert.Add(i, []);
+
+            // Only 5 objects per batch, maximally dispersed
+            for (int j = 0; j < 256; j++)
+            {
+                objsToInsert[i].Add(
+                    new SpatialObject([
+                        new LongVector3(
+                        FastRandom.NextInt(-SpaceRange, SpaceRange),
+                        FastRandom.NextInt(-SpaceRange, SpaceRange),
+                        FastRandom.NextInt(-SpaceRange, SpaceRange))
+                    ]));
+            }
+        }
+        return objsToInsert;
+    }
 
     public Dictionary<int, List<SpatialObject>> GetSkewedObjects()
     {
