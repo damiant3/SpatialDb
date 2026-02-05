@@ -1,44 +1,64 @@
 ﻿///////////////////////////////
 using SpatialDbLib.Synchronize;
-using System.Diagnostics;
 
 namespace SpatialDbLib.Lattice;
 
-public class SpatialLattice : OctetRootNode
+public class SpatialRootNode
+    : RootNode<OctetParentNode, OctetBranchNode, LargeLeafNode, SpatialRootNode>
 {
-    public SpatialLattice()
-        : base(LatticeUniverse.RootRegion)
+    public SpatialRootNode(Region bounds, byte latticeDepth)
+        : base(bounds, latticeDepth)
     {
-        BoundsTransform = new ParentToSubLatticeTransform(LatticeUniverse.RootRegion);
     }
 
+    protected override OctetBranchNode CreateBranch(OctetParentNode parent, Region bounds)
+    {
+        throw new NotImplementedException();
+    }
+
+    protected override LargeLeafNode CreateVenue(OctetParentNode parent, Region bounds)
+    {
+        throw new NotImplementedException();
+    }
+}
+public interface ISpatialLattice : ISpatialNode
+{
+    byte LatticeDepth { get; }
+    VenueLeafNode? ResolveLeafFromOuterLattice(SpatialObject obj);
+    AdmitResult AdmitForInsert(Span<SpatialObject> buffer);
+
+    ParentToSubLatticeTransform BoundsTransform { get; }
+
+}
+
+public class SpatialLattice
+    : ISpatialLattice,
+      ISpatialNode
+{
+    [ThreadStatic] private static byte t_latticeDepth;
+    public static byte CurrentThreadLatticeDepth
+    => t_latticeDepth;
+
+    internal protected readonly SpatialRootNode m_root;
+    public ParentToSubLatticeTransform BoundsTransform { get; protected set; }
+
+    public SpatialLattice() // for the rootiest of roots
+        : this(LatticeUniverse.RootRegion, 0)
+    {
+    }
+    
     public SpatialLattice(Region outerBounds, byte latticeDepth)
-        : base(LatticeUniverse.RootRegion)
     {
-        LatticeDepth = latticeDepth;
-        BoundsTransform = new ParentToSubLatticeTransform(outerBounds);
-    }
-
-    public readonly ParentToSubLatticeTransform BoundsTransform;
-    public readonly byte LatticeDepth;
-
-    public static MultiObjectScope<(SpatialObject, IList<LongVector3>)> LockAndSnapshot(IEnumerable<SpatialObject> objects)
-    {
-        var lockedObjects = new List<(SpatialObject, IList<LongVector3>)>();
-        var acquiredLocks = new List<SlimSyncer>();
-
-        foreach (var obj in objects)
+        m_root = new SpatialRootNode(LatticeUniverse.RootRegion, latticeDepth)
         {
-            var s = new SlimSyncer(((ISync)obj).Sync, SlimSyncer.LockMode.Write, $"SpatialLattice.LockAndSnapshot: Object({obj.Guid})");
-            acquiredLocks.Add(s);
-            //lockedObjects.Add(new (obj, obj.GetPositionStack()));
-        }
-
-        return new MultiObjectScope<(SpatialObject, IList<LongVector3>)>(lockedObjects, acquiredLocks);
+            OwningLattice = this
+        };
+        BoundsTransform = new ParentToSubLatticeTransform(outerBounds);
     }
 
     public AdmitResult InsertAsOne(List<SpatialObject> objs)
     {
+        using var s = PushLatticeDepth(LatticeDepth);
         List<AdmitResult> results = [];
         foreach (var obj in objs)
         {
@@ -71,15 +91,13 @@ public class SpatialLattice : OctetRootNode
 
     public AdmitResult Insert(SpatialObject[] objs)
     {
+        using var s = PushLatticeDepth(LatticeDepth);
         var admitResult = Admit(objs);
         if (admitResult is AdmitResult.BulkCreated created)
         {
             foreach (var proxy in created.Proxies)
             {
-                if (proxy.IsCommitted)
-                {
-                    throw new InvalidOperationException("Proxy is already committed during bulk insert commit.");
-                }
+                if (proxy.IsCommitted) throw new InvalidOperationException("Proxy is already committed during bulk insert commit.");
                 proxy.Commit();
             }
         }
@@ -89,7 +107,8 @@ public class SpatialLattice : OctetRootNode
 
     public AdmitResult Insert(SpatialObject obj)
     {
-        using var s = new SlimSyncer(((ISync)obj).Sync, SlimSyncer.LockMode.Write, "SpatialLattice.Insert: Object");
+        using var s = PushLatticeDepth(LatticeDepth);
+        using var s2 = new SlimSyncer(((ISync)obj).Sync, SlimSyncer.LockMode.Write, "SpatialLattice.Insert: Object");
         var admitResult = Admit(obj, obj.LocalPosition);
         if (admitResult is AdmitResult.Created created)
             created.Proxy.Commit();
@@ -98,94 +117,113 @@ public class SpatialLattice : OctetRootNode
 
     public void Remove(SpatialObject obj)
     {
-        using var s = new SlimSyncer(((ISync)obj).Sync, SlimSyncer.LockMode.Write, "SpatialLattice.Remove: Object");
+        using var s = PushLatticeDepth(LatticeDepth);
+        using var s2 = new SlimSyncer(((ISync)obj).Sync, SlimSyncer.LockMode.Write, "SpatialLattice.Remove: Object");
         while (true)
         {
-            var leaf = ResolveOccupyingLeaf(obj);
+            var leaf = m_root.ResolveOccupyingLeaf(obj);
             if (leaf == null) return;
             leaf.Vacate(obj);
             return;
         }
     }
+    public void AdmitMigrants(IList<SpatialObject> objs)
+    {
+        foreach (var obj in objs)
+        {
+            var inner = BoundsTransform.OuterToInnerInsertion(obj.LocalPosition, obj.Guid);
+            obj.AppendPosition(inner);
+        }
+        m_root.AdmitMigrants(objs);
+    }
+
+    public byte LatticeDepth  => m_root.LatticeDepth;
+
+    // i need a class/method that returns an IDisposable, and on Dispose it resets the lattice depth to the previous value.
+    // this is for the case where we need to temporarily set the lattice depth for a call, but we want to be sure it gets reset even if an exception is thrown.
+    public IDisposable PushLatticeDepth(byte depth)
+    {
+        return new LatticeDepthScope(depth);
+    }
+    class LatticeDepthScope : IDisposable
+    {
+        public LatticeDepthScope(byte depth)
+        {
+            t_latticeDepth = depth;
+        }
+        public void Dispose()
+        {
+            t_latticeDepth--;
+        }
+    }
+    public AdmitResult Admit(SpatialObject obj, LongVector3 proposedPosition)
+    {
+        using var s = PushLatticeDepth(LatticeDepth);
+        return m_root.Admit(obj, proposedPosition);
+    }
+
+    public AdmitResult Admit(Span<SpatialObject> buffer)
+    {
+        using var s = PushLatticeDepth(LatticeDepth);
+        return m_root.Admit(buffer);
+    }
+
+    // is this useful?  presumably nobody can even target this during construction/migration into it.
+    //public IDisposable LockAndSnapshotForMigration()
+    //{
+    //    return m_root.LockAndSnapshotForMigration(out var snapshot);
+    //}
 
     public VenueLeafNode? ResolveLeafFromOuterLattice(SpatialObject obj)
     {
-#if DEBUG
-        if(obj.PositionStackDepth <= LatticeDepth)
-        {
-            throw new InvalidOperationException("Object position stack depth is less than or equal to lattice depth during outer lattice leaf resolution.");
-        }
-#endif
-        return ResolveLeaf(obj);
+        using var s = PushLatticeDepth(LatticeDepth);
+        return m_root.ResolveLeafFromOuterLattice(obj);
     }
 
-    public VenueLeafNode? ResolveOccupyingLeaf(SpatialObject obj)
+    public AdmitResult AdmitForInsert(Span<SpatialObject> buffer)
     {
-        var resolveleaf = ResolveLeaf(obj);
-        if (resolveleaf == null) return null;
-        if (!resolveleaf.Contains(obj))
-        {
-            return null;
-        }
-        return resolveleaf;
-    }
-
-    public VenueLeafNode? ResolveLeaf(SpatialObject obj)
-    {
-        LongVector3 pos = obj.GetPositionStack()[LatticeDepth];
-        ISpatialNode current = this;
-        while (current != null)
-        {
-            switch (current)
+        foreach (var obj in buffer)
+            // the following sequence seems like it should move down to the sublattice.  why this branch cares about this.
+            if (!obj.HasPositionAtDepth(LatticeDepth))
             {
-                case SubLatticeBranchNode sublatticebranch:
-                    return sublatticebranch.Sublattice.ResolveLeafFromOuterLattice(obj);
-
-                case OctetParentNode parent:
-                {
-                    var result = parent.SelectChild(pos)
-                        ?? throw new InvalidOperationException("Failed to select child during occupation resolution");
-                    current = result.ChildNode;
-                    break;
-                }
-                case VenueLeafNode leaf:
-                {
-                    using var s3 = new SlimSyncer(((ISync)leaf).Sync, SlimSyncer.LockMode.Read, "SpatialLattice.ResolveLeaf: Leaf");
-                    return leaf;
-                }
-                default:
-                    throw new InvalidOperationException("Unknown node type during occupation resolution");
+                var proposedPosition = obj.GetPositionAtDepth(LatticeDepth - 1);
+                var framedPosition = BoundsTransform.OuterToInnerInsertion(proposedPosition, obj.Guid);
+                obj.AppendPosition(framedPosition);
             }
-        }
-        return null;
+
+        return Admit(buffer);
     }
 
-    public override void AdmitMigrants(IList<SpatialObject> objs)
+    internal VenueLeafNode? ResolveOccupyingLeaf(SpatialObject obj)
     {
-        List<KeyValuePair<ISpatialNode, List<SpatialObject>>> migrantsByTargetChild = [];
-
-#if DEBUG
-        if (objs.Any(a => a.PositionStackDepth > LatticeDepth + 1))
-        {
-            Debugger.Break();
-            throw new InvalidOperationException($"Occupant has depth > lattice");
-        }
-#endif
-
-        foreach (var obj in objs)
-        {
-            var innerPosition = BoundsTransform.OuterToInnerInsertion(obj.LocalPosition, obj.Guid);
-            obj.AppendPosition(innerPosition);
-            if (!Bounds.Contains(obj.LocalPosition)) throw new InvalidOperationException("Migrant has no home.");
-            if (SelectChild(obj.LocalPosition) is not SelectChildResult selectChildResult) throw new InvalidOperationException("Containment invariant violated");
-            var migrantSubGroup = migrantsByTargetChild.Find(kvp => kvp.Key == selectChildResult.ChildNode);
-            if (migrantSubGroup.Key != null && migrantSubGroup.Value != null)
-                migrantSubGroup.Value.Add(obj);
-            else
-                migrantsByTargetChild.Add(new KeyValuePair<ISpatialNode, List<SpatialObject>>(selectChildResult.ChildNode, [obj]));
-        }
-
-        foreach (var kvp in migrantsByTargetChild)
-            kvp.Key.AdmitMigrants(kvp.Value);
+        using var s = PushLatticeDepth(LatticeDepth);
+        return m_root.ResolveOccupyingLeaf(obj);
     }
+
+    internal VenueLeafNode? ResolveLeaf(SpatialObject obj)
+    {
+        using var s = PushLatticeDepth(LatticeDepth);
+        return m_root.ResolveLeaf(obj);
+    }
+
+    //public static MultiObjectScope<(SpatialObject, IList<LongVector3>)> LockAndSnapshot(IEnumerable<SpatialObject> objects)
+    //{
+    //    var lockedObjects = new List<(SpatialObject, IList<LongVector3>)>();
+    //    var acquiredLocks = new List<SlimSyncer>();
+
+    //    foreach (var obj in objects)
+    //    {
+    //        var s = new SlimSyncer(((ISync)obj).Sync, SlimSyncer.LockMode.Write, $"SpatialLattice.LockAndSnapshot: Object({obj.Guid})");
+    //        acquiredLocks.Add(s);
+    //        //lockedObjects.Add(new (obj, obj.GetPositionStack()));
+    //    }
+
+    //    return new MultiObjectScope<(SpatialObject, IList<LongVector3>)>(lockedObjects, acquiredLocks);
+    //}
+
+
+
+
+
+
 }

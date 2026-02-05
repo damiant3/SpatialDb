@@ -102,18 +102,17 @@ public partial class ParallelTests
     {
         var objsToInsert = new Dictionary<int, List<SpatialObject>>();
 
-        var a = new LongVector3(-SpaceRange + 1, -SpaceRange + 1, -SpaceRange + 1);
-        var b = new LongVector3(SpaceRange - 1, SpaceRange - 1, SpaceRange - 1);
+        var a = new LongVector3(-SpaceRange + 1);
+        var b = new LongVector3(SpaceRange - 1);
 
+        //var a = new LongVector3(1);
+        //var b = new LongVector3(-1);
         for (int i = 0; i < TASKS_PER_ITERATION; i++)
         {
             objsToInsert.Add(i, []);
             for (int j = 0; j < BATCH_SIZE; j++)
             {
-                objsToInsert[i].Add(
-                    new SpatialObject([
-                        (j & 1) == 0 ? a : b
-                    ]));
+                objsToInsert[i].Add((j % 2) == 0 ? new SpatialObject([a]) : new SpatialObject([b]));
             }
         }
 
@@ -124,7 +123,7 @@ public partial class ParallelTests
     {
         var objsToInsert = new Dictionary<int, List<SpatialObject>>();
 
-        var center = new LongVector3(0, 0, 0);
+        var center = LongVector3.Zero;
         int variance = SpaceRange / 1024; // very tight cluster
 
         for (int i = 0; i < TASKS_PER_ITERATION; i++)

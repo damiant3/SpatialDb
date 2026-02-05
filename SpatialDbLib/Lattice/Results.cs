@@ -45,10 +45,10 @@ public abstract class AdmitResult
 
 }
 
-public readonly struct SelectChildResult(byte indexInParent, IChildNode childNode)
+public readonly struct SelectChildResult(byte indexInParent, IChildNode<OctetParentNode> childNode)
 {
     public readonly byte IndexInParent = indexInParent;
-    public readonly IChildNode ChildNode = childNode;
+    public readonly IChildNode<OctetParentNode> ChildNode = childNode;
 }
 
 

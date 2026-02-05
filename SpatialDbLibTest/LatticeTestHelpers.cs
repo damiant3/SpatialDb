@@ -4,21 +4,28 @@ namespace SpatialDbLibTest;
 
 public class LatticeTestHelpers
 {
-    public static SpatialLattice GetOwningLattice(ISpatialNode region)
+    public static ISpatialLattice GetOwningLattice(ISpatialNode region)
     {
         var current = region;
-
         while (true)
         {
-            if (current is SpatialLattice lattice)
-                return lattice;
-
-            current = current switch
+            switch (current)
             {
-                VenueLeafNode leaf => leaf.Parent,
-                OctetBranchNode branch => branch.Parent,
-                _ => throw new InvalidOperationException("Unexpected region type")
-            };
+                case SpatialRootNode root:
+                    return root.OwningLattice
+                        ?? throw new InvalidOperationException("Root has no owning lattice");
+
+                case LeafNode leaf:
+                    current = leaf.Parent;
+                    break;
+
+                case OctetBranchNode branch:
+                    current = branch.Parent;
+                    break;
+
+                default:
+                    throw new InvalidOperationException($"Unexpected node type: {current.GetType().Name}");
+            }
         }
     }
 

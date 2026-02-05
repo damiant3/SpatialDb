@@ -55,7 +55,7 @@ namespace SpatialDbLibTest
             return sb.ToString();
         }
 
-        public void Cleanup() => CreateChildLeafNodes();
+        public void Cleanup() => m_root.CreateChildLeafNodes();
     }
 
     public class TestConcurrentDictionary

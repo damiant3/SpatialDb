@@ -12,4 +12,20 @@
     <None Remove="Distance\**" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Remove="Simulation\TickableSpatialNode.cs" />
+    <Compile Remove="Simulation\TickableSpatialObject.cs" />
+    <Compile Remove="Simulation\TickableVenueLeafNode.cs" />
+    <Compile Remove="Simulation\TickResult.cs" />
+    <Compile Remove="Simulation\Time.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Simulation\TickableSpatialNode.cs" />
+    <None Include="Simulation\TickableSpatialObject.cs" />
+    <None Include="Simulation\TickableVenueLeafNode.cs" />
+    <None Include="Simulation\TickResult.cs" />
+    <None Include="Simulation\Time.cs" />
+  </ItemGroup>
+
 </Project>

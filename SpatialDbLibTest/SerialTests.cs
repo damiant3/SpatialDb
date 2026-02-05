@@ -67,7 +67,7 @@ public class SerialTests
                 switch (n)
                 {
                     case SubLatticeBranchNode s:
-                        Scan(s.Sublattice);
+                        Scan(s.Sublattice.m_root);
                         break;
                     case VenueLeafNode l:
                         if (l.Contains(obj)) count++;
@@ -79,7 +79,7 @@ public class SerialTests
                 }
             }
 
-            Scan(lattice);
+            Scan(lattice.m_root);
             Assert.AreEqual(1, count);
         }
         Console.WriteLine("Object exists in exactly one leaf passed.");

@@ -54,6 +54,9 @@ public partial class ParallelTests
     [TestMethod]
     public void BulkInsertStress()
     {
+        Console.WriteLine("=== Bimodal Distribution ===");
+        RunInsertBulk(GetBimodalObjects());
+
         Console.WriteLine("=== Single Path Distribution ===");
         RunInsertBulk(GetSinglePathObjects());
 
@@ -61,8 +64,7 @@ public partial class ParallelTests
         RunInsertBulk(GetSkewedObjects());
         Console.WriteLine("=== Uniform Distribution ===");
         RunInsertBulk(GetUniformObjects());
-        Console.WriteLine("=== Bimodal Distribution ===");
-        RunInsertBulk(GetBimodalObjects());
+
         Console.WriteLine("=== Clustered Distribution ===");
         RunInsertBulk(GetClusteredObjects());
 
