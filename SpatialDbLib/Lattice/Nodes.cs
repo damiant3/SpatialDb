@@ -8,20 +8,15 @@ public interface ISpatialNode
     AdmitResult Admit(SpatialObject obj, LongVector3 proposedPosition);
     AdmitResult Admit(Span<SpatialObject> buffer);
     void AdmitMigrants(IList<SpatialObject> obj);
-    //IDisposable LockAndSnapshotForMigration();
 }
 
 public abstract class SpatialNode(Region bounds)
     : ISync
 {
     public Region Bounds { get; } = bounds;
-
     protected readonly ReaderWriterLockSlim Sync  = new(LockRecursionPolicy.SupportsRecursion);
     ReaderWriterLockSlim ISync.Sync => Sync;
-
     public abstract void AdmitMigrants(IList<SpatialObject> obj);
-    //public abstract IDisposable LockAndSnapshotForMigration();
-
     public abstract AdmitResult Admit(SpatialObject obj, LongVector3 proposedPosition);
     public abstract AdmitResult Admit(Span<SpatialObject> buffer);
 }
@@ -36,7 +31,6 @@ public interface IParentNode : ISpatialNode
         List<SpatialObject> occupantsSnapshot);
 
     VenueLeafNode CreateNewVenueNode(int i, LongVector3 childMin, LongVector3 childMax);
-
 }
 
 public interface IChildNode<TParent> : ISpatialNode
@@ -45,8 +39,8 @@ public interface IChildNode<TParent> : ISpatialNode
     public TParent Parent { get; }
 }
 
-public abstract class RootNode<TParent, TBranch, TVenue, TSelf>
-    : OctetParentNode
+public abstract class RootNode<TParent, TBranch, TVenue, TSelf>(Region bounds, byte latticeDepth)
+    : OctetParentNode(bounds)
     where TParent : OctetParentNode
     where TBranch : OctetBranchNode
     where TVenue : VenueLeafNode
@@ -55,24 +49,12 @@ public abstract class RootNode<TParent, TBranch, TVenue, TSelf>
     protected RootNode(Region bounds)
         : this(bounds, 0) { }
 
-    protected RootNode(Region bounds, byte latticeDepth)
-        : base(bounds)
-    {
-        LatticeDepth = latticeDepth;
-    }
-
     internal ISpatialLattice? OwningLattice { get; set; }
-    protected abstract TBranch CreateBranch(TParent parent, Region bounds);
-    protected abstract TVenue CreateVenue(TParent parent, Region bounds);
 
-    public readonly byte LatticeDepth;
-
-
+    public readonly byte LatticeDepth = latticeDepth;
 
     public override void AdmitMigrants(IList<SpatialObject> objs)
-    {
-        BucketAndDispatchMigrants(objs);
-    }
+        => BucketAndDispatchMigrants(objs);
 
     public VenueLeafNode? ResolveLeafFromOuterLattice(SpatialObject obj)
     {
@@ -85,17 +67,7 @@ public abstract class RootNode<TParent, TBranch, TVenue, TSelf>
 }
 
 public class OctetRootNode(Region bounds)
-    : RootNode<OctetParentNode, OctetBranchNode, LargeLeafNode, OctetRootNode>(bounds)
-{
-    protected override OctetBranchNode CreateBranch(OctetParentNode parent, Region bounds)
-    {
-        return new OctetBranchNode(bounds, parent, []);
-    }
-    protected override LargeLeafNode CreateVenue(OctetParentNode parent, Region bounds)
-    {
-        return new LargeLeafNode(bounds, parent);
-    }
-}
+    : RootNode<OctetParentNode, OctetBranchNode, LargeLeafNode, OctetRootNode>(bounds) { }
 
 public abstract class OctetParentNode
     : SpatialNode,
@@ -133,9 +105,7 @@ public abstract class OctetParentNode
     }
 
     public virtual VenueLeafNode CreateNewVenueNode(int i, LongVector3 childMin, LongVector3 childMax)
-    {
-        return new LargeLeafNode(new(childMin, childMax), this);
-    }
+        => new LargeLeafNode(new(childMin, childMax), this);
 
     public SelectChildResult? SelectChild(LongVector3 pos)
     {
@@ -235,9 +205,8 @@ public abstract class OctetParentNode
     }
 
     public override void AdmitMigrants(IList<SpatialObject> objs)
-    {
-        BucketAndDispatchMigrants(objs);
-    }
+        => BucketAndDispatchMigrants(objs);
+
 
     public struct AdmitFrame(OctetParentNode parent, IChildNode<OctetParentNode> childNode, byte childIndex)
     {
@@ -307,11 +276,9 @@ public abstract class OctetParentNode
         byte latticeDepth,
         bool branchOrSublattice,
         List<SpatialObject> occupantsSnapshot)
-    {
-        return branchOrSublattice
+        => branchOrSublattice
             ? new OctetBranchNode(subdividingleaf.Bounds, parent, occupantsSnapshot)
             : new SubLatticeBranchNode(subdividingleaf.Bounds, parent, (byte)(latticeDepth + 1), occupantsSnapshot);
-    }
 
     public void SubdivideAndMigrate(OctetParentNode parent, VenueLeafNode subdividingleaf, byte latticeDepth, int childIndex, bool branchOrSublattice)
     {
@@ -354,69 +321,66 @@ public abstract class OctetParentNode
             Proxies = [];
             PartitionInPlace(workingSlice.GetSpan(rootBuffer), latticeDepth);
         }
-
         void PartitionInPlace(Span<SpatialObject> span, byte latticeDepth)
         {
             var mid = Parent.Bounds.Mid;
-            var octants = ArrayPool<byte>.Shared.Rent(span.Length);
-            try
+            using var s = RentArray(span.Length, out var octants);
+            for (int i = 0; i < span.Length; i++)
             {
-                for (int i = 0; i < span.Length; i++)
-                {
-                    var pos = span[i].GetPositionAtDepth(latticeDepth);
-                    octants[i] = (byte)(
-                        ((pos.X >= mid.X) ? 4 : 0) |
-                        ((pos.Y >= mid.Y) ? 2 : 0) |
-                        ((pos.Z >= mid.Z) ? 1 : 0));
-                }
-                Span<int> counts = stackalloc int[8];
-                for (int i = 0; i < span.Length; i++) counts[octants[i]]++;
-
-                int runningOffset = 0;
-                byte bucketIdx = 0;
-                for (byte i = 0; i < 8; i++)
-                {
-                    if (counts[i] == 0) continue;
-                    Buckets[bucketIdx] = new (WorkingSlice.Start + runningOffset, counts[i]);
-                    BucketChildIndex[bucketIdx] = i;
-                    bucketIdx++;
-                    runningOffset += counts[i];
-                }
-                BucketCount = bucketIdx;
-
-                Span<int> bucketStart = stackalloc int[BucketCount];
-                Span<int> bucketEnd = stackalloc int[BucketCount];
-                for (byte i = 0; i < BucketCount; i++)
-                {
-                    bucketStart[i] = Buckets[i].Start - WorkingSlice.Start;
-                    bucketEnd[i] = bucketStart[i] + Buckets[i].Length;
-                }
-
-                Span<int> octantToBucket = stackalloc int[8];
-                octantToBucket.Fill(-1);
-                for (byte i = 0; i < BucketCount; i++) octantToBucket[BucketChildIndex[i]] = i;
-                for (byte b = 0; b < BucketCount; b++)
-                {
-                    int pos = bucketStart[b];
-                    byte octant = BucketChildIndex[b];
-                    while (pos < bucketEnd[b])
-                    {
-                        byte targetOctant = octants[pos];
-                        if (targetOctant == octant) { pos++; continue; }
-                        int targetBucket = octantToBucket[targetOctant];
-                        int swapPos = bucketStart[targetBucket]++;
-                        (span[pos], span[swapPos]) = (span[swapPos], span[pos]);
-                        (octants[pos], octants[swapPos]) = (octants[swapPos], octants[pos]);
-                    }
-                }
+                var pos = span[i].GetPositionAtDepth(latticeDepth);
+                octants[i] = (byte)(
+                    ((pos.X >= mid.X) ? 4 : 0) |
+                    ((pos.Y >= mid.Y) ? 2 : 0) |
+                    ((pos.Z >= mid.Z) ? 1 : 0));
             }
-            finally
+            Span<int> counts = stackalloc int[8];
+            for (int i = 0; i < span.Length; i++) counts[octants[i]]++;
+
+            int runningOffset = 0;
+            byte bucketIdx = 0;
+            for (byte i = 0; i < 8; i++)
             {
-                ArrayPool<byte>.Shared.Return(octants, clearArray: false);
+                if (counts[i] == 0) continue;
+                Buckets[bucketIdx] = new(WorkingSlice.Start + runningOffset, counts[i]);
+                BucketChildIndex[bucketIdx] = i;
+                bucketIdx++;
+                runningOffset += counts[i];
+            }
+            BucketCount = bucketIdx;
+
+            Span<int> bucketStart = stackalloc int[BucketCount];
+            Span<int> bucketEnd = stackalloc int[BucketCount];
+            for (byte i = 0; i < BucketCount; i++)
+            {
+                bucketStart[i] = Buckets[i].Start - WorkingSlice.Start;
+                bucketEnd[i] = bucketStart[i] + Buckets[i].Length;
+            }
+
+            Span<int> octantToBucket = stackalloc int[8];
+            octantToBucket.Fill(-1);
+            for (byte i = 0; i < BucketCount; i++) octantToBucket[BucketChildIndex[i]] = i;
+            for (byte b = 0; b < BucketCount; b++)
+            {
+                int pos = bucketStart[b];
+                byte octant = BucketChildIndex[b];
+                while (pos < bucketEnd[b])
+                {
+                    byte targetOctant = octants[pos];
+                    if (targetOctant == octant) { pos++; continue; }
+                    int targetBucket = octantToBucket[targetOctant];
+                    int swapPos = bucketStart[targetBucket]++;
+                    (span[pos], span[swapPos]) = (span[swapPos], span[pos]);
+                    (octants[pos], octants[swapPos]) = (octants[swapPos], octants[pos]);
+                }
             }
         }
-    }
 
+        private static ArrayRentalContract RentArray(int length, out byte[] array)
+        {
+            array = ArrayPool<byte>.Shared.Rent(length);
+            return new ArrayRentalContract(array);
+        }
+    }
     public override AdmitResult Admit(Span<SpatialObject> buffer)
     {
         var stack = new Stack<AdmitWorkFrame>();
@@ -503,7 +467,6 @@ public abstract class OctetParentNode
         }
     }
 }
-
 public class OctetBranchNode
     : OctetParentNode,
       IChildNode<OctetParentNode>
@@ -525,9 +488,7 @@ public abstract class LeafNode(Region bounds, OctetParentNode parent)
     public OctetParentNode Parent { get; } = parent;
 
     public virtual bool CanSubdivide()
-    {
-        return Bounds.Size.X > 1 && Bounds.Size.Y > 1 && Bounds.Size.Z > 1;
-    }
+        => Bounds.Size.X > 1 && Bounds.Size.Y > 1 && Bounds.Size.Z > 1;
 }
 
 public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
@@ -536,7 +497,6 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
     internal IList<SpatialObject> Occupants { get; } = [];
     internal bool m_isRetired = false;
     public bool IsRetired => m_isRetired;
-
     public bool Contains(SpatialObject obj)
     {
         using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Read, "Venue.Contains: Leaf");
@@ -549,15 +509,10 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
     }
 
     internal void Vacate(SpatialObject obj)
-    {
-        Occupants.Remove(obj);
-    }
+        => Occupants.Remove(obj);
 
     private void Occupy(SpatialObject obj)
-    {
-        // private, assumes write lock held and is not retired
-        Occupants.Add(obj);
-    }
+        => Occupants.Add(obj); // private, assumes write lock held and is not retired
 
     internal void Retire()
     {
@@ -575,9 +530,7 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
 
     public virtual int Capacity => 8;
     public bool IsAtCapacity(int toAdd = 1)
-    {
-        return Occupants.Count + toAdd > Capacity;
-    }
+        => Occupants.Count + toAdd > Capacity;
 
     public override void AdmitMigrants(IList<SpatialObject> objs)
     {
@@ -708,9 +661,8 @@ public class SubLatticeBranchNode
         Sublattice.AdmitMigrants(migrants);
     }
     public override void AdmitMigrants(IList<SpatialObject> objs)
-    {
-        Sublattice.AdmitMigrants(objs);
-    }
+        => Sublattice.AdmitMigrants(objs);
+
     public override AdmitResult Admit(SpatialObject obj, LongVector3 proposedPosition)
     {
         if (!Bounds.Contains(proposedPosition))
@@ -726,40 +678,7 @@ public class SubLatticeBranchNode
     }
 
     public VenueLeafNode? ResolveLeafFromOuterLattice(SpatialObject obj)
-    {
-        return Sublattice.ResolveLeafFromOuterLattice(obj);
-    }
-
-
-    // the following method, I believe, was put in while trying to rundown a race condition above in the stack and is not actually necessary.
-    // this should get called by the thread making the sublattice, so no reason to take the locks here.
-    //public override MultiObjectScope<IChildNode<OctetParentNode>> LockAndSnapshotForMigration()
-    //{
-    //    var locksAcquired = new List<SlimSyncer>();
-    //    var nodesLocked = new List<IChildNode<OctetParentNode>>();
-    //    try
-    //    {
-    //        if (!((ISync)Sublattice).Sync.IsWriteLockHeld)
-    //            locksAcquired.Add(new(((ISync)Sublattice).Sync, SlimSyncer.LockMode.Write, "SublatticeBranch.LockAndSnap: Sublattice"));
-
-    //        foreach (var child in Sublattice.Children)
-    //        {
-    //            if (!((ISync)child).Sync.IsWriteLockHeld)
-    //            {
-    //                var childLock = new SlimSyncer(((ISync)child).Sync, SlimSyncer.LockMode.Write, "SublatticeBranch.LockAndSnap: Child");
-    //                locksAcquired.Add(childLock);
-    //            }
-    //            nodesLocked.Add(child);
-    //        }
-    //        return new (nodesLocked, locksAcquired);
-    //    }
-    //    catch
-    //    {
-    //        foreach (var l in locksAcquired)
-    //            l.Dispose();
-    //        throw;
-    //    }
-    //}
+        => Sublattice.ResolveLeafFromOuterLattice(obj);
 
     public override AdmitResult Admit(Span<SpatialObject> buffer)
     {
@@ -771,8 +690,6 @@ public class SubLatticeBranchNode
                 throw new InvalidOperationException($"Object outside SublatticeBranch bounds: {proposedPosition}");
         }
 #endif
-
         return Sublattice.AdmitForInsert(buffer);
     }
 }
-

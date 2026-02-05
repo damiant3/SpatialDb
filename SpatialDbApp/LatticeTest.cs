@@ -54,7 +54,6 @@ namespace SpatialDbLibTest
                 sb.AppendLine($"Object {kvp.Key}: {kvp.Value}");
             return sb.ToString();
         }
-
         public void Cleanup() => m_root.CreateChildLeafNodes();
     }
 
