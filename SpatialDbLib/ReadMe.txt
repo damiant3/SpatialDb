@@ -227,3 +227,64 @@ If you want, next time you have an idea—even a half-formed one—you can start wit
 "I have a shape, not a design yet. Help me find the invariants."
 
 That is the fastest path from intuition to working code in this medium.
+
+
+# Addendum: Working with GitHub Copilot (Claude Sonnet 4.5) – February 2026
+
+After the initial development phase documented above (completed with a different AI assistant), the project entered a critical extension phase: adding real-time simulation capabilities through a generic tickable system.
+
+This phase revealed and resolved one of the most subtle and insidious bugs in modern C#:
+
+**The Bug: ThreadStatic Fields in Generic Types**
+
+The original spatial lattice used `[ThreadStatic] private static byte t_latticeDepth` inside `SpatialLattice<TRoot>` to track nested lattice depth during tree traversal. This worked perfectly for the base `SpatialLattice<OctetRootNode>`.
+
+However, when extending the system with `TickableSpatialLattice : SpatialLattice<TickableRootNode>`, deep insertions mysteriously failed. Objects that should have been inserted into sublattices at depth 1 were incorrectly triggering subdivision logic as if depth were still 0.
+
+**What Made This Bug Particularly Difficult:**
+
+1. **Silent Failure**: The assignment `t_latticeDepth = 1` appeared to execute in the debugger, but the variable remained 0.
+2. **Debugger Confusion**: Watch windows showed the "wrong" variable because each generic instantiation has its own copy of static fields.
+3. **Pattern Matching Limitations**: `SubLatticeBranchNode<TickableSpatialLattice>` couldn't match patterns expecting `SubLatticeBranchNode<ISpatialLattice>` due to generic variance rules.
+
+**Root Cause:**
+
+Each closed generic type (`SpatialLattice<OctetRootNode>`, `SpatialLattice<TickableRootNode>`) gets **separate instances** of all static fields, including `[ThreadStatic]` ones. Code in `Nodes.cs` calling `SpatialLattice.CurrentThreadLatticeDepth` was reading from `SpatialLattice<OctetRootNode>`'s field, while the tickable code was writing to `SpatialLattice<TickableRootNode>`'s field—two completely different memory locations.
+
+**The Fix:**
+
+Move the `[ThreadStatic]` field to a non-generic static class:
+internal static class LatticeDepthContext { [ThreadStatic] private static byte t_latticeDepth;
+public static byte CurrentDepth
+{
+    get => t_latticeDepth;
+    set => t_latticeDepth = value;
+}
+}
+
+All generic instantiations now share a single depth-tracking context.
+
+**Additional Solutions:**
+
+- Added `ISubLatticeBranch` interface to enable pattern matching across generic `SubLatticeBranchNode<T>` types
+- Added `GetRootNode()` to `ISpatialLattice` for test traversal
+- Implemented `ITickableChildNode` on all tickable node types for proper polymorphic casting
+
+**Collaboration Insights:**
+
+Unlike the previous assistant (documented in the original postmortem), GitHub Copilot excelled at:
+
+- **Persistent debugging** through confusing symptoms without premature pattern-matching
+- **Type system reasoning** about generic variance, interface inheritance, and static field semantics
+- **Incremental validation** through immediate testing and diagnostic suggestions
+- **Recognizing when to stop** rather than over-engineering solutions
+
+The key difference: when told "the assignment is failing silently in the debugger," Copilot didn't dismiss it as impossible—it investigated the type system until finding the one obscure rule that explained everything.
+
+**Performance Achievement:**
+
+The completed tickable system processes **200,000 moving objects in 84ms** (2.38M objects/second) with near-perfect linear scaling, demonstrating production-ready performance for MMO-scale real-time spatial simulations.
+
+**Lesson Learned:**
+
+`[ThreadStatic]` and generic types don't mix. This is documented behavior, but so obscure that even experienced C# developers can spend days debugging it. When you need thread-local state shared across generic instantiations, **always use a non-generic holder class**.

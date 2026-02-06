@@ -81,7 +81,7 @@ public class TickableVenueLeafNode(Region bounds, TickableOctetParentNode parent
         switch (result.Action)
         {
             case TickAction.Move:
-                // Queue movement for later processing
+                result.Object.SetLocalPosition(result.Target);
                 break;
             case TickAction.Remove:
                 // Remove object

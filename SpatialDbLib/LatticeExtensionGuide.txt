@@ -1,292 +1,198 @@
 🏗️ Developer Guide: Extending the Spatial Lattice System
+
+========================================
 Architecture Overview
+========================================
+
 The spatial lattice uses a type family pattern with generic base classes to support polymorphic node hierarchies. This allows you to create parallel hierarchies (e.g., standard vs. tickable) without code duplication.
-Core Hierarchy
-SpatialLattice (facade/coordinator)
+
+Core Hierarchy:
+
+SpatialLattice<TRoot> (generic coordinator)
   └─ RootNode<TParent, TBranch, TVenue, TSelf> (generic root with type family)
        └─ OctetParentNode (parent node logic)
-            └─ OctetBranchNode (parent with parent)
+            ├─ OctetBranchNode (branch with parent)
             └─ LeafNode (abstract leaf)
-                 └─ VenueLeafNode (leaf with occupants)
-                 └─ SubLatticeBranchNode (nested lattice)
-Key Principles
+                 ├─ VenueLeafNode (leaf with occupants)
+                 └─ SubLatticeBranchNode<TLattice> (nested lattice)
 
-Type Families Travel Together: Branch, Venue, and Root types must be compatible
-ThreadStatic Depth Tracking: SpatialLattice.CurrentThreadLatticeDepth tracks context
-Position Stacks: Objects have position stacks; use GetPositionAtDepth(depth) for navigation
-Factories in Root: Root node knows concrete types via abstract factory methods
+Key Principles:
 
+1. Type Families Travel Together: Branch, Venue, and Root types must be compatible
+2. Shared Depth Tracking: LatticeDepthContext.CurrentDepth is thread-local but shared across ALL generic instantiations
+3. Position Stacks: Objects have position stacks; use GetPositionAtDepth(depth) for navigation
+4. Factories in Root: Root node knows concrete types via virtual factory methods
+5. Interface-Based Polymorphism: Use marker interfaces (e.g., ISubLatticeBranch) for pattern matching across generic types
 
-🎯 How to Add New Capabilities (e.g., Tick)
+(Damian's note:)
+Claude Sonnet 4.5 is very proud of us finding the bug below, and wrote this general warning to help you avoid the same mistake!
+What s/he fails to realize is how, there are like, i dunno, 3 people i've ever known who would care. lol.  Without further adieu...
+
+========================================
+⚠️ CRITICAL: ThreadStatic and Generic Types
+========================================
+
+NEVER put [ThreadStatic] fields in generic classes! Each closed generic type gets separate static field instances.
+
+WRONG PATTERN:
+  public class SpatialLattice<TRoot> {
+      [ThreadStatic] private static byte t_depth;  // ❌ Separate instance per TRoot!
+  }
+
+RIGHT PATTERN:
+  internal static class LatticeDepthContext {
+      [ThreadStatic] private static byte t_latticeDepth;  // ✅ Shared by all
+      public static byte CurrentDepth { get; set; }
+  }
+
+This was the source of a multi-day debugging session where assignments appeared to work in the debugger but the value never changed. The debugger was showing the wrong generic instantiation's copy of the field!
+
+========================================
+🎯 How to Add New Capabilities (Example: Tickable System)
+========================================
+
 Step 1: Define Your Interfaces
+--------------------------------------
 Create interfaces for the new behavior at each level:
-csharp// For nodes that can be ticked
-public interface ITickableSpatialNode : ISpatialNode
-{
-    void Tick();
-}
 
-// For objects that participate in ticking
-public interface ITickableObject
-{
-    TickResult? Tick();  // Returns movement/action request
-}
+- ITickableSpatialNode: Interface for nodes that can be ticked
+- ITickableObject: Interface for objects that participate in ticking
+- ITickableChildNode: Combines child behavior with tickable behavior
 
-// For child nodes in tickable hierarchy
-public interface ITickableChildNode : IChildNode<TickableOctetParentNode>, ITickableSpatialNode
-{
-    // Combines child behavior with tickable behavior
-}
 Step 2: Create Tickable Base Classes
+--------------------------------------
 Extend the core hierarchy with tickable versions:
-csharp// Tickable parent node
-public class TickableOctetParentNode : OctetParentNode, ITickableSpatialNode
-{
-    public TickableOctetParentNode(Region bounds) : base(bounds) { }
-    
-    // Override Children to return tickable children
-    public new ITickableChildNode[] Children => 
-        base.Children.Cast<ITickableChildNode>().ToArray();
-    
-    // Implement tick behavior
-    public virtual void Tick()
-    {
-        foreach (var child in Children)
-            child.Tick();
-    }
-}
 
-// Tickable branch
-public class TickableOctetBranchNode 
-    : TickableOctetParentNode, 
-      ITickableChildNode
-{
-    public TickableOctetBranchNode(Region bounds, OctetParentNode parent, IList<SpatialObject> migrants)
-        : base(bounds)
-    {
-        Parent = (TickableOctetParentNode)parent;
-        AdmitMigrants(migrants);
-    }
-    
-    public new TickableOctetParentNode Parent { get; }
-    OctetParentNode IChildNode<OctetParentNode>.Parent => Parent;
-}
+- TickableOctetParentNode: Extends OctetParentNode, implements ITickableSpatialNode
+- TickableOctetBranchNode: Extends TickableOctetParentNode, implements ITickableChildNode
+- TickableVenueLeafNode: Extends VenueLeafNode, implements ITickableChildNode
 
-// Tickable venue leaf
-public class TickableVenueLeafNode 
-    : VenueLeafNode, 
-      ITickableChildNode
-{
-    private List<ITickableObject> m_tickableObjects = new();
-    
-    public TickableVenueLeafNode(Region bounds, OctetParentNode parent) 
-        : base(bounds, parent) { }
-    
-    public void RegisterForTicks(ITickableObject obj)
-    {
-        if (!m_tickableObjects.Contains(obj))
-            m_tickableObjects.Add(obj);
-    }
-    
-    public void Tick()
-    {
-        foreach (var obj in m_tickableObjects.ToList())  // Copy to avoid modification during iteration
-        {
-            var result = obj.Tick();
-            if (result.HasValue)
-            {
-                // Handle movement/removal requests
-                HandleTickResult(result.Value);
-            }
-        }
-    }
-    
-    private void HandleTickResult(TickResult result)
-    {
-        switch (result.Action)
-        {
-            case TickAction.Move:
-                // Queue movement for later processing
-                break;
-            case TickAction.Remove:
-                // Remove object
-                break;
-        }
-    }
-}
+IMPORTANT: All child node types must implement BOTH:
+  - IChildNode<OctetParentNode> for base class compatibility (explicit interface)
+  - ITickableChildNode for tickable hierarchy (public implementation)
+
 Step 3: Create Tickable Root Node
+--------------------------------------
 Define the root that declares the tickable type family:
-public class TickableSpatialRootNode 
-    : RootNode<TickableOctetParentNode, TickableOctetBranchNode, TickableVenueLeafNode, TickableSpatialRootNode>
-{
-    public TickableSpatialRootNode(Region bounds, byte latticeDepth)
-        : base(bounds, latticeDepth) { }
-    
-    // Root knows how to tick
-    public void Tick()
-    {
-        // Tick all children
-        foreach (var child in Children.Cast<ITickableSpatialNode>())
-            child.Tick();
-    }
-}
+
+Create TickableRootNode<TParent, TBranch, TVenue, TSelf> extending TickableOctetParentNode
+Must implement IRootNode with the tickable type family
+Override CreateBranchNodeWithLeafs to create tickable branches and sublattices
+Override CreateNewVenueNode to create tickable venue leafs
+Implement ResolveLeafFromOuterLattice for sublattice boundary crossing
+
 Step 4: Create Tickable Lattice Facade
-The public-facing class that users interact with:
-public class TickableSpatialLattice : ISpatialLattice
-{
-    protected readonly TickableSpatialRootNode m_root;
-    public ParentToSubLatticeTransform BoundsTransform { get; protected set; }
-    
-    public TickableSpatialLattice() 
-        : this(LatticeUniverse.RootRegion, 0) { }
-    
-    public TickableSpatialLattice(Region outerBounds, byte latticeDepth)
-    {
-        m_root = new TickableSpatialRootNode(LatticeUniverse.RootRegion, latticeDepth)
-        {
-            OwningLattice = this
-        };
-        BoundsTransform = new ParentToSubLatticeTransform(outerBounds);
-    }
-    
-    public byte LatticeDepth => m_root.LatticeDepth;
-    
-    // Delegate all ISpatialLattice methods to m_root
-    public AdmitResult Insert(SpatialObject obj)
-    {
-        using var s = SpatialLattice.PushLatticeDepth(LatticeDepth);
-        using var s2 = new SlimSyncer(((ISync)obj).Sync, SlimSyncer.LockMode.Write, "Insert");
-        
-        var positionAtThisDepth = obj.GetPositionAtDepth(LatticeDepth);
-        var admitResult = m_root.Admit(obj, positionAtThisDepth);
-        
-        if (admitResult is AdmitResult.Created created)
-            created.Proxy.Commit();
-        
-        return admitResult;
-    }
-    
-    // ... other ISpatialLattice methods ...
-    
-    // New tickable functionality
-    public void Tick()
-    {
-        using var s = SpatialLattice.PushLatticeDepth(LatticeDepth);
-        m_root.Tick();
-    }
-}
+--------------------------------------
+Inherit from SpatialLattice<TRoot> to get all standard functionality:
+
+Create TickableSpatialLattice extending SpatialLattice<TickableRootNode>
+Override CreateRoot to return your custom TickableRootNode
+Add new methods like Tick() that delegate to m_root
+No need to reimplement Insert, Remove, etc. - inherit them!
+
 Step 5: Handle Sublattices
-Create tickable sublattice branch node:
-public class TickableSubLatticeBranchNode : SubLatticeBranchNode, ITickableChildNode
-{
-    internal new TickableSpatialLattice Sublattice { get; set; }
-    
-    public TickableSubLatticeBranchNode(
-        Region bounds, 
-        OctetParentNode parent, 
-        byte latticeDepth, 
-        IList<SpatialObject> migrants)
-        : base(bounds, parent)
-    {
-        Sublattice = new TickableSpatialLattice(bounds, latticeDepth);
-        Sublattice.AdmitMigrants(migrants);
-        base.Sublattice = Sublattice;  // Set base class property
-    }
-    
-    public void Tick()
-    {
-        Sublattice.Tick();
-    }
-}
-Step 6: Override Factory Methods in Root
-Tell the root how to create tickable nodes:
-public class TickableSpatialRootNode : RootNode<...>
-{
-    // Override factory from OctetParentNode
-    public override IChildNode<OctetParentNode> CreateBranchNodeWithLeafs(
-        OctetParentNode parent,
-        VenueLeafNode subdividingLeaf,
-        byte latticeDepth,
-        bool branchOrSublattice,
-        List<SpatialObject> occupantsSnapshot)
-    {
-        return branchOrSublattice
-            ? new TickableOctetBranchNode(subdividingLeaf.Bounds, parent, occupantsSnapshot)
-            : new TickableSubLatticeBranchNode(subdividingLeaf.Bounds, parent, (byte)(latticeDepth + 1), occupantsSnapshot);
-    }
-    
-    public override VenueLeafNode CreateNewVenueNode(int i, LongVector3 childMin, LongVector3 childMax)
-    {
-        return new TickableVenueLeafNode(new Region(childMin, childMax), this);
-    }
-}
+--------------------------------------
+Create tickable sublattice branch node using SubLatticeBranchNode<TLattice>:
 
+Extend SubLatticeBranchNode<TickableSpatialLattice>
+Implement both IChildNode<OctetParentNode> and ITickableChildNode
+Pass (byte)(latticeDepth + 1) to sublattice constructor
+Store Parent as TickableOctetParentNode with explicit interface implementation for OctetParentNode
+
+========================================
 🧪 Testing Your Extension
-Test Template
-csharp[TestMethod]
-public void Test_TickableBasicFunctionality()
-{
-    var lattice = new TickableSpatialLattice();
-    
-    // 1. Insert tickable object
-    var obj = new TickableSpatialObject([new(100, 100, 100)]);
-    obj.Velocity = new IntVector3(10, 0, 0);  // Set movement
-    
-    lattice.Insert(obj);
-    
-    // 2. Verify insertion worked
-    var leaf = lattice.ResolveOccupyingLeaf(obj);
-    Assert.IsNotNull(leaf);
-    Assert.IsInstanceOfType(leaf, typeof(TickableVenueLeafNode));
-    
-    // 3. Tick the lattice
-    lattice.Tick();
-    
-    // 4. Verify tick behavior occurred
-    // (e.g., object moved, state changed, etc.)
-}
+========================================
 
-[TestMethod]
-public void Test_TickableWithSublattices()
-{
-    var lattice = new TickableSpatialLattice();
-    
-    // Force sublattice creation
-    for (int i = 0; i < 20; i++)
-    {
-        var obj = new TickableSpatialObject([new(1, 1, 1)]);
-        lattice.Insert(obj);
-    }
-    
-    // Verify tick propagates through sublattices
-    lattice.Tick();
-    
-    // Verify all objects were ticked
-}
+Basic Functionality Test:
+- Insert tickable object
+- Verify insertion into correct leaf type
+- Register object for ticks
+- Add time delay (Thread.Sleep) to ensure measurable delta
+- Call Tick() and verify movement occurred
 
-⚠️ Common Pitfalls
-1. Mismatched Type Families
-If root creates TickableOctetBranchNode but expects OctetBranchNode, you'll get cast exceptions. Keep types consistent.
-2. Not Overriding CreateBranchNodeWithLeafs
-The base OctetParentNode.CreateBranchNodeWithLeafs creates non-tickable nodes. Override it in your tickable root!
-3. Forgetting Sublattice Variants
-Regular sublattices won't tick. Make TickableSubLatticeBranchNode that contains TickableSpatialLattice.
+Sublattice Propagation Test:
+- Insert 20+ objects at same location to force sublattice creation
+- Call Tick() and verify no errors
+- Validates tick propagation through nested lattices
 
-📋 Checklist for New Extension
+Performance Benchmark:
+- Test with increasing object counts (1k, 10k, 50k, 100k, 200k)
+- Measure insertion time separately from tick time
+- Calculate objects/second throughput
+- Verify linear scaling
 
- Define interfaces for new behavior (ITickableSpatialNode, etc.)
- Create extended parent node class (TickableOctetParentNode)
- Create extended branch node class (TickableOctetBranchNode)
- Create extended venue leaf class (TickableVenueLeafNode)
- Create extended sublattice branch class (TickableSubLatticeBranchNode)
- Create root node declaring type family (TickableSpatialRootNode)
- Create facade class (TickableSpatialLattice)
- Override factory methods in root node
- Add PushLatticeDepth to all facade entry points
- Write unit tests for basic functionality
- Write unit tests for sublattice scenarios
- Write concurrent stress tests
+Expected Performance (Reference):
+  1,000 objects:    < 1ms tick time (∞ objects/sec)
+  10,000 objects:   ~10ms tick time (1,000,000 objects/sec)
+  50,000 objects:   ~21ms tick time (2,380,000 objects/sec)
+  100,000 objects:  ~47ms tick time (2,127,000 objects/sec)
+  200,000 objects:  ~84ms tick time (2,380,000 objects/sec)
 
+Linear scaling maintained up to 200k+ objects!
 
-This pattern lets you extend the lattice without touching existing code. The generic RootNode does the heavy lifting, you just declare your type family and implement your new behavior!
-Good luck with Tick! 
+At 10 ticks/second (100ms budget): ~238,000 active moving objects
+At 60 ticks/second (16.6ms budget): ~39,600 active moving objects
+
+========================================
+⚠️ Common Pitfalls & Solutions
+========================================
+
+1. Cast Exceptions on Child Nodes
+Problem: "Unable to cast object of type 'TickableVenueLeafNode' to type 'ITickableChildNode'"
+Solution: Ensure ALL child node types implement ITickableChildNode:
+  - TickableVenueLeafNode ✅
+  - TickableOctetBranchNode ✅
+  - TickableSubLatticeBranchNode ✅
+
+2. Type Mismatch in CreateBranchNodeWithLeafs
+Problem: Cannot return TickableOctetBranchNode from method requiring IChildNode<OctetParentNode>
+Solution: Implement explicit interface for base type:
+  OctetParentNode IChildNode<OctetParentNode>.Parent => Parent;
+
+3. Generic SubLatticeBranchNode Not Matching Pattern
+Problem: SubLatticeBranchNode<TickableSpatialLattice> doesn't match SubLatticeBranchNode<ISpatialLattice>
+Solution: Use the ISubLatticeBranch marker interface in pattern matching:
+  case ISubLatticeBranch sublattice:
+      return sublattice.GetSublattice().ResolveLeafFromOuterLattice(obj);
+
+========================================
+📋 Extension Checklist
+========================================
+
+When adding a new capability (like Tick):
+
+☐ Define interfaces for new behavior (ITickableSpatialNode, ITickableChildNode)
+☐ Create extended parent node class (TickableOctetParentNode)
+☐ Create extended branch node class (TickableOctetBranchNode)
+☐ Create extended venue leaf class (TickableVenueLeafNode)
+☐ Create extended sublattice branch class (TickableSubLatticeBranchNode)
+☐ Create root node declaring type family (TickableRootNode)
+☐ Create facade class inheriting SpatialLattice<TRoot> (TickableSpatialLattice)
+☐ Override CreateRoot() to return your custom root
+☐ Override CreateBranchNodeWithLeafs() in root node
+☐ Override CreateNewVenueNode() in root node
+☐ Implement explicit IChildNode<OctetParentNode> interfaces where needed
+☐ Write unit test for basic functionality
+☐ Write unit test for sublattice scenarios
+☐ Write performance benchmark
+
+========================================
+🚀 Summary
+========================================
+
+This pattern lets you extend the lattice without modifying core code. The generic SpatialLattice<TRoot> and RootNode handle the infrastructure—you just:
+
+1. Define your interfaces
+2. Extend the node types
+3. Override factory methods
+4. Inherit from SpatialLattice<YourRoot>
+
+The result is a fully functional parallel hierarchy with all the lattice's spatial partitioning, thread-safety, and performance characteristics intact.
+
+Key Lessons Learned from Tickable Implementation:
+- Generic types with [ThreadStatic] are dangerous - use non-generic holder classes
+- Pattern matching across generic instantiations requires marker interfaces
+- Explicit interface implementations solve type compatibility issues
+- Performance scales linearly to 200k+ objects with proper spatial partitioning
+
+Good luck with your extension!
