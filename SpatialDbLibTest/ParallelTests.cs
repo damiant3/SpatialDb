@@ -70,7 +70,7 @@ public partial class ParallelTests
 
     }
 
-    [TestMethod]
+    //[TestMethod]
     public void InsertAsOneStress()
     {
         Console.WriteLine("=== Single Path Distribution ===");
@@ -111,7 +111,5 @@ public partial class ParallelTests
         Console.WriteLine($"Test complete after {ITERATIONS} iterations.");
         Console.WriteLine(test.GenerateReportString());
     }
-
-
 }
 

@@ -14,16 +14,10 @@
 
   <ItemGroup>
     <Compile Remove="LatticeExtensionGuide.cs" />
-    <Compile Remove="Simulation\TickableSpatialNode.cs" />
-    <Compile Remove="Simulation\TickableSpatialObject.cs" />
-    <Compile Remove="Simulation\TickResult.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include="LatticeExtensionGuide.cs" />
-    <None Include="Simulation\TickableSpatialNode.cs" />
-    <None Include="Simulation\TickableSpatialObject.cs" />
-    <None Include="Simulation\TickResult.cs" />
   </ItemGroup>
 
 </Project>

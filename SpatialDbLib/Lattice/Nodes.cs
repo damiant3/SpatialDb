@@ -287,7 +287,7 @@ public abstract class OctetParentNode
         }
     }
 
-    public IChildNode<OctetParentNode> CreateBranchNodeWithLeafs(
+    public virtual IChildNode<OctetParentNode> CreateBranchNodeWithLeafs(
         OctetParentNode parent,
         VenueLeafNode subdividingleaf,
         byte latticeDepth,
@@ -655,28 +655,18 @@ public class LargeLeafNode(Region bounds, OctetParentNode parent)
     public override int Capacity => 16;
 }
 
-public class SubLatticeBranchNode
+public abstract class SubLatticeBranchNode<TLattice>
     : LeafNode
+    where TLattice : ISpatialLattice
 {
-    internal SpatialLattice Sublattice { get; set; }
+    internal TLattice Sublattice { get; set; }
+
     protected SubLatticeBranchNode(Region bounds, OctetParentNode parent)
         : base(bounds, parent)
     {
-        Sublattice = null!;  // to be initialized by subclass constructor
+        Sublattice = default!;  // to be initialized by subclass constructor
     }
 
-    public SubLatticeBranchNode(Region bounds, OctetParentNode parent, byte latticeDepth, IList<SpatialObject> migrants)
-        : base(bounds, parent)
-    {
-        Sublattice = new SpatialLattice(bounds, latticeDepth);
-#if DEBUG
-        if (migrants.Any(a => a.PositionStackDepth > latticeDepth + 1))
-        {
-            throw new InvalidOperationException($"Occupant has depth > lattice");
-        }
-#endif
-        Sublattice.AdmitMigrants(migrants);
-    }
     public override void AdmitMigrants(IList<SpatialObject> objs)
         => Sublattice.AdmitMigrants(objs);
 
@@ -708,5 +698,22 @@ public class SubLatticeBranchNode
         }
 #endif
         return Sublattice.AdmitForInsert(buffer);
+    }
+}
+
+public class SubLatticeBranchNode
+    : SubLatticeBranchNode<SpatialLattice>
+{
+    public SubLatticeBranchNode(Region bounds, OctetParentNode parent, byte latticeDepth, IList<SpatialObject> migrants)
+        : base(bounds, parent)
+    {
+        Sublattice = new SpatialLattice(bounds, latticeDepth);
+#if DEBUG
+        if (migrants.Any(a => a.PositionStackDepth > latticeDepth + 1))
+        {
+            throw new InvalidOperationException($"Occupant has depth > lattice");
+        }
+#endif
+        Sublattice.AdmitMigrants(migrants);
     }
 }
