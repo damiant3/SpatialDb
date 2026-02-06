@@ -13,21 +13,31 @@ public class SpatialLattice: SpatialLattice<OctetRootNode>
 
 public interface ISpatialLattice : ISpatialNode
 {
+    ISpatialNode GetRootNode();
     byte LatticeDepth { get; }
     VenueLeafNode? ResolveLeafFromOuterLattice(SpatialObject obj);
     AdmitResult AdmitForInsert(Span<SpatialObject> buffer);
     ParentToSubLatticeTransform BoundsTransform { get; }
 }
+internal static class LatticeDepthContext
+{
+    [ThreadStatic] private static byte t_latticeDepth;
 
+    public static byte CurrentDepth
+    {
+        get => t_latticeDepth;
+        set => t_latticeDepth = value;
+    }
+}
 public class SpatialLattice<TRoot>
     : ISpatialLattice,
       ISpatialNode
     where TRoot : IRootNode<OctetParentNode, OctetBranchNode, VenueLeafNode, TRoot>
 {
-    [ThreadStatic] private static byte t_latticeDepth;
-    public static byte CurrentThreadLatticeDepth
-        => t_latticeDepth;
 
+    public static byte CurrentThreadLatticeDepth => LatticeDepthContext.CurrentDepth;
+
+    public ISpatialNode GetRootNode() => m_root;
     internal protected readonly TRoot m_root;
     public ParentToSubLatticeTransform BoundsTransform { get; protected set; }
 
@@ -58,12 +68,13 @@ public class SpatialLattice<TRoot>
         private readonly byte m_previousDepth;
         public LatticeDepthScope(byte depth)
         {
-            m_previousDepth = t_latticeDepth;
-            t_latticeDepth = depth;
+            m_previousDepth = LatticeDepthContext.CurrentDepth;
+            LatticeDepthContext.CurrentDepth = depth;
         }
+
         public void Dispose()
         {
-            t_latticeDepth = m_previousDepth;
+            LatticeDepthContext.CurrentDepth = m_previousDepth;
         }
     }
 
@@ -119,7 +130,7 @@ public class SpatialLattice<TRoot>
     {
         using var s = PushLatticeDepth(LatticeDepth);
         using var s2 = new SlimSyncer(((ISync)obj).Sync, SlimSyncer.LockMode.Write, "SpatialLattice.Insert: Object");
-        var admitResult = Admit(obj, obj.GetPositionAtDepth(t_latticeDepth));
+        var admitResult = Admit(obj, obj.GetPositionAtDepth(LatticeDepthContext.CurrentDepth));
         if (admitResult is AdmitResult.Created created)
             created.Proxy.Commit();
         return admitResult;

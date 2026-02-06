@@ -33,8 +33,8 @@ public class TickableOctetParentNode(Region bounds)
 
 public class TickableOctetBranchNode
     : TickableOctetParentNode,
-      IChildNode<OctetParentNode>, // Implement IChildNode<OctetParentNode> for compatibility
-      IChildNode<TickableOctetParentNode>
+      IChildNode<OctetParentNode>,
+      ITickableChildNode
 {
     public TickableOctetBranchNode(Region bounds, TickableOctetParentNode parent, IList<SpatialObject> migrants)
         : base(bounds)
@@ -51,12 +51,11 @@ public class TickableOctetBranchNode
 public class TickableVenueLeafNode(Region bounds, TickableOctetParentNode parent)
     : VenueLeafNode(bounds, parent),
       ITickableSpatialNode,
-      IChildNode<OctetParentNode>
+      ITickableChildNode
 {
     private List<ITickableObject> m_tickableObjects = [];
 
     public new TickableOctetParentNode Parent { get; } = parent;
-    OctetParentNode IChildNode<OctetParentNode>.Parent => Parent;
 
     public void RegisterForTicks(ITickableObject obj)
     {
@@ -115,7 +114,7 @@ public class TickableRootNode<TParent, TBranch, TVenue, TSelf>(Region bounds, by
 
         return branchOrSublattice
             ? new TickableOctetBranchNode(tickableLeaf.Bounds, tickableParent, occupantsSnapshot)
-            : new TickableSubLatticeBranchNode(tickableLeaf.Bounds, tickableParent, (byte)(latticeDepth + 1), occupantsSnapshot);
+            : new TickableSubLatticeBranchNode(tickableLeaf.Bounds, tickableParent, latticeDepth, occupantsSnapshot);
     }
 
     public override VenueLeafNode CreateNewVenueNode(int i, LongVector3 childMin, LongVector3 childMax)
@@ -123,14 +122,19 @@ public class TickableRootNode<TParent, TBranch, TVenue, TSelf>(Region bounds, by
 
     public VenueLeafNode? ResolveLeafFromOuterLattice(SpatialObject obj)
     {
-        throw new NotImplementedException();
+#if DEBUG
+        if (obj.PositionStackDepth <= LatticeDepth)
+            throw new InvalidOperationException("Object position stack depth is less than or equal to lattice depth during outer lattice leaf resolution.");
+#endif
+        return ResolveLeaf(obj);
     }
 }
-public class TickableRootNode :
+public class TickableRootNode : 
     TickableRootNode<TickableOctetParentNode, TickableOctetBranchNode, TickableVenueLeafNode, TickableRootNode>,
     IRootNode<OctetParentNode, OctetBranchNode, VenueLeafNode, TickableRootNode>
 {
     public TickableRootNode(Region bounds) : base(bounds) { }
+    public TickableRootNode(Region bound, byte latticeDepth) : base(bound, latticeDepth) { }
 }
 public class TickableSpatialLattice(Region outerBounds, byte latticeDepth)
     : SpatialLattice<TickableRootNode>(outerBounds, latticeDepth),
@@ -138,9 +142,9 @@ public class TickableSpatialLattice(Region outerBounds, byte latticeDepth)
 {
     public TickableSpatialLattice()
         :this(LatticeUniverse.RootRegion, 0) { }
-    protected override TickableRootNode CreateRoot(Region bounds, byte depth)
+    protected override TickableRootNode CreateRoot(Region bounds, byte latticeDepth)
     {
-        return new TickableRootNode(bounds);
+        return new TickableRootNode(bounds, latticeDepth);
     }
 
     public void Tick()
@@ -154,7 +158,7 @@ public class TickableSubLatticeBranchNode
       IChildNode<OctetParentNode>,
       ITickableChildNode
 {
-    public TickableOctetParentNode Parent { get; }
+    public new TickableOctetParentNode Parent { get; }  // not proud of this new
     OctetParentNode IChildNode<OctetParentNode>.Parent => Parent;
 
     public TickableSubLatticeBranchNode(
@@ -165,7 +169,7 @@ public class TickableSubLatticeBranchNode
         : base(bounds, parent)
     {
         Parent = parent;
-        Sublattice = new TickableSpatialLattice(bounds, latticeDepth);
+        Sublattice = new TickableSpatialLattice(bounds, (byte)(latticeDepth+1));
         Sublattice.AdmitMigrants(migrants);
     }
 

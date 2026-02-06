@@ -171,14 +171,14 @@ public abstract class OctetParentNode
 
     public VenueLeafNode? ResolveLeaf(SpatialObject obj)
     {
-        LongVector3 pos = obj.GetPositionStack()[SpatialLattice.CurrentThreadLatticeDepth];
+        LongVector3 pos = obj.GetPositionStack()[LatticeDepthContext.CurrentDepth];
         ISpatialNode current = this;
         while (current != null)
         {
             switch (current)
             {
-                case SubLatticeBranchNode sublatticebranch:
-                    return sublatticebranch.ResolveLeafFromOuterLattice(obj);
+                case ISubLatticeBranch sublatticebranch:
+                    return sublatticebranch.GetSublattice().ResolveLeafFromOuterLattice(obj);
 
                 case OctetParentNode parent:
                 {
@@ -655,11 +655,18 @@ public class LargeLeafNode(Region bounds, OctetParentNode parent)
     public override int Capacity => 16;
 }
 
+public interface ISubLatticeBranch
+{
+    ISpatialLattice GetSublattice();
+}
+
 public abstract class SubLatticeBranchNode<TLattice>
-    : LeafNode
+    : LeafNode,
+      ISubLatticeBranch
     where TLattice : ISpatialLattice
 {
     internal TLattice Sublattice { get; set; }
+    public ISpatialLattice GetSublattice() => Sublattice;
 
     protected SubLatticeBranchNode(Region bounds, OctetParentNode parent)
         : base(bounds, parent)
@@ -701,8 +708,9 @@ public abstract class SubLatticeBranchNode<TLattice>
     }
 }
 
+
 public class SubLatticeBranchNode
-    : SubLatticeBranchNode<SpatialLattice>
+    : SubLatticeBranchNode<ISpatialLattice>
 {
     public SubLatticeBranchNode(Region bounds, OctetParentNode parent, byte latticeDepth, IList<SpatialObject> migrants)
         : base(bounds, parent)

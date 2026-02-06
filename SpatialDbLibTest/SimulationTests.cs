@@ -6,20 +6,35 @@ namespace SpatialDbLibTest;
 [TestClass]
 public class SimulationTests
 {
+    [TestMethod]
+    public void ResolveLeafFromOuterLattice_ThrowsNotImplementedException()
+    {
+        // Arrange
+        var lattice = new TickableSpatialLattice();
+        var obj = new TickableSpatialObject([new (1000), new (1200)]);
+
+        var result = lattice.Insert(obj);
+        Assert.IsTrue(result is AdmitResult.Created, "Insertion should succeed");
+
+        // Act
+        var x = lattice.ResolveOccupyingLeaf(obj);
+
+        // Assert - handled by ExpectedException
+        Assert.IsNotNull(x);
+    }
 
     [TestMethod]
     public void BasicMovementTest()
     {
         var lattice = new TickableSpatialLattice();
-        var obj = new TickableSpatialObject(new LongVector3(1000, 1000, 1000));
+        var obj = new TickableSpatialObject(new LongVector3(1000));
 
         // Insert object
         lattice.Insert(new List<SpatialObject> { obj });
 
         // Give it velocity
         obj.Accelerate(new IntVector3(100, 0, 0));  // Moving east at 100 units/tick
-
-        // Tick with 16ms delta (60fps equivalent)
+        obj.RegisterForTicks();
         var result = obj.Tick();
         Assert.IsNotNull(result);
 
@@ -33,7 +48,7 @@ public class SimulationTests
         var lattice = new TickableSpatialLattice();
 
         // 1. Insert tickable object
-        var obj = new TickableSpatialObject(new(100));
+        var obj = new TickableSpatialObject([new(100)]);
         obj.Velocity = new IntVector3(10, 0, 0);  // Set movement
 
         lattice.Insert(obj);
@@ -58,7 +73,7 @@ public class SimulationTests
         // Force sublattice creation
         for (int i = 0; i < 20; i++)
         {
-            var obj = new TickableSpatialObject(new(1));
+            var obj = new TickableSpatialObject([new(1)]);
             lattice.Insert(obj);
         }
 

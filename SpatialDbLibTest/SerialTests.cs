@@ -73,9 +73,9 @@ public class SerialTests
         {
             switch (node)
             {
-                case SubLatticeBranchNode s:
+                case ISubLatticeBranch s:
                     sublatticeCount++;
-                    CountSublattices(s.Sublattice.m_root);
+                    CountSublattices(s.GetSublattice().GetRootNode());
                     break;
                 case OctetParentNode p:
                     foreach (var c in p.Children)
@@ -248,8 +248,8 @@ public class SerialTests
             {
                 switch (n)
                 {
-                    case SubLatticeBranchNode s:
-                        Scan(s.Sublattice.m_root);
+                    case ISubLatticeBranch s:
+                        Scan(s.GetSublattice().GetRootNode());
                         break;
                     case VenueLeafNode l:
                         if (l.Contains(obj)) count++;

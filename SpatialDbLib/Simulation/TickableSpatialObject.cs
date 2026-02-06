@@ -27,15 +27,14 @@ public static class SimulationPolicy
     }
 }
 
-public class TickableSpatialObject(LongVector3 position)
-    : SpatialObject([position]),
+public class TickableSpatialObject(List<LongVector3> position)
+    : SpatialObject(position),
       ITickableObject
 {
-
+    public TickableSpatialObject(LongVector3 position) : this([position]) { }
     private IntVector3 m_velocity = new(0);
-    private ShortVector3 m_remainder = new(0);
 
-    private long m_lastTick = DateTime.Now.Ticks;
+    private long m_lastTick = 0;
     public bool IsStationary => !SimulationPolicy.MeetsMovementThreshold(Velocity);
 
     public IntVector3 Velocity
@@ -46,11 +45,6 @@ public class TickableSpatialObject(LongVector3 position)
             var enforced = SimulationPolicy.EnforceMovementThreshold(value);
             bool wasMoving = !m_velocity.IsZero;
             m_velocity = enforced;
-
-            if (wasMoving && enforced.IsZero)
-            {
-                m_remainder = ShortVector3.Zero;  // Kill accumulator too
-            }
         }
     }
 
@@ -59,19 +53,38 @@ public class TickableSpatialObject(LongVector3 position)
         Velocity += acceleration;
     }
 
+    public void RegisterForTicks()
+    {
+        m_lastTick = DateTime.Now.Ticks;
+    }
+
+    public void UnregisterForTicks()
+    {
+        m_lastTick = 0;
+    }
+    // Expected ticks per second = 10, so ticks per tick = TimeSpan.TicksPerSecond / 10
+    const long expectedTicksPerTick = TimeSpan.TicksPerSecond / 10;
+
     public virtual TickResult? Tick()
     {
         if (m_velocity.IsZero) return null;
-        var deltaTicks = DateTime.Now.Ticks - m_lastTick;
-        m_lastTick+= deltaTicks;
 
-        // Extract whole units (short can hold ±32K, plenty for per-tick movement)
-        var movement = m_remainder.ToInt();
-        if (movement.IsZero) return null;
+        var deltaTicks = (int)(DateTime.Now.Ticks - m_lastTick);
+        m_lastTick += deltaTicks;
 
-        m_remainder = ShortVector3.Zero;  // Reset after extracting movement
+        var scaledVelocity = m_velocity * deltaTicks;
+        
+        // Add to remainder (converting from long to short precision)
+        // scaledVelocity is in units of (velocity * ticks), divide by expectedTicksPerTick to get actual movement
+        var fractionalMovement = new ShortVector3(
+            (short)(scaledVelocity.X / expectedTicksPerTick),
+            (short)(scaledVelocity.Y / expectedTicksPerTick),
+            (short)(scaledVelocity.Z / expectedTicksPerTick)
+        );
+        
 
-        LongVector3 target = LocalPosition + movement;
+
+        LongVector3 target = LocalPosition + fractionalMovement;
         return TickResult.Move(this, target);
     }
 }

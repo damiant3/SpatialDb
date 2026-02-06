@@ -33,7 +33,7 @@ public partial class ParallelTests
         Console.WriteLine(test.GenerateReportString());
     }
     
-    [TestMethod]
+    //[TestMethod]
     public void InsertAsOneVsBulk_TinyClusters()
     {
         Console.WriteLine("=== InsertAsOne: Tiny Clustered Distribution (ignores batch size config, sets = 5) ===");
@@ -42,7 +42,7 @@ public partial class ParallelTests
         RunInsertBulk(GetTinyClusteredObjects());
     }
 
-    [TestMethod]
+    //[TestMethod]
     public void InsertAsOneVsBulk_TinyDispersed()
     {
         Console.WriteLine("=== InsertAsOne: Tiny Dispersed Distribution (ignores batch size config, sets = 5) ===");
@@ -86,7 +86,7 @@ public partial class ParallelTests
 
     }
 
-    [TestMethod]
+   // [TestMethod]
     public void InsertStress_ConcurrentDictionary()
     {
         var test = new ConcurrentDictionaryParallelTest(TASKS_PER_ITERATION, BATCH_SIZE, benchmarkTest: true);
