@@ -31,6 +31,8 @@ public interface IParentNode : ISpatialNode
         List<SpatialObject> occupantsSnapshot);
 
     VenueLeafNode CreateNewVenueNode(int i, LongVector3 childMin, LongVector3 childMax);
+    public abstract VenueLeafNode? ResolveOccupyingLeaf(SpatialObject obj);
+    public abstract VenueLeafNode? ResolveLeaf(SpatialObject obj);
 }
 
 public interface IChildNode<TParent> : ISpatialNode
@@ -39,19 +41,31 @@ public interface IChildNode<TParent> : ISpatialNode
     public TParent Parent { get; }
 }
 
-public abstract class RootNode<TParent, TBranch, TVenue, TSelf>(Region bounds, byte latticeDepth)
-    : OctetParentNode(bounds)
+public interface IRootNode<TParent, TBranch, TVenue, TSelf>
+    : IParentNode
     where TParent : OctetParentNode
-    where TBranch : OctetBranchNode
+    where TBranch : OctetParentNode, IChildNode<TParent>
+    where TVenue : VenueLeafNode
+    where TSelf : IRootNode<TParent, TBranch, TVenue, TSelf>
+{
+    byte LatticeDepth { get; }
+    VenueLeafNode? ResolveLeafFromOuterLattice(SpatialObject obj);
+    ISpatialLattice? OwningLattice { get; set; }
+}
+public class RootNode<TParent, TBranch, TVenue, TSelf>(Region bounds, byte latticeDepth)
+    : OctetParentNode(bounds),
+    IRootNode<TParent, TBranch, TVenue, TSelf>
+    where TParent : OctetParentNode
+    where TBranch : OctetParentNode, IChildNode<TParent>
     where TVenue : VenueLeafNode
     where TSelf : RootNode<TParent, TBranch, TVenue, TSelf>
 {
     protected RootNode(Region bounds)
         : this(bounds, 0) { }
 
-    internal ISpatialLattice? OwningLattice { get; set; }
+    public ISpatialLattice? OwningLattice { get; set; }
 
-    public readonly byte LatticeDepth = latticeDepth;
+    public byte LatticeDepth { get; } = latticeDepth;
 
     public override void AdmitMigrants(IList<SpatialObject> objs)
         => BucketAndDispatchMigrants(objs);
@@ -66,11 +80,14 @@ public abstract class RootNode<TParent, TBranch, TVenue, TSelf>(Region bounds, b
     }
 }
 
-public class OctetRootNode(Region bounds)
-    : RootNode<OctetParentNode, OctetBranchNode, LargeLeafNode, OctetRootNode>(bounds) { }
+public abstract class ParentNode(Region bounds)
+    : SpatialNode(bounds)
+{
+    public abstract IChildNode<OctetParentNode>[] Children { get; }
+}
 
 public abstract class OctetParentNode
-    : SpatialNode,
+    : ParentNode,
       IParentNode
 {
     public OctetParentNode(Region bounds)
@@ -79,7 +96,7 @@ public abstract class OctetParentNode
         CreateChildLeafNodes();
     }
 
-    public virtual IChildNode<OctetParentNode>[] Children { get; } = new IChildNode<OctetParentNode>[8];
+    public override IChildNode<OctetParentNode>[] Children { get; } = new IChildNode<OctetParentNode>[8];
 
     public void CreateChildLeafNodes()
     {

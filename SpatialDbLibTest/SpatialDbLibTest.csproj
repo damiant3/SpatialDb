@@ -9,6 +9,11 @@
 
   <ItemGroup>
     <Compile Remove="DistanceTests.cs" />
+    <Compile Remove="SimulationTests.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="SimulationTests.cs" />
   </ItemGroup>
 
   <ItemGroup>

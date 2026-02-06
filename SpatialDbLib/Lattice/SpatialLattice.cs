@@ -2,8 +2,14 @@
 ///////////////////////////////
 namespace SpatialDbLib.Lattice;
 
-public class SpatialRootNode(Region bounds, byte latticeDepth)
-        : RootNode<OctetParentNode, OctetBranchNode, LargeLeafNode, SpatialRootNode>(bounds, latticeDepth){ }
+public class OctetRootNode(Region bounds, byte latticeDepth)
+    : RootNode<OctetParentNode, OctetBranchNode, VenueLeafNode, OctetRootNode>(bounds, latticeDepth) { }
+
+public class SpatialLattice: SpatialLattice<OctetRootNode>
+{
+    public SpatialLattice() : base() { }
+    public SpatialLattice(Region outerBounds, byte latticeDepth) : base(outerBounds, latticeDepth) { }
+}
 
 public interface ISpatialLattice : ISpatialNode
 {
@@ -13,15 +19,16 @@ public interface ISpatialLattice : ISpatialNode
     ParentToSubLatticeTransform BoundsTransform { get; }
 }
 
-public class SpatialLattice
+public class SpatialLattice<TRoot>
     : ISpatialLattice,
       ISpatialNode
+    where TRoot : IRootNode<OctetParentNode, OctetBranchNode, VenueLeafNode, TRoot>
 {
     [ThreadStatic] private static byte t_latticeDepth;
     public static byte CurrentThreadLatticeDepth
         => t_latticeDepth;
 
-    internal protected readonly SpatialRootNode m_root;
+    internal protected readonly TRoot m_root;
     public ParentToSubLatticeTransform BoundsTransform { get; protected set; }
 
     public SpatialLattice() // for the rootiest of roots
@@ -29,11 +36,15 @@ public class SpatialLattice
 
     public SpatialLattice(Region outerBounds, byte latticeDepth)
     {
-        m_root = new SpatialRootNode(LatticeUniverse.RootRegion, latticeDepth)
-        {
-            OwningLattice = this
-        };
+        m_root = CreateRoot(LatticeUniverse.RootRegion, latticeDepth);
+        m_root.OwningLattice = this;
         BoundsTransform = new ParentToSubLatticeTransform(outerBounds);
+    }
+
+    protected virtual TRoot CreateRoot(Region bounds, byte depth)
+    {
+        // Default creates SpatialRootNode, but can be overridden
+        return (TRoot)(IRootNode<OctetParentNode, OctetBranchNode, VenueLeafNode, TRoot>) new OctetRootNode(bounds, depth);
     }
 
     public byte LatticeDepth => m_root.LatticeDepth;

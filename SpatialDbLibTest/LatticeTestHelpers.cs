@@ -11,11 +11,11 @@ public class LatticeTestHelpers
         {
             switch (current)
             {
-                case SpatialRootNode root:
+                case OctetRootNode root:
                     return root.OwningLattice
                         ?? throw new InvalidOperationException("Root has no owning lattice");
 
-                case LeafNode leaf:
+                case VenueLeafNode leaf:
                     current = leaf.Parent;
                     break;
 

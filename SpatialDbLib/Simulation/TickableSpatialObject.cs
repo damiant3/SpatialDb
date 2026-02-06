@@ -41,7 +41,7 @@ public class TickableSpatialObject(LongVector3 position)
     public IntVector3 Velocity
     {
         get => m_velocity;
-        private set
+        internal set
         {
             var enforced = SimulationPolicy.EnforceMovementThreshold(value);
             bool wasMoving = !m_velocity.IsZero;
@@ -65,8 +65,6 @@ public class TickableSpatialObject(LongVector3 position)
         var deltaTicks = DateTime.Now.Ticks - m_lastTick;
         m_lastTick+= deltaTicks;
 
-        
-
         // Extract whole units (short can hold ±32K, plenty for per-tick movement)
         var movement = m_remainder.ToInt();
         if (movement.IsZero) return null;
@@ -76,6 +74,5 @@ public class TickableSpatialObject(LongVector3 position)
         LongVector3 target = LocalPosition + movement;
         return TickResult.Move(this, target);
     }
-
 }
 
