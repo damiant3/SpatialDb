@@ -99,16 +99,17 @@ The node type system uses abstract base classes and interfaces:
            +-- LeafNode (abstract, has Parent)
                 |
                 +-- VenueLeafNode (occupant storage)
-                     |
-                     +-- LargeLeafNode (capacity: 16)
-                     +-- SubLatticeBranchNode (nested lattice)
+                |    |
+                |    +-- LargeLeafNode (capacity: 16)
+                |
+                +-- SubLatticeBranchNode (nested lattice)
 
 ### Structural Composition (Runtime Tree)
 
 At runtime, a lattice is a tree of nodes connected by parent-child relationships:
 
     SpatialLattice
-      owns: RootNode
+      owns: RootNode (parent node, subdivides space, top of tree)
         Children[8]: array of IChildNode
           |
           +-- OctetBranchNode (parent node, subdivides space)
@@ -125,6 +126,7 @@ At runtime, a lattice is a tree of nodes connected by parent-child relationships
 - RootNode IS AN OctetParentNode (inheritance)
 - SpatialLattice HAS A RootNode (composition)
 - SubLatticeBranchNode IS A LeafNode but CONTAINS a nested SpatialLattice
+- VenueLeafNode and SubLatticeBranchNode are both leaf types, but only VenueLeafNode stores occupants directly
 
 This design allows leaves and parent nodes to be treated uniformly as ISpatialNode while maintaining type safety for their distinct responsibilities.
 
