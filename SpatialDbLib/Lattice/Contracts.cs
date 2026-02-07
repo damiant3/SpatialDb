@@ -1,4 +1,6 @@
 ﻿///////////////////////////////
+using System.Buffers;
+
 namespace SpatialDbLib.Lattice;
 
 public abstract class AdmitResult
@@ -43,6 +45,29 @@ public abstract class AdmitResult
     public static AdmitResult SubdivideRequest(LeafNode leaf) => new Subdivide(leaf);
     public static AdmitResult DelegateRequest(LeafNode leaf) => new Delegate(leaf);
 
+}
+
+public class ArrayRentalContract(byte[] array)
+    : IDisposable
+{
+    private bool m_disposed = false;
+    private readonly byte[] m_array = array;
+
+    public void Dispose()
+    {
+        if (m_disposed) return;
+        m_disposed = true;
+        if (m_array != null)
+            ArrayPool<byte>.Shared.Return(m_array, clearArray: false);
+        GC.SuppressFinalize(this);
+    }
+}
+
+internal sealed class BufferSlice(int start, int length)
+{
+    public int Start { get; } = start;
+    public int Length { get; } = length;
+    public Span<SpatialObject> GetSpan(Span<SpatialObject> rootBuffer) => rootBuffer.Slice(Start, Length);
 }
 
 public readonly struct SelectChildResult(byte indexInParent, IChildNode<OctetParentNode> childNode)

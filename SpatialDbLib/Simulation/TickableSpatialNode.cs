@@ -1,5 +1,6 @@
 ﻿using SpatialDbLib.Lattice;
 using SpatialDbLib.Math;
+using SpatialDbLib.Synchronize;
 //////////////////////////////////
 namespace SpatialDbLib.Simulation;
 
@@ -71,19 +72,69 @@ public class TickableVenueLeafNode(Region bounds, TickableOctetParentNode parent
 
     public new TickableOctetParentNode Parent { get; } = parent;
 
+    public override AdmitResult Admit(SpatialObject obj, LongVector3 proposedPosition)
+    {
+        if (!Bounds.Contains(proposedPosition))
+            return AdmitResult.EscalateRequest();
+
+        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "TickableVenue.Admit: Leaf");
+        if (IsRetired)
+            return AdmitResult.RetryRequest();
+
+        if (IsAtCapacity(1))
+        {
+            return CanSubdivide()
+                ? AdmitResult.SubdivideRequest(this)
+                : AdmitResult.DelegateRequest(this);
+        }
+
+        SpatialObjectProxy proxy = obj is TickableSpatialObject tickable
+            ? new TickableSpatialObjectProxy(tickable, this, proposedPosition)
+            : new SpatialObjectProxy(obj, this, proposedPosition);
+
+        if (proxy is ITickableObject tickableProxy)
+            RegisterForTicks(tickableProxy);
+
+        Occupy(proxy);
+        return AdmitResult.Create(proxy);
+    }
+
+    private void Occupy(SpatialObject obj) => Occupants.Add(obj);
+
     public override void AdmitMigrants(IList<SpatialObject> objs)
     {
         base.AdmitMigrants(objs);
         foreach (var obj in objs)
+        {
             if (obj is TickableSpatialObject tickable)
+            {
                 tickable.SetOccupyingLeaf(this);
+                
+                // If object was already registered for ticks, register with new leaf
+                if (tickable.Velocity != IntVector3.Zero)
+                    RegisterForTicks(tickable);
+            }
+            else if (obj is ITickableObject tickableObj)
+            {
+                RegisterForTicks(tickableObj);
+            }
+        }
     }
 
     internal override void Replace(SpatialObjectProxy proxy)
     {
         base.Replace(proxy);
+
+        if (proxy is ITickableObject tickableProxy)
+            UnregisterForTicks(tickableProxy);
+
         if (proxy.OriginalObject is TickableSpatialObject tickable)
+        {
             tickable.SetOccupyingLeaf(this);
+            // Re-register original object for ticks after proxy is replaced
+            if (tickable.Velocity != IntVector3.Zero)
+                RegisterForTicks(tickable);
+        }
     }
 
     public void RegisterForTicks(ITickableObject obj)
@@ -95,10 +146,9 @@ public class TickableVenueLeafNode(Region bounds, TickableOctetParentNode parent
     public void UnregisterForTicks(ITickableObject obj)
         => m_tickableObjects.Remove(obj);
 
-
     public void Tick()
     {
-        foreach (var obj in m_tickableObjects.ToList())  // Copy to avoid modification during iteration
+        foreach (var obj in m_tickableObjects.ToList())
         {
             var result = obj.Tick();
             if (result.HasValue)
@@ -126,18 +176,13 @@ public class TickableVenueLeafNode(Region bounds, TickableOctetParentNode parent
     {
         var tickableObj = obj as TickableSpatialObject;
         if (tickableObj != null) UnregisterForTicks(tickableObj);
+        
         var admitResult = Parent.Admit(obj, newPosition);
         if (admitResult is AdmitResult.Created created)
         {
             created.Proxy.Commit();
             Vacate(obj);
             tickableObj?.RegisterForTicks();
-        }
-        else
-        {
-            // Movement failed - object stays in current leaf
-            // Could log this or handle differently
-            // this wont happen until there is policy reasons, like a walled off part of the lattice for dev playground or something.
         }
     }
 }

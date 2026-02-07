@@ -311,13 +311,6 @@ public abstract class OctetParentNode
         migrationSnapshot.Dispose();
     }
 
-    internal sealed class BufferSlice(int start, int length)
-    {
-        public int Start { get; } = start;
-        public int Length { get; } = length;
-        public Span<SpatialObject> GetSpan(Span<SpatialObject> rootBuffer) => rootBuffer.Slice(Start, Length);
-    }
-
     internal sealed class AdmitWorkFrame
     {
         public OctetParentNode Parent;

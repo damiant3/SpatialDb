@@ -18,6 +18,8 @@ public interface ILatticeCoordinateTransform
     LongVector3 OuterToInnerCanonical(LongVector3 outerPosition);
     LongVector3 OuterToInnerInsertion(LongVector3 outerPosition, Guid guid);
     LongVector3 InnerToOuter(LongVector3 innerPosition);
+    IntVector3 OuterToInnerVelocity(IntVector3 outerVelocity);
+    IntVector3 InnerToOuterVelocity(IntVector3 innerVelocity);
     bool ContainsOuter(LongVector3 outerPosition);
     bool ContainsInner(LongVector3 innerPosition);
 }
@@ -33,6 +35,44 @@ public class ParentToSubLatticeTransform(Region outerBounds)
 
     public bool ContainsInner(LongVector3 innerPosition)
         => InnerLatticeBounds.Contains(innerPosition);
+
+    public IntVector3 OuterToInnerVelocity(IntVector3 outerVelocity)
+    {
+        var innerSize = InnerLatticeBounds.Size;
+        var outerSize = OuterLatticeBounds.Size;
+
+        if (innerSize == outerSize)
+            return outerVelocity;
+
+        var scaleX = innerSize.X / outerSize.X;
+        var scaleY = innerSize.Y / outerSize.Y;
+        var scaleZ = innerSize.Z / outerSize.Z;
+
+        return new IntVector3(
+            (int)(outerVelocity.X * (long)scaleX),
+            (int)(outerVelocity.Y * (long)scaleY),
+            (int)(outerVelocity.Z * (long)scaleZ)
+        );
+    }
+
+    public IntVector3 InnerToOuterVelocity(IntVector3 innerVelocity)
+    {
+        var innerSize = InnerLatticeBounds.Size;
+        var outerSize = OuterLatticeBounds.Size;
+
+        if (innerSize == outerSize)
+            return innerVelocity;
+
+        var scaleX = innerSize.X / outerSize.X;
+        var scaleY = innerSize.Y / outerSize.Y;
+        var scaleZ = innerSize.Z / outerSize.Z;
+
+        return new IntVector3(
+            (int)(innerVelocity.X / (long)scaleX),
+            (int)(innerVelocity.Y / (long)scaleY),
+            (int)(innerVelocity.Z / (long)scaleZ)
+        );
+    }
 
     public LongVector3 OuterToInnerInsertion(LongVector3 outer, Guid guid)
     {
@@ -61,27 +101,20 @@ public class ParentToSubLatticeTransform(Region outerBounds)
 
         static LongVector3 OuterToInnerFromSizeOne(Guid g)
         {
-            // get 128 bits from the guid
             Span<byte> bytes = stackalloc byte[16];
             g.TryWriteBytes(bytes);
 
             ulong s0 = BitConverter.ToUInt64(bytes[..8]);
             ulong s1 = BitConverter.ToUInt64(bytes[8..]);
 
-            // combine into a 64-bit seed with full avalanche
             ulong state = s0 ^ s1 * 0x9E3779B97F4A7C15UL;
 
             long half = LatticeUniverse.HalfExtent;
 
             long NextCoord()
             {
-                // 64 random bits
                 ulong r = SplitMix64(ref state);
-
-                // keep 63 bits -> uniform in [0, 2^63)
                 ulong u63 = r >> 1;
-
-                // reinterpret as signed offset in [-2^62, +2^62)
                 return (long)u63 - half;
             }
 

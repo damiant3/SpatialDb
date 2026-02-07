@@ -104,7 +104,7 @@ public class SpatialObjectProxy : SpatialObject
         SetLocalPosition(proposedPosition);
     }
 
-    public void Commit()
+    public virtual void Commit()
     {
         if (IsCommitted)
             throw new InvalidOperationException("Proxy already swapped!");
