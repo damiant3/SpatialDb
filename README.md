@@ -68,7 +68,6 @@ Create tickable lattice and insert moving object:
     var lattice = new TickableSpatialLattice();
     var obj = new TickableSpatialObject(new LongVector3(1000, 1000, 1000));
     lattice.Insert(obj);
-    obj.Accelerate(new IntVector3(100, 0, 0));
 
 Register for ticks:
 
