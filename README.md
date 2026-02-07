@@ -81,15 +81,52 @@ Tick all objects (moves objects based on elapsed time):
 
 ## Architecture
 
-The system uses a generic type family pattern to support polymorphic node hierarchies:
+### Type Hierarchy (Inheritance)
 
-    SpatialLattice<TRoot>
-      └─ RootNode<TParent, TBranch, TVenue, TSelf>
-           └─ OctetParentNode
-                ├─ OctetBranchNode
-                └─ LeafNode
-                     ├─ VenueLeafNode (occupant storage)
-                     └─ SubLatticeBranchNode<TLattice> (nested lattice)
+The node type system uses abstract base classes and interfaces:
+
+    ISpatialNode (interface)
+      |
+      +-- SpatialNode (abstract base with locking)
+           |
+           +-- ParentNode (abstract, has Children array)
+           |    |
+           |    +-- OctetParentNode (8-way branching)
+           |         |
+           |         +-- RootNode (top of lattice)
+           |         +-- OctetBranchNode (IChildNode)
+           |
+           +-- LeafNode (abstract, has Parent)
+                |
+                +-- VenueLeafNode (occupant storage)
+                     |
+                     +-- LargeLeafNode (capacity: 16)
+                     +-- SubLatticeBranchNode (nested lattice)
+
+### Structural Composition (Runtime Tree)
+
+At runtime, a lattice is a tree of nodes connected by parent-child relationships:
+
+    SpatialLattice
+      owns: RootNode
+        Children[8]: array of IChildNode
+          |
+          +-- OctetBranchNode (parent node, subdivides space)
+          |    Children[8]: more branches or leaves
+          |
+          +-- VenueLeafNode (leaf, stores objects)
+          |
+          +-- SubLatticeBranchNode (leaf containing nested lattice)
+               owns: SpatialLattice (depth + 1)
+                 owns: RootNode...
+
+**Key distinctions:**
+- LeafNode and OctetParentNode are siblings in the type hierarchy (both extend SpatialNode)
+- RootNode IS AN OctetParentNode (inheritance)
+- SpatialLattice HAS A RootNode (composition)
+- SubLatticeBranchNode IS A LeafNode but CONTAINS a nested SpatialLattice
+
+This design allows leaves and parent nodes to be treated uniformly as ISpatialNode while maintaining type safety for their distinct responsibilities.
 
 Extending the system (e.g., adding tick behavior) requires:
 1. Define interfaces for new behavior

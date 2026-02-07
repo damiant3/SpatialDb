@@ -610,12 +610,6 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
     {
         var snapshot = new List<SpatialObject>();
         var locksAcquired = new List<SlimSyncer>();
-
-        if (!Sync.IsWriteLockHeld)
-        {
-            var leafLock = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "Venue.LockAndSnap: Leaf");
-            locksAcquired.Add(leafLock);
-        }
         try
         {
             for (int i = 0; i < Occupants.Count; i++)
