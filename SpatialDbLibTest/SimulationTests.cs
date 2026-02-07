@@ -49,7 +49,6 @@ public class SimulationTests
 
         // 1. Insert tickable object
         var obj = new TickableSpatialObject([new(100)]);
-        obj.Velocity = new IntVector3(10, 0, 0);  // Set movement (units per second)
 
         lattice.Insert(obj);
 
