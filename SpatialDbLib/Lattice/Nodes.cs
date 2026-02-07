@@ -1,4 +1,5 @@
-﻿using SpatialDbLib.Synchronize;
+﻿using SpatialDbLib.Math;
+using SpatialDbLib.Synchronize;
 using System.Buffers;
 ///////////////////////////////
 namespace SpatialDbLib.Lattice;
@@ -537,7 +538,7 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
         m_isRetired = true;
     }
 
-    internal void Replace(SpatialObjectProxy proxy)
+    internal virtual void Replace(SpatialObjectProxy proxy)
     {
         int index = Occupants.IndexOf(proxy);
         if (index == -1)

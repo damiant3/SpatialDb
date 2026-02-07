@@ -1,4 +1,4 @@
-﻿using SpatialDbLib.Lattice;
+﻿using SpatialDbLib.Math;
 namespace SpatialDbLib.Simulation;
 
 public enum TickAction

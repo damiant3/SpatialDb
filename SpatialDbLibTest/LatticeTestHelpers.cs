@@ -1,5 +1,6 @@
-﻿///////////////////////////
-using SpatialDbLib.Lattice;
+﻿using SpatialDbLib.Lattice;
+using SpatialDbLib.Math;
+///////////////////////////
 namespace SpatialDbLibTest;
 
 public class LatticeTestHelpers

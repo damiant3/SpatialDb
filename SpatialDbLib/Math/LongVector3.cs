@@ -1,4 +1,6 @@
-﻿namespace SpatialDbLib.Lattice;
+﻿using SystemMath = System.Math;
+////////////////////////////
+namespace SpatialDbLib.Math;
 
 public readonly struct LongVector3(long x, long y, long z)
 {
@@ -16,10 +18,10 @@ public readonly struct LongVector3(long x, long y, long z)
     );
 
     public long MaxComponentAbs()
-        => Math.Max(Math.Abs(X), Math.Max(Math.Abs(Y), Math.Abs(Z)));
+        => SystemMath.Max(SystemMath.Abs(X), SystemMath.Max(SystemMath.Abs(Y), SystemMath.Abs(Z)));
 
     public long SumAbs()
-        => Math.Abs(X) + Math.Abs(Y) + Math.Abs(Z);
+        => SystemMath.Abs(X) + SystemMath.Abs(Y) + SystemMath.Abs(Z);
 
     public override string ToString() => $"({X}, {Y}, {Z})";
 

@@ -1,5 +1,6 @@
-﻿///////////////////////////////
-namespace SpatialDbLib.Lattice;
+﻿using SystemMath = System.Math;
+////////////////////////////
+namespace SpatialDbLib.Math;
 
 public readonly struct ByteVector3(byte x, byte y, byte z)
 {
@@ -28,7 +29,7 @@ public readonly struct ByteVector3(byte x, byte y, byte z)
     public bool IsZero => X == 0 && Y == 0 && Z == 0;
 
     public byte MaxComponentAbs()
-        => Math.Max(X, Math.Max(Y, Z));
+        => SystemMath.Max(X, SystemMath.Max(Y, Z));
 
     public int SumAbs()
         => X + Y + Z;

@@ -1,5 +1,6 @@
 ﻿///////////////////////////
 using SpatialDbLib.Lattice;
+using SpatialDbLib.Math;
 using System.Collections.Concurrent;
 using static SpatialDbLib.Lattice.AdmitResult;
 namespace SpatialDbLibTest;

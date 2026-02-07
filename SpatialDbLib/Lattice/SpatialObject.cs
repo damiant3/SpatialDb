@@ -1,6 +1,6 @@
-﻿///////////////////////////////
+﻿using SpatialDbLib.Math;
 using SpatialDbLib.Synchronize;
-
+///////////////////////////////
 namespace SpatialDbLib.Lattice;
 
 public class SpatialObject(IList<LongVector3> initialPosition)

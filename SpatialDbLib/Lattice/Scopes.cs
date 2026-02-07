@@ -1,6 +1,5 @@
-﻿
-using System.Buffers;
-
+﻿using System.Buffers;
+///////////////////////////////
 namespace SpatialDbLib.Lattice;
 
 public class ArrayRentalContract(byte[] array) 

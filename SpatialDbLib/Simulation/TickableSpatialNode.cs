@@ -1,4 +1,5 @@
 ﻿using SpatialDbLib.Lattice;
+using SpatialDbLib.Math;
 //////////////////////////////////
 namespace SpatialDbLib.Simulation;
 
@@ -19,10 +20,23 @@ public class TickableOctetParentNode(Region bounds)
         return new TickableVenueLeafNode(new Region(childMin, childMax), this);
     }
 
-    protected ITickableChildNode GetTickableChild(int index)
+    public override IChildNode<OctetParentNode> CreateBranchNodeWithLeafs(
+        OctetParentNode parent,
+        VenueLeafNode subdividingLeaf,
+        byte latticeDepth,
+        bool branchOrSublattice,
+        List<SpatialObject> occupantsSnapshot)
     {
-        return (ITickableChildNode)base.Children[index];
+        var tickableParent = (TickableOctetParentNode)parent;
+        var tickableLeaf = (TickableVenueLeafNode)subdividingLeaf;
+
+        return branchOrSublattice
+            ? new TickableOctetBranchNode(tickableLeaf.Bounds, tickableParent, occupantsSnapshot)
+            : new TickableSubLatticeBranchNode(tickableLeaf.Bounds, tickableParent, latticeDepth, occupantsSnapshot);
     }
+
+    protected ITickableChildNode GetTickableChild(int index)
+        => (ITickableChildNode)base.Children[index];
 
     public virtual void Tick()
     {
@@ -57,11 +71,30 @@ public class TickableVenueLeafNode(Region bounds, TickableOctetParentNode parent
 
     public new TickableOctetParentNode Parent { get; } = parent;
 
+    public override void AdmitMigrants(IList<SpatialObject> objs)
+    {
+        base.AdmitMigrants(objs);
+        foreach (var obj in objs)
+            if (obj is TickableSpatialObject tickable)
+                tickable.SetOccupyingLeaf(this);
+    }
+
+    internal override void Replace(SpatialObjectProxy proxy)
+    {
+        base.Replace(proxy);
+        if (proxy.OriginalObject is TickableSpatialObject tickable)
+            tickable.SetOccupyingLeaf(this);
+    }
+
     public void RegisterForTicks(ITickableObject obj)
     {
         if (!m_tickableObjects.Contains(obj))
             m_tickableObjects.Add(obj);
     }
+
+    public void UnregisterForTicks(ITickableObject obj)
+        => m_tickableObjects.Remove(obj);
+
 
     public void Tick()
     {
@@ -69,10 +102,7 @@ public class TickableVenueLeafNode(Region bounds, TickableOctetParentNode parent
         {
             var result = obj.Tick();
             if (result.HasValue)
-            {
-                // Handle movement/removal requests
                 HandleTickResult(result.Value);
-            }
         }
     }
 
@@ -81,11 +111,33 @@ public class TickableVenueLeafNode(Region bounds, TickableOctetParentNode parent
         switch (result.Action)
         {
             case TickAction.Move:
-                result.Object.SetLocalPosition(result.Target);
+                if (Bounds.Contains(result.Target))
+                    result.Object.SetLocalPosition(result.Target);
+                else
+                    HandleBoundaryCrossing(result.Object, result.Target);
                 break;
             case TickAction.Remove:
-                // Remove object
+                Vacate(result.Object);
                 break;
+        }
+    }
+
+    private void HandleBoundaryCrossing(SpatialObject obj, LongVector3 newPosition)
+    {
+        var tickableObj = obj as TickableSpatialObject;
+        if (tickableObj != null) UnregisterForTicks(tickableObj);
+        var admitResult = Parent.Admit(obj, newPosition);
+        if (admitResult is AdmitResult.Created created)
+        {
+            created.Proxy.Commit();
+            Vacate(obj);
+            tickableObj?.RegisterForTicks();
+        }
+        else
+        {
+            // Movement failed - object stays in current leaf
+            // Could log this or handle differently
+            // this wont happen until there is policy reasons, like a walled off part of the lattice for dev playground or something.
         }
     }
 }
@@ -129,7 +181,7 @@ public class TickableRootNode<TParent, TBranch, TVenue, TSelf>(Region bounds, by
         return ResolveLeaf(obj);
     }
 }
-public class TickableRootNode : 
+public class TickableRootNode :
     TickableRootNode<TickableOctetParentNode, TickableOctetBranchNode, TickableVenueLeafNode, TickableRootNode>,
     IRootNode<OctetParentNode, OctetBranchNode, VenueLeafNode, TickableRootNode>
 {
@@ -143,14 +195,10 @@ public class TickableSpatialLattice(Region outerBounds, byte latticeDepth)
     public TickableSpatialLattice()
         :this(LatticeUniverse.RootRegion, 0) { }
     protected override TickableRootNode CreateRoot(Region bounds, byte latticeDepth)
-    {
-        return new TickableRootNode(bounds, latticeDepth);
-    }
+        => new(bounds, latticeDepth);
 
     public void Tick()
-    {
-        m_root.Tick();
-    }
+        => m_root.Tick();
 }
 
 public class TickableSubLatticeBranchNode
@@ -174,7 +222,5 @@ public class TickableSubLatticeBranchNode
     }
 
     public void Tick()
-    {
-        Sublattice.Tick();
-    }
+        => Sublattice.Tick();
 }

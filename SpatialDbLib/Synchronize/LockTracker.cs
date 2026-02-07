@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Text;
 ///////////////////////////////////
 namespace SpatialDbLib.Synchronize;
+
 public static class LockTracker
 {
     private class LockInfo

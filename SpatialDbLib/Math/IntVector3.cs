@@ -1,5 +1,6 @@
-﻿
-namespace SpatialDbLib.Lattice;
+﻿using SystemMath = System.Math;
+////////////////////////////
+namespace SpatialDbLib.Math;
 
 public readonly struct IntVector3(int x, int y, int z)
 {
@@ -47,10 +48,10 @@ public readonly struct IntVector3(int x, int y, int z)
     public long MagnitudeSquared => (long)X * X + (long)Y * Y + (long)Z * Z;
 
     public int MaxComponentAbs()
-        => Math.Max(Math.Abs(X), Math.Max(Math.Abs(Y), Math.Abs(Z)));
+        => SystemMath.Max(SystemMath.Abs(X), SystemMath.Max(SystemMath.Abs(Y), SystemMath.Abs(Z)));
 
     public int SumAbs()
-        => Math.Abs(X) + Math.Abs(Y) + Math.Abs(Z);
+        => SystemMath.Abs(X) + SystemMath.Abs(Y) + SystemMath.Abs(Z);
 
     public override string ToString() => $"({X}, {Y}, {Z})";
 
@@ -99,7 +100,7 @@ public readonly struct UIntVector3(uint x, uint y, uint z)
     public ulong MagnitudeSquared => (ulong)X * X + (ulong)Y * Y + (ulong)Z * Z;
 
     public uint MaxComponentAbs()
-        => Math.Max(X, Math.Max(Y, Z));
+        => SystemMath.Max(X, SystemMath.Max(Y, Z));
 
     public uint SumAbs()
         => X + Y + Z;

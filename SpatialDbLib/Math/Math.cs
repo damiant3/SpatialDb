@@ -1,10 +1,10 @@
-﻿///////////////////////////////
-namespace SpatialDbLib.Lattice;
+﻿////////////////////////////
+namespace SpatialDbLib.Math;
 
 public static class LatticeUniverse
 {
     public const int RootBits = 63;
-    public const long HalfExtent = 1L << (RootBits - 1);
+    public const long HalfExtent = 1L << RootBits - 1;
 
     public static readonly Region RootRegion =
         new(
@@ -54,9 +54,9 @@ public class ParentToSubLatticeTransform(Region outerBounds)
         {
             x += 0x9E3779B97F4A7C15UL;
             ulong z = x;
-            z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
-            z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
-            return z ^ (z >> 31);
+            z = (z ^ z >> 30) * 0xBF58476D1CE4E5B9UL;
+            z = (z ^ z >> 27) * 0x94D049BB133111EBUL;
+            return z ^ z >> 31;
         }
 
         static LongVector3 OuterToInnerFromSizeOne(Guid g)
@@ -69,7 +69,7 @@ public class ParentToSubLatticeTransform(Region outerBounds)
             ulong s1 = BitConverter.ToUInt64(bytes[8..]);
 
             // combine into a 64-bit seed with full avalanche
-            ulong state = s0 ^ (s1 * 0x9E3779B97F4A7C15UL);
+            ulong state = s0 ^ s1 * 0x9E3779B97F4A7C15UL;
 
             long half = LatticeUniverse.HalfExtent;
 
@@ -105,9 +105,9 @@ public class ParentToSubLatticeTransform(Region outerBounds)
         var baseY = (ulong)InnerLatticeBounds.Min.Y + outerOffset.Y * scaleY;
         var baseZ = (ulong)InnerLatticeBounds.Min.Z + outerOffset.Z * scaleZ;
 
-        var repX = baseX + (discriminator % scaleX);
-        var repY = baseY + ((discriminator >> 21) % scaleY);
-        var repZ = baseZ + ((discriminator >> 42) % scaleZ);
+        var repX = baseX + discriminator % scaleX;
+        var repY = baseY + (discriminator >> 21) % scaleY;
+        var repZ = baseZ + (discriminator >> 42) % scaleZ;
 
         return new LongVector3(
             unchecked((long)repX),
@@ -166,7 +166,6 @@ public class ParentToSubLatticeTransform(Region outerBounds)
         );
     }
 }
-
 
 public readonly struct Region
 {
