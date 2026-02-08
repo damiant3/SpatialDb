@@ -10,7 +10,8 @@ public interface ITickableSpatialNode : ISpatialNode
 }
 
 public interface ITickableChildNode
-    : IChildNode<TickableOctetParentNode>, ITickableSpatialNode { }
+    : IChildNode<TickableOctetParentNode>, ITickableSpatialNode
+{ }
 
 public class TickableOctetParentNode(Region bounds)
     : OctetParentNode(bounds),
@@ -26,7 +27,7 @@ public class TickableOctetParentNode(Region bounds)
         VenueLeafNode subdividingLeaf,
         byte latticeDepth,
         bool branchOrSublattice,
-        List<SpatialObject> occupantsSnapshot)
+        List<ISpatialObject> occupantsSnapshot)
     {
         var tickableParent = (TickableOctetParentNode)parent;
         var tickableLeaf = (TickableVenueLeafNode)subdividingLeaf;
@@ -51,7 +52,7 @@ public class TickableOctetBranchNode
       IChildNode<OctetParentNode>,
       ITickableChildNode
 {
-    public TickableOctetBranchNode(Region bounds, TickableOctetParentNode parent, IList<SpatialObject> migrants)
+    public TickableOctetBranchNode(Region bounds, TickableOctetParentNode parent, IList<ISpatialObject> migrants)
         : base(bounds)
     {
         Parent = parent;
@@ -68,11 +69,24 @@ public class TickableVenueLeafNode(Region bounds, TickableOctetParentNode parent
       ITickableSpatialNode,
       ITickableChildNode
 {
-    private List<ITickableObject> m_tickableObjects = [];
+    private List<ITickable> m_tickableObjects = [];
+    protected override ISpatialObjectProxy CreateProxy(
+        ISpatialObject obj,
+        LongVector3 proposedPosition)
+    {
+        if (obj is TickableSpatialObject tickable)
+        {
+            var proxy = new TickableSpatialObjectProxy(tickable, this, proposedPosition);
+            RegisterForTicks(proxy);
+            return proxy;
+        }
 
-    public new TickableOctetParentNode Parent { get; } = parent;
+        return base.CreateProxy(obj, proposedPosition);
+    }
 
-    public override AdmitResult Admit(SpatialObject obj, LongVector3 proposedPosition)
+    public new TickableOctetParentNode Parent { get; } = parent; // not proud of this
+
+    public override AdmitResult Admit(ISpatialObject obj, LongVector3 proposedPosition)
     {
         if (!Bounds.Contains(proposedPosition))
             return AdmitResult.EscalateRequest();
@@ -88,62 +102,54 @@ public class TickableVenueLeafNode(Region bounds, TickableOctetParentNode parent
                 : AdmitResult.DelegateRequest(this);
         }
 
-        SpatialObjectProxy proxy = obj is TickableSpatialObject tickable
+        ISpatialObjectProxy proxy = obj is TickableSpatialObject tickable
             ? new TickableSpatialObjectProxy(tickable, this, proposedPosition)
             : new SpatialObjectProxy(obj, this, proposedPosition);
 
-        if (proxy is ITickableObject tickableProxy)
+        if (proxy is ITickable tickableProxy)
             RegisterForTicks(tickableProxy);
 
         Occupy(proxy);
         return AdmitResult.Create(proxy);
     }
 
-    private void Occupy(SpatialObject obj) => Occupants.Add(obj);
-
-    public override void AdmitMigrants(IList<SpatialObject> objs)
+    public override void AdmitMigrants(IList<ISpatialObject> objs)
     {
         base.AdmitMigrants(objs);
         foreach (var obj in objs)
         {
-            if (obj is TickableSpatialObject tickable)
+            if (obj is TickableSpatialObjectBase tickable)
             {
                 tickable.SetOccupyingLeaf(this);
-                
-                // If object was already registered for ticks, register with new leaf
+
                 if (tickable.Velocity != IntVector3.Zero)
                     RegisterForTicks(tickable);
-            }
-            else if (obj is ITickableObject tickableObj)
-            {
-                RegisterForTicks(tickableObj);
             }
         }
     }
 
-    internal override void Replace(SpatialObjectProxy proxy)
+    public override void Replace(ISpatialObjectProxy proxy)
     {
         base.Replace(proxy);
 
-        if (proxy is ITickableObject tickableProxy)
+        if (proxy is ITickable tickableProxy)
             UnregisterForTicks(tickableProxy);
 
-        if (proxy.OriginalObject is TickableSpatialObject tickable)
+        if (proxy.OriginalObject is TickableSpatialObjectBase tickable)
         {
             tickable.SetOccupyingLeaf(this);
-            // Re-register original object for ticks after proxy is replaced
             if (tickable.Velocity != IntVector3.Zero)
                 RegisterForTicks(tickable);
         }
     }
 
-    public void RegisterForTicks(ITickableObject obj)
+    public void RegisterForTicks(ITickable obj)
     {
         if (!m_tickableObjects.Contains(obj))
             m_tickableObjects.Add(obj);
     }
 
-    public void UnregisterForTicks(ITickableObject obj)
+    public void UnregisterForTicks(ITickable obj)
         => m_tickableObjects.Remove(obj);
 
     public void Tick()
@@ -174,9 +180,9 @@ public class TickableVenueLeafNode(Region bounds, TickableOctetParentNode parent
 
     private void HandleBoundaryCrossing(SpatialObject obj, LongVector3 newPosition)
     {
-        var tickableObj = obj as TickableSpatialObject;
+        var tickableObj = obj as TickableSpatialObjectBase;
         if (tickableObj != null) UnregisterForTicks(tickableObj);
-        
+
         var admitResult = Parent.Admit(obj, newPosition);
         if (admitResult is AdmitResult.Created created)
         {
@@ -191,6 +197,10 @@ public class TickableRootNode<TParent, TBranch, TVenue, TSelf>(Region bounds, by
     : TickableOctetParentNode(bounds),
       IRootNode<TickableOctetParentNode, TickableOctetBranchNode, TickableVenueLeafNode, TickableRootNode<TParent, TBranch, TVenue, TSelf>>,
       ITickableSpatialNode
+    where TParent : TickableOctetParentNode
+    where TBranch : TickableOctetBranchNode
+    where TVenue : TickableVenueLeafNode
+    where TSelf : TickableRootNode<TParent, TBranch, TVenue, TSelf>
 {
     protected TickableRootNode(Region bounds)
     : this(bounds, 0) { }
@@ -204,7 +214,7 @@ public class TickableRootNode<TParent, TBranch, TVenue, TSelf>(Region bounds, by
         VenueLeafNode subdividingLeaf,
         byte latticeDepth,
         bool branchOrSublattice,
-        List<SpatialObject> occupantsSnapshot)
+        List<ISpatialObject> occupantsSnapshot)
     {
         var tickableParent = (TickableOctetParentNode)parent;
         var tickableLeaf = (TickableVenueLeafNode)subdividingLeaf;
@@ -217,7 +227,7 @@ public class TickableRootNode<TParent, TBranch, TVenue, TSelf>(Region bounds, by
     public override VenueLeafNode CreateNewVenueNode(int i, LongVector3 childMin, LongVector3 childMax)
         => new TickableVenueLeafNode(new Region(childMin, childMax), this);
 
-    public VenueLeafNode? ResolveLeafFromOuterLattice(SpatialObject obj)
+    public VenueLeafNode? ResolveLeafFromOuterLattice(ISpatialObject obj)
     {
 #if DEBUG
         if (obj.PositionStackDepth <= LatticeDepth)
@@ -226,6 +236,7 @@ public class TickableRootNode<TParent, TBranch, TVenue, TSelf>(Region bounds, by
         return ResolveLeaf(obj);
     }
 }
+
 public class TickableRootNode :
     TickableRootNode<TickableOctetParentNode, TickableOctetBranchNode, TickableVenueLeafNode, TickableRootNode>,
     IRootNode<OctetParentNode, OctetBranchNode, VenueLeafNode, TickableRootNode>
@@ -233,12 +244,14 @@ public class TickableRootNode :
     public TickableRootNode(Region bounds) : base(bounds) { }
     public TickableRootNode(Region bound, byte latticeDepth) : base(bound, latticeDepth) { }
 }
+
 public class TickableSpatialLattice(Region outerBounds, byte latticeDepth)
     : SpatialLattice<TickableRootNode>(outerBounds, latticeDepth),
       ITickableSpatialNode
 {
     public TickableSpatialLattice()
-        :this(LatticeUniverse.RootRegion, 0) { }
+        : this(LatticeUniverse.RootRegion, 0) { }
+
     protected override TickableRootNode CreateRoot(Region bounds, byte latticeDepth)
         => new(bounds, latticeDepth);
 
@@ -251,18 +264,18 @@ public class TickableSubLatticeBranchNode
       IChildNode<OctetParentNode>,
       ITickableChildNode
 {
-    public new TickableOctetParentNode Parent { get; }  // not proud of this new
+    public new TickableOctetParentNode Parent { get; }
     OctetParentNode IChildNode<OctetParentNode>.Parent => Parent;
 
     public TickableSubLatticeBranchNode(
         Region bounds,
         TickableOctetParentNode parent,
         byte latticeDepth,
-        IList<SpatialObject> migrants)
+        IList<ISpatialObject> migrants)
         : base(bounds, parent)
     {
         Parent = parent;
-        Sublattice = new TickableSpatialLattice(bounds, (byte)(latticeDepth+1));
+        Sublattice = new TickableSpatialLattice(bounds, (byte)(latticeDepth + 1));
         Sublattice.AdmitMigrants(migrants);
     }
 

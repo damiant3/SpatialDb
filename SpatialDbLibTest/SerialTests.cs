@@ -166,7 +166,7 @@ public class SerialTests
     public void Test_BulkInsertMixedDepths()
     {
         var lattice = new SpatialLattice();
-        var objects = new List<SpatialObject>();
+        var objects = new List<ISpatialObject>();
 
         // Create objects with varying depths
         for (int i = 0; i < 50; i++)
@@ -181,7 +181,7 @@ public class SerialTests
         }
 
         // Bulk insert
-        var result = lattice.Insert(objects.ToArray());
+        var result = lattice.Insert(objects);
         Assert.IsInstanceOfType(result, typeof(AdmitResult.BulkCreated));
 
         // Verify all present
@@ -193,7 +193,7 @@ public class SerialTests
     public void SerialTests_Omnibus()
     {
         var lattice = new SpatialLattice();
-        List<SpatialObject> insertedObjects = [];
+        List<ISpatialObject> insertedObjects = [];
 
         // === I1: Coordinate round-trip (root) ===
         {
@@ -316,7 +316,7 @@ public class SerialTests
         }
         {
             // test bulk insert
-            List<SpatialObject> tmp = [];
+            List<ISpatialObject> tmp = [];
             for (int i = 0; i < 1000; i++)
             {
                 var objtmp = new SpatialObject([new (44456543789), new(-122224456789),new(5678900000987)]);

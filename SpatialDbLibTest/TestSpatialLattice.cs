@@ -9,7 +9,7 @@ public class TestSpatialLattice
     : SpatialLattice,
       ITestCatalog
 {
-    public void TestBulkInsert(List<SpatialObject> objs)
+    public void TestBulkInsert(List<ISpatialObject> objs)
     {
         AdmitResult ret;
         try
@@ -28,7 +28,7 @@ public class TestSpatialLattice
         }
     }
 
-    public void TestInsertAsOne(List<SpatialObject> objs)
+    public void TestInsertAsOne(List<ISpatialObject> objs)
     {
         AdmitResult ret;
         try
@@ -47,7 +47,7 @@ public class TestSpatialLattice
         }
     }
 
-    public void TestInsert(SpatialObject obj)
+    public void TestInsert(ISpatialObject obj)
     {
         AdmitResult ret;
         try
@@ -66,7 +66,7 @@ public class TestSpatialLattice
         }
     }
 
-    public void TestRemove(SpatialObject obj)
+    public void TestRemove(ISpatialObject obj)
     {
         try
         {
@@ -96,10 +96,10 @@ public class TestSpatialLattice
 }
 
 public class TestConcurrentDictionary
-    : ConcurrentDictionary<Guid, SpatialObject>,
+    : ConcurrentDictionary<Guid, ISpatialObject>,
       ITestCatalog
 {
-    public void TestBulkInsert(List<SpatialObject> objs)
+    public void TestBulkInsert(List<ISpatialObject> objs)
     {
         try
         {
@@ -116,7 +116,7 @@ public class TestConcurrentDictionary
         }
     }
 
-    public void TestInsertAsOne(List<SpatialObject> objs)
+    public void TestInsertAsOne(List<ISpatialObject> objs)
     {   // In ConcurrentDictionary, this is the same as bulk insert, as there are no transactional guarantees made
         try
         {
@@ -133,7 +133,7 @@ public class TestConcurrentDictionary
         }
     }
 
-    public void TestInsert(SpatialObject obj)
+    public void TestInsert(ISpatialObject obj)
     {
         try
         {
@@ -147,7 +147,7 @@ public class TestConcurrentDictionary
         }
     }
 
-    public void TestRemove(SpatialObject obj)
+    public void TestRemove(ISpatialObject obj)
     {
         try
         {

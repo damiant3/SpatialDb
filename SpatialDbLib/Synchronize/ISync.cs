@@ -1,7 +1,7 @@
 ﻿///////////////////////////////////
 namespace SpatialDbLib.Synchronize;
 
-internal interface ISync
+public interface ISync
 {
     ReaderWriterLockSlim Sync { get; }
 }

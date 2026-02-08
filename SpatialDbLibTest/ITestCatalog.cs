@@ -4,10 +4,10 @@ namespace SpatialDbLibTest
 {
     public interface ITestCatalog
     {
-        void TestBulkInsert(List<SpatialObject> objs);
-        void TestInsertAsOne(List<SpatialObject> objs);
-        void TestInsert(SpatialObject obj);
-        void TestRemove(SpatialObject obj);
+        void TestBulkInsert(List<ISpatialObject> objs);
+        void TestInsertAsOne(List<ISpatialObject> objs);
+        void TestInsert(ISpatialObject obj);
+        void TestRemove(ISpatialObject obj);
         string GenerateExceptionReport();
         void Cleanup();
     }

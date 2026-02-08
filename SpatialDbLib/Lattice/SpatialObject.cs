@@ -3,8 +3,32 @@ using SpatialDbLib.Synchronize;
 ///////////////////////////////
 namespace SpatialDbLib.Lattice;
 
+// Core spatial object interface
+public interface ISpatialObject : ISync
+{
+    Guid Guid { get; }
+    LongVector3 LocalPosition { get; }
+    int PositionStackDepth { get; }
+    IList<LongVector3> GetPositionStack();
+    void SetPositionStack(IList<LongVector3> newStack);
+    void AppendPosition(LongVector3 newPosition);
+    void SetLocalPosition(LongVector3 newLocalPos);
+    bool HasPositionAtDepth(int depth);
+    LongVector3 GetPositionAtDepth(int depth);
+}
+
+// Proxy contract
+public interface ISpatialObjectProxy : ISpatialObject
+{
+    bool IsCommitted { get; }
+    ISpatialObject OriginalObject { get; }
+    VenueLeafNode TargetLeaf { get; set; }
+    void Commit();
+    void Rollback();
+}
+
 public class SpatialObject(IList<LongVector3> initialPosition)
-    : ISync
+    : ISpatialObject
 {
     public Guid Guid { get; } = Guid.NewGuid();
 
@@ -72,9 +96,9 @@ public class SpatialObject(IList<LongVector3> initialPosition)
             return m_positionStack[^1];
         }
     }
- }
+}
 
-public class SpatialObjectProxy : SpatialObject
+public class SpatialObjectProxy : SpatialObject, ISpatialObjectProxy
 {
     public enum ProxyState
     {
@@ -84,10 +108,11 @@ public class SpatialObjectProxy : SpatialObject
     }
     private ProxyState m_proxyState;
     public bool IsCommitted => ProxyState.Committed == m_proxyState;
-    public SpatialObject OriginalObject { get; }
+    public ISpatialObject OriginalObject { get; }
+    ISpatialObject ISpatialObjectProxy.OriginalObject => OriginalObject;
     public VenueLeafNode TargetLeaf { get; set; }
 
-    public SpatialObjectProxy(SpatialObject originalObj, VenueLeafNode targetleaf, LongVector3 proposedPosition)
+    public SpatialObjectProxy(ISpatialObject originalObj, VenueLeafNode targetleaf, LongVector3 proposedPosition)
         : base([.. originalObj.GetPositionStack()])
     {
 #if DEBUG

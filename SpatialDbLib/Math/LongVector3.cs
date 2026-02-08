@@ -67,6 +67,14 @@ public readonly struct LongVector3(long x, long y, long z)
             Midpoint(min.Z, max.Z)
         );
 
+    internal int DistanceTo(LongVector3 other)
+    {
+        long dx = X - other.X;
+        long dy = Y - other.Y;
+        long dz = Z - other.Z;
+        return (int)SystemMath.Sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
     public static readonly LongVector3 Zero = new(0);
 }
 

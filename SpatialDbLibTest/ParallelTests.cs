@@ -9,7 +9,7 @@ public partial class ParallelTests
     const int TASKS_PER_ITERATION = 16;
     const int BATCH_SIZE = 10000;
 
-    public void RunInsertBulk(Dictionary<int, List<SpatialObject>> objectsToInsert)
+    public void RunInsertBulk(Dictionary<int, List<ISpatialObject>> objectsToInsert)
     {
         var test = new LatticeParallelTest(TASKS_PER_ITERATION, BATCH_SIZE, benchmarkTest: true);
         for (int iter = 0; iter < ITERATIONS; iter++)
@@ -21,7 +21,7 @@ public partial class ParallelTests
         Console.WriteLine(test.GenerateReportString());
     }
 
-    public void RunInsertAsOne(Dictionary<int, List<SpatialObject>> objectsToInsert)
+    public void RunInsertAsOne(Dictionary<int, List<ISpatialObject>> objectsToInsert)
     {
         var test = new LatticeParallelTest(TASKS_PER_ITERATION, BATCH_SIZE, benchmarkTest: true);
         for (int iter = 0; iter < ITERATIONS; iter++)

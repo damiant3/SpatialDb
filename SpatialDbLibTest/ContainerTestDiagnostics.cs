@@ -136,7 +136,7 @@ public class ParallelContainerTestDiagnostic<T>(int taskCount = 1, int batchSize
     public int TaskCount = taskCount;
     public int BatchSize = batchSize;
 
-    public void InsertBulkItems(Dictionary<int, List<SpatialObject>> objsToInsert)
+    public void InsertBulkItems(Dictionary<int, List<ISpatialObject>> objsToInsert)
     {
         var tasks = new List<Task>();
         for (int j = 0; j < TaskCount; j++)
@@ -170,7 +170,7 @@ public class ParallelContainerTestDiagnostic<T>(int taskCount = 1, int batchSize
     }
 
 
-    public void InsertAsOne(Dictionary<int, List<SpatialObject>> objsToInsert)
+    public void InsertAsOne(Dictionary<int, List<ISpatialObject>> objsToInsert)
     {
         var tasks = new List<Task>();
         for (int j = 0; j < TaskCount; j++)
@@ -228,7 +228,7 @@ public class ParallelContainerTestDiagnostic<T>(int taskCount = 1, int batchSize
         return cts;
     }
 
-    public void InsertItems(Dictionary<int, List<SpatialObject>> objsToInsert)
+    public void InsertItems(Dictionary<int, List<ISpatialObject>> objsToInsert)
     {
         var tasks = new List<Task>();
 

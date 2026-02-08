@@ -9,16 +9,22 @@ public enum TickAction
     Remove
 }
 
-public readonly struct TickResult
+public struct TickResult
 {
     public SpatialObject Object { get; init; }
-    public LongVector3 Target { get; init; }
     public TickAction Action { get; init; }
+    public LongVector3 Target { get; init; }
+
+    public TickResult(SpatialObject obj, TickAction action, LongVector3 target)
+    {
+        Object = obj;
+        Action = action;
+        Target = target;
+    }
 
     public static TickResult Move(SpatialObject obj, LongVector3 target)
-        => new() { Object = obj, Target = target, Action = TickAction.Move };
+        => new(obj, TickAction.Move, target);
 
     public static TickResult Remove(SpatialObject obj)
-        => new() { Object = obj, Action = TickAction.Remove };
+        => new(obj, TickAction.Remove, LongVector3.Zero);
 }
-

@@ -7,16 +7,16 @@ public abstract class AdmitResult
 {
     private AdmitResult() { }
 
-    public sealed class BulkCreated(List<SpatialObjectProxy> proxies)
+    public sealed class BulkCreated(List<ISpatialObjectProxy> proxies)
         : AdmitResult
     {
-        public List<SpatialObjectProxy> Proxies { get; } = proxies;
+        public List<ISpatialObjectProxy> Proxies { get; } = proxies;
     }
 
-    public sealed class Created(SpatialObjectProxy proxy)
+    public sealed class Created(ISpatialObjectProxy proxy)
         : AdmitResult
     {
-        public SpatialObjectProxy Proxy { get; } = proxy;
+        public ISpatialObjectProxy Proxy { get; } = proxy;
     }
 
     public sealed class Rejected : AdmitResult { }
@@ -37,8 +37,8 @@ public abstract class AdmitResult
         public LeafNode Leaf { get; } = leaf;
     }
 
-    public static AdmitResult BulkCreate(List<SpatialObjectProxy> proxies) => new BulkCreated(proxies);
-    public static AdmitResult Create(SpatialObjectProxy proxy) => new Created(proxy);
+    public static AdmitResult BulkCreate(List<ISpatialObjectProxy> proxies) => new BulkCreated(proxies);
+    public static AdmitResult Create(ISpatialObjectProxy proxy) => new Created(proxy);
     public static AdmitResult Reject() => new Rejected();
     public static AdmitResult EscalateRequest() => new Escalate();
     public static AdmitResult RetryRequest() => new Retry();
@@ -67,7 +67,7 @@ internal sealed class BufferSlice(int start, int length)
 {
     public int Start { get; } = start;
     public int Length { get; } = length;
-    public Span<SpatialObject> GetSpan(Span<SpatialObject> rootBuffer) => rootBuffer.Slice(Start, Length);
+    public Span<ISpatialObject> GetSpan(Span<ISpatialObject> rootBuffer) => rootBuffer.Slice(Start, Length);
 }
 
 public readonly struct SelectChildResult(byte indexInParent, IChildNode<OctetParentNode> childNode)

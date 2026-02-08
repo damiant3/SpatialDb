@@ -16,8 +16,8 @@ public interface ISpatialLattice : ISpatialNode
 {
     ISpatialNode GetRootNode();
     byte LatticeDepth { get; }
-    VenueLeafNode? ResolveLeafFromOuterLattice(SpatialObject obj);
-    AdmitResult AdmitForInsert(Span<SpatialObject> buffer);
+    VenueLeafNode? ResolveLeafFromOuterLattice(ISpatialObject obj);
+    AdmitResult AdmitForInsert(Span<ISpatialObject> buffer);
     ParentToSubLatticeTransform BoundsTransform { get; }
 }
 internal static class LatticeDepthContext
@@ -74,12 +74,11 @@ public class SpatialLattice<TRoot>
         }
 
         public void Dispose()
-        {
-            LatticeDepthContext.CurrentDepth = m_previousDepth;
-        }
+            => LatticeDepthContext.CurrentDepth = m_previousDepth;
+
     }
 
-    public AdmitResult InsertAsOne(List<SpatialObject> objs)
+    public AdmitResult InsertAsOne(List<ISpatialObject> objs)
     {
         using var s = PushLatticeDepth(LatticeDepth);
         List<AdmitResult> results = [];
@@ -91,12 +90,8 @@ public class SpatialLattice<TRoot>
             else
             {
                 foreach (var result in results)
-                {
                     if (result is AdmitResult.Created createdRollback)
-                    {
                         createdRollback.Proxy.Rollback();
-                    }
-                }
                 return admitResult;
             }
         }
@@ -107,12 +102,12 @@ public class SpatialLattice<TRoot>
         }
         return AdmitResult.BulkCreate([.. results.Cast<AdmitResult.Created>().Select(r => r.Proxy)]);
     }
-    public AdmitResult Insert(List<SpatialObject> objs)
+    public AdmitResult Insert(List<ISpatialObject> objs)
     {
         return Insert(objs.ToArray());
     }
 
-    public AdmitResult Insert(SpatialObject[] objs)
+    public AdmitResult Insert(ISpatialObject[] objs)
     {
         using var s = PushLatticeDepth(LatticeDepth);
         var admitResult = Admit(objs);
@@ -127,20 +122,20 @@ public class SpatialLattice<TRoot>
         return admitResult;
     }
 
-    public AdmitResult Insert(SpatialObject obj)
+    public AdmitResult Insert(ISpatialObject obj)
     {
         using var s = PushLatticeDepth(LatticeDepth);
-        using var s2 = new SlimSyncer(((ISync)obj).Sync, SlimSyncer.LockMode.Write, "SpatialLattice.Insert: Object");
+        using var s2 = new SlimSyncer(obj.Sync, SlimSyncer.LockMode.Write, "SpatialLattice.Insert: Object");
         var admitResult = Admit(obj, obj.GetPositionAtDepth(LatticeDepthContext.CurrentDepth));
         if (admitResult is AdmitResult.Created created)
             created.Proxy.Commit();
         return admitResult;
     }
 
-    public void Remove(SpatialObject obj)
+    public void Remove(ISpatialObject obj)
     {
         using var s = PushLatticeDepth(LatticeDepth);
-        using var s2 = new SlimSyncer(((ISync)obj).Sync, SlimSyncer.LockMode.Write, "SpatialLattice.Remove: Object");
+        using var s2 = new SlimSyncer(obj.Sync, SlimSyncer.LockMode.Write, "SpatialLattice.Remove: Object");
         while (true)
         {
             var leaf = m_root.ResolveOccupyingLeaf(obj);
@@ -149,7 +144,7 @@ public class SpatialLattice<TRoot>
             return;
         }
     }
-    public void AdmitMigrants(IList<SpatialObject> objs)
+    public void AdmitMigrants(IList<ISpatialObject> objs)
     {
         foreach (var obj in objs)
         {
@@ -159,25 +154,25 @@ public class SpatialLattice<TRoot>
         m_root.AdmitMigrants(objs);
     }
 
-    public AdmitResult Admit(SpatialObject obj, LongVector3 proposedPosition)
+    public AdmitResult Admit(ISpatialObject obj, LongVector3 proposedPosition)
     {
         using var s = PushLatticeDepth(LatticeDepth);
         return m_root.Admit(obj, proposedPosition);
     }
 
-    public AdmitResult Admit(Span<SpatialObject> buffer)
+    public AdmitResult Admit(Span<ISpatialObject> buffer)
     {
         using var s = PushLatticeDepth(LatticeDepth);
         return m_root.Admit(buffer);
     }
 
-    public VenueLeafNode? ResolveLeafFromOuterLattice(SpatialObject obj)
+    public VenueLeafNode? ResolveLeafFromOuterLattice(ISpatialObject obj)
     {
         using var s = PushLatticeDepth(LatticeDepth);
         return m_root.ResolveLeafFromOuterLattice(obj);
     }
 
-    public AdmitResult AdmitForInsert(Span<SpatialObject> buffer)
+    public AdmitResult AdmitForInsert(Span<ISpatialObject> buffer)
     {
         foreach (var obj in buffer)
             // the following sequence seems like it should move down to the sublattice.  why this branch cares about this?
@@ -191,13 +186,13 @@ public class SpatialLattice<TRoot>
         return Admit(buffer);
     }
 
-    internal VenueLeafNode? ResolveOccupyingLeaf(SpatialObject obj)
+    internal VenueLeafNode? ResolveOccupyingLeaf(ISpatialObject obj)
     {
         using var s = PushLatticeDepth(LatticeDepth);
         return m_root.ResolveOccupyingLeaf(obj);
     }
 
-    internal VenueLeafNode? ResolveLeaf(SpatialObject obj)
+    internal VenueLeafNode? ResolveLeaf(ISpatialObject obj)
     {
         using var s = PushLatticeDepth(LatticeDepth);
         return m_root.ResolveLeaf(obj);

@@ -7,9 +7,9 @@ public partial class ParallelTests
 {
     public int SpaceRange = int.MaxValue;
 
-    public Dictionary<int, List<SpatialObject>> GetTinyClusteredObjects()
+    public Dictionary<int, List<ISpatialObject>> GetTinyClusteredObjects()
     {
-        var objsToInsert = new Dictionary<int, List<SpatialObject>>();
+        var objsToInsert = new Dictionary<int, List<ISpatialObject>>();
         for (int i = 0; i < TASKS_PER_ITERATION; i++)
         {
             objsToInsert.Add(i, []);
@@ -41,9 +41,9 @@ public partial class ParallelTests
         return objsToInsert;
     }
 
-    public Dictionary<int, List<SpatialObject>> GetTinyDispersedObjects()
+    public Dictionary<int, List<ISpatialObject>> GetTinyDispersedObjects()
     {
-        var objsToInsert = new Dictionary<int, List<SpatialObject>>();
+        var objsToInsert = new Dictionary<int, List<ISpatialObject>>();
         for (int i = 0; i < TASKS_PER_ITERATION; i++)
         {
             objsToInsert.Add(i, []);
@@ -63,9 +63,9 @@ public partial class ParallelTests
         return objsToInsert;
     }
 
-    public Dictionary<int, List<SpatialObject>> GetSkewedObjects()
+    public Dictionary<int, List<ISpatialObject>> GetSkewedObjects()
     {
-        var objsToInsert = new Dictionary<int, List<SpatialObject>>();
+        var objsToInsert = new Dictionary<int, List<ISpatialObject>>();
 
         for (int i = 0; i < TASKS_PER_ITERATION; i++)
         {
@@ -99,9 +99,9 @@ public partial class ParallelTests
         return objsToInsert;
     }
 
-    public Dictionary<int, List<SpatialObject>> GetBimodalObjects()
+    public Dictionary<int, List<ISpatialObject>> GetBimodalObjects()
     {
-        var objsToInsert = new Dictionary<int, List<SpatialObject>>();
+        var objsToInsert = new Dictionary<int, List<ISpatialObject>>();
 
         var a = new LongVector3(-SpaceRange + 1);
         var b = new LongVector3(SpaceRange - 1);
@@ -120,9 +120,9 @@ public partial class ParallelTests
         return objsToInsert;
     }
 
-    public Dictionary<int, List<SpatialObject>> GetClusteredObjects()
+    public Dictionary<int, List<ISpatialObject>> GetClusteredObjects()
     {
-        var objsToInsert = new Dictionary<int, List<SpatialObject>>();
+        var objsToInsert = new Dictionary<int, List<ISpatialObject>>();
 
         var center = LongVector3.Zero;
         int variance = SpaceRange / 1024; // very tight cluster
@@ -146,9 +146,9 @@ public partial class ParallelTests
         return objsToInsert;
     }
 
-    public Dictionary<int, List<SpatialObject>> GetSinglePathObjects()
+    public Dictionary<int, List<ISpatialObject>> GetSinglePathObjects()
     {
-        var objsToInsert = new Dictionary<int, List<SpatialObject>>();
+        var objsToInsert = new Dictionary<int, List<ISpatialObject>>();
 
         // Pick a point extremely close to one octant corner
         var basePoint = new LongVector3(
@@ -169,12 +169,12 @@ public partial class ParallelTests
         return objsToInsert;
     }
 
-    public Dictionary<int, List<SpatialObject>> GetUniformObjects()
+    public Dictionary<int, List<ISpatialObject>> GetUniformObjects()
     {
-        var objsToInsert = new Dictionary<int, List<SpatialObject>>();
+        var objsToInsert = new Dictionary<int, List<ISpatialObject>>();
         for (int i = 0; i < TASKS_PER_ITERATION; i++)
         {
-            var list = new List<SpatialObject>(BATCH_SIZE);
+            var list = new List<ISpatialObject>(BATCH_SIZE);
             for (int j = 0; j < BATCH_SIZE; j++)
             {
                 list.Add(new SpatialObject([new LongVector3(
