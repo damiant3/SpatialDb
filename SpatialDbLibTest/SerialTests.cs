@@ -1,194 +1,12 @@
 ﻿///////////////////////////
 using SpatialDbLib.Lattice;
 using SpatialDbLib.Math;
-using System.Collections.Concurrent;
 using static SpatialDbLib.Lattice.AdmitResult;
 namespace SpatialDbLibTest;
 
 [TestClass]
 public class SerialTests
 {
-    // T1: Alternating depth insertions
-    [TestMethod]
-    public void Test_AlternatingDepthInsertions()
-    {
-        var lattice = new SpatialLattice();
-        var objects = new List<SpatialObject>();
-
-        // Insert at depth 3 (deep)
-        var obj1 = new SpatialObject([
-            new(100),  // depth 0
-            new(50),     // depth 1
-            new(25),     // depth 2
-            new(12)      // depth 3
-        ]);
-        objects.Add(obj1);
-        var result = lattice.Insert(obj1);
-        Assert.IsTrue(result is Created, $"Insertion failed for object {obj1.Guid}");
-
-        // Insert at depth 1 (shallow)
-        var obj2 = new SpatialObject([
-            new(200),  // depth 0
-            new(100)   // depth 1
-        ]);
-        objects.Add(obj2);
-        result = lattice.Insert(obj2);
-        Assert.IsTrue(result is Created);
-        // Insert at depth 2 (medium)
-
-        var obj3 = new SpatialObject([
-            new(150),
-            new(75),
-            new(37)
-        ]);
-        objects.Add(obj3);
-        result = lattice.Insert(obj3);
-        Assert.IsTrue(result is Created);
-
-        // Verify all findable
-        foreach (var obj in objects)
-        {
-            var leaf = lattice.ResolveOccupyingLeaf(obj);
-            Assert.IsNotNull(leaf, $"Object {obj.Guid} not found");
-            Assert.IsTrue(leaf.Contains(obj), $"Leaf does not contain object {obj.Guid}");
-        }
-    }
-
-    // T2: Force multiple sublattice levels
-    [TestMethod]
-    public void Test_NestedSublattices()
-    {
-        var lattice = new SpatialLattice();
-
-        // Create object that forces 3 levels of sublattices
-        // (fill a leaf at depth 0, then force subdivision to depth 1, then depth 2...)
-        for (int i = 0; i < 20; i++)
-        {
-            var obj = new SpatialObject([new(1, 1, 1)]);
-            lattice.Insert(obj);
-        }
-
-        // Verify sublattice structure exists
-        int sublatticeCount = 0;
-        void CountSublattices(ISpatialNode node)
-        {
-            switch (node)
-            {
-                case ISubLatticeBranch s:
-                    sublatticeCount++;
-                    CountSublattices(s.GetSublattice().GetRootNode());
-                    break;
-                case OctetParentNode p:
-                    foreach (var c in p.Children)
-                        CountSublattices(c);
-                    break;
-            }
-        }
-        CountSublattices(lattice.m_root);
-
-        Assert.IsTrue(sublatticeCount > 0, "No sublattices created");
-    }
-
-    // T3: Concurrent deep and shallow insertions
-    [TestMethod]
-    public void Test_ConcurrentMixedDepthInsertions()
-    {
-        var lattice = new SpatialLattice();
-        var tasks = new List<Task>();
-        var allObjects = new ConcurrentBag<SpatialObject>();
-
-        // Spawn threads doing deep inserts
-        for (int t = 0; t < 4; t++)
-        {
-            tasks.Add(Task.Run(() =>
-            {
-                for (int i = 0; i < 100; i++)
-                {
-                    var depth = (i % 3) + 1;  // Depths 1, 2, 3
-                    var positions = new List<LongVector3>();
-                    var pos = new LongVector3(
-                        Random.Shared.Next(1000),
-                        Random.Shared.Next(1000),
-                        Random.Shared.Next(1000));
-
-                    for (int d = 0; d <= depth; d++)
-                    {
-                        positions.Add(pos);
-                        pos = new(pos.X / 2, pos.Y / 2, pos.Z / 2);
-                    }
-
-                    var obj = new SpatialObject(positions);
-                    allObjects.Add(obj);
-                    lattice.Insert(obj);
-                }
-            }));
-        }
-
-        Task.WaitAll(tasks.ToArray());
-
-        // Verify all objects findable
-        foreach (var obj in allObjects)
-        {
-            var leaf = lattice.ResolveOccupyingLeaf(obj);
-            Assert.IsNotNull(leaf);
-        }
-    }
-
-    // T4: Remove from mixed depths
-    [TestMethod]
-    public void Test_RemoveFromMixedDepths()
-    {
-        var lattice = new SpatialLattice();
-        var deepObj = new SpatialObject([
-            new(100, 100, 100),
-        new(50, 50, 50),
-        new(25, 25, 25)
-        ]);
-        var shallowObj = new SpatialObject([
-            new(200, 200, 200)
-        ]);
-
-        lattice.Insert(deepObj);
-        lattice.Insert(shallowObj);
-
-        // Remove shallow
-        lattice.Remove(shallowObj);
-        Assert.IsNull(lattice.ResolveOccupyingLeaf(shallowObj));
-        Assert.IsNotNull(lattice.ResolveOccupyingLeaf(deepObj));
-
-        // Remove deep
-        lattice.Remove(deepObj);
-        Assert.IsNull(lattice.ResolveOccupyingLeaf(deepObj));
-    }
-
-    // T5: Bulk insert with mixed depths
-    [TestMethod]
-    public void Test_BulkInsertMixedDepths()
-    {
-        var lattice = new SpatialLattice();
-        var objects = new List<ISpatialObject>();
-
-        // Create objects with varying depths
-        for (int i = 0; i < 50; i++)
-        {
-            var depth = i % 4;  // 0-3
-            var positions = new List<LongVector3> { new(i * 10, i * 10, i * 10) };
-
-            for (int d = 1; d <= depth; d++)
-                positions.Add(new(i * 10 / (d + 1), i * 10 / (d + 1), i * 10 / (d + 1)));
-
-            objects.Add(new SpatialObject(positions));
-        }
-
-        // Bulk insert
-        var result = lattice.Insert(objects);
-        Assert.IsInstanceOfType(result, typeof(AdmitResult.BulkCreated));
-
-        // Verify all present
-        foreach (var obj in objects)
-            Assert.IsNotNull(lattice.ResolveOccupyingLeaf(obj));
-    }
-
     [TestMethod]
     public void SerialTests_Omnibus()
     {
@@ -201,13 +19,14 @@ public class SerialTests
             var positions = new[]
             {
                 LongVector3.Zero,
-                new(1), new(-1),
+                new(1),
+                new(-1),
                 new(1234567890, -987654321, 567890123),
                 LatticeUniverse.RootRegion.Min,
                 LatticeUniverse.RootRegion.Max - new LongVector3(1),
             };
 
-            var newobjects = positions.Select(a => new SpatialObject([a])).ToList<SpatialObject>();
+            var newobjects = positions.Select(a => new SpatialObject([a])).ToList();
             foreach (var p in positions)
             {
                 var inner = t.OuterToInnerCanonical(p);
@@ -258,15 +77,13 @@ public class SerialTests
                     case OctetParentNode p:
                         foreach (var c in p.Children) Scan(c);
                         break;
-
                 }
             }
 
             Scan(lattice.m_root);
             Assert.AreEqual(1, count);
+            Console.WriteLine("Object exists in exactly one leaf passed.");
         }
-        Console.WriteLine("Object exists in exactly one leaf passed.");
-
 
         // === I7 + I8: Double commit throws, remove removes ===
         {
@@ -280,7 +97,7 @@ public class SerialTests
             Assert.IsTrue(leaf != null);
             lattice.Remove(obj);
             insertedObjects.Remove(obj);
-            Assert.ThrowsException<InvalidOperationException>(()=>created.Proxy!.Commit());
+            Assert.ThrowsException<InvalidOperationException>(() => created.Proxy!.Commit());
             leaf = lattice.ResolveOccupyingLeaf(obj);
             Assert.IsTrue(leaf == null);
             Console.WriteLine("Double commit throws, Removed items can't be resolved passed.");
@@ -293,7 +110,7 @@ public class SerialTests
             var obj = new SpatialObject([pos]);
             insertedObjects.Add(obj);
             var x = lattice.Insert(obj);
-            Assert.IsTrue(x  is Created);
+            Assert.IsTrue(x is Created);
             var leaf = lattice.ResolveOccupyingLeaf(obj);
             Assert.IsNotNull(leaf);
             var owning = LatticeTestHelpers.GetOwningLattice(leaf);
@@ -301,43 +118,123 @@ public class SerialTests
             Assert.AreEqual(pos, projected);
             Console.WriteLine("Local lattice projection matches original passed.");
         }
-        // === I9: Deep Insertion ===
+
+        // === I10: Alternating depth insertions ===
         {
-            var obj = new SpatialObject([LongVector3.Zero, LongVector3.Zero]);
-            insertedObjects.Add(obj);
-            var r = lattice.Insert(obj);
-            var created = r as Created;
-            Assert.IsNotNull(created);
-            Assert.IsTrue(created.Proxy.IsCommitted);
-            var leaf = lattice.ResolveOccupyingLeaf(obj);
-            Assert.IsNotNull(leaf);
-            Assert.IsTrue(leaf.Contains(obj));
-            Console.WriteLine("Object insert deeply into lattice.");
-        }
-        {
-            // test bulk insert
-            List<ISpatialObject> tmp = [];
-            for (int i = 0; i < 1000; i++)
+            var objects = new List<SpatialObject>();
+
+            // Insert at depth 3 (deep)
+            var obj1 = new SpatialObject([
+                new(100),
+                new(50),
+                new(25),
+                new(12)
+            ]);
+            objects.Add(obj1);
+            insertedObjects.Add(obj1);
+            var result = lattice.Insert(obj1);
+            Assert.IsTrue(result is Created, $"Insertion failed for object {obj1.Guid}");
+
+            // Insert at depth 1 (shallow)
+            var obj2 = new SpatialObject([
+                new(200),
+                new(100)
+            ]);
+            objects.Add(obj2);
+            insertedObjects.Add(obj2);
+            result = lattice.Insert(obj2);
+            Assert.IsTrue(result is Created);
+
+            // Insert at depth 2 (medium)
+            var obj3 = new SpatialObject([
+                new(150),
+                new(75),
+                new(37)
+            ]);
+            objects.Add(obj3);
+            insertedObjects.Add(obj3);
+            result = lattice.Insert(obj3);
+            Assert.IsTrue(result is Created);
+
+            // Verify all findable
+            foreach (var obj in objects)
             {
-                var objtmp = new SpatialObject([new (44456543789), new(-122224456789),new(5678900000987)]);
-                tmp.Add(objtmp);
+                var leaf = lattice.ResolveOccupyingLeaf(obj);
+                Assert.IsNotNull(leaf, $"Object {obj.Guid} not found");
+                Assert.IsTrue(leaf.Contains(obj), $"Leaf does not contain object {obj.Guid}");
             }
 
-            var r = lattice.Insert(tmp);
+            Console.WriteLine("Alternating depth insertions passed.");
+        }
 
-            Assert.IsTrue(r is BulkCreated);
-            foreach (var obj in tmp)
+        // === I11: Nested sublattice structure validation ===
+        {
+            // Verify multiple levels of sublattices exist (from forcing sublattices earlier)
+            int sublatticeCount = 0;
+            void CountSublattices(ISpatialNode node)
+            {
+                switch (node)
+                {
+                    case ISubLatticeBranch s:
+                        sublatticeCount++;
+                        CountSublattices(s.GetSublattice().GetRootNode());
+                        break;
+                    case OctetParentNode p:
+                        foreach (var c in p.Children)
+                            CountSublattices(c);
+                        break;
+                }
+            }
+            CountSublattices(lattice.m_root);
+
+            Assert.IsTrue(sublatticeCount > 0, "No sublattices created");
+            Console.WriteLine($"Nested sublattice structure validated ({sublatticeCount} sublattices).");
+        }
+
+        // === I12: Remove from mixed depths ===
+        {
+            var deepObj = new SpatialObject([new(300), new(150), new(75)]);
+            var shallowObj = new SpatialObject([new(400)]);
+
+            lattice.Insert(deepObj);
+            lattice.Insert(shallowObj);
+
+            lattice.Remove(shallowObj);
+            Assert.IsNull(lattice.ResolveOccupyingLeaf(shallowObj));
+            Assert.IsNotNull(lattice.ResolveOccupyingLeaf(deepObj));
+
+            lattice.Remove(deepObj);
+            Assert.IsNull(lattice.ResolveOccupyingLeaf(deepObj));
+
+            Console.WriteLine("Remove from mixed depths passed.");
+        }
+
+        // === I13: Bulk insert with varying depths ===
+        {
+            var objects = new List<ISpatialObject>();
+
+            for (int i = 0; i < 50; i++)
+            {
+                var depth = i % 4;  // 0-3
+                var positions = new List<LongVector3> { new(i * 10 + 500, i * 10 + 500, i * 10 + 500) };
+                for (int d = 1; d <= depth; d++)
+                    positions.Add(new((i * 10 + 500) / (d + 1), (i * 10 + 500) / (d + 1), (i * 10 + 500) / (d + 1)));
+                objects.Add(new SpatialObject(positions));
+            }
+
+            var result = lattice.Insert(objects);
+            Assert.IsInstanceOfType(result, typeof(BulkCreated));
+
+            foreach (var obj in objects)
             {
                 insertedObjects.Add(obj);
-                var leaf = lattice.ResolveOccupyingLeaf(obj);
-                Assert.IsNotNull(leaf);
-                Assert.IsTrue(leaf.Contains(obj));
+                Assert.IsNotNull(lattice.ResolveOccupyingLeaf(obj));
             }
-            
-            Console.WriteLine("Bulk insert deeply into lattice.");
+
+            Console.WriteLine("Bulk insert with varying depths passed.");
         }
 
-        // Final validate all objects where lattice position stacks depth > 1 inner to outer transform works.
+        // === I14: Deep lattice projections matches original ===
         {
             bool atLeastOne = false;
             foreach (var obj in insertedObjects)

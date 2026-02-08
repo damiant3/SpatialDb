@@ -35,7 +35,7 @@ public abstract class TickableSpatialObjectBase(IList<LongVector3> position)
       IMoveable
 {
     private IList<IntVector3> m_velocityStack = [new(0)];
-    private long m_lastTick = 0;
+    private int m_lastMsTick = 0;
     private TickableVenueLeafNode? m_occupyingLeaf;
 
     public bool IsStationary => !SimulationPolicy.MeetsMovementThreshold(LocalVelocity);
@@ -81,35 +81,28 @@ public abstract class TickableSpatialObjectBase(IList<LongVector3> position)
 
     public void RegisterForTicks()
     {
-        m_lastTick = DateTime.Now.Ticks;
+        m_lastMsTick = MillisecondTicks32;
         m_occupyingLeaf?.RegisterForTicks(this);
     }
 
     public void UnregisterForTicks()
     {
-        m_lastTick = 0;
+        m_lastMsTick = 0;
 
         m_occupyingLeaf?.UnregisterForTicks(this);
     }
 
-    const long ExpectedTicksPerTick = TimeSpan.TicksPerSecond / 10;
+
+    public static int MillisecondTicks32 => unchecked((int)((DateTime.Now.Ticks * 429497L) >> 32));
 
     public virtual TickResult? Tick()
     {
         if (LocalVelocity.IsZero) return null;
-
-        var deltaTicks = (int)(DateTime.Now.Ticks - m_lastTick);
-        m_lastTick += deltaTicks;
-
-        var scaledVelocity = LocalVelocity * deltaTicks;
-
-        var fractionalMovement = new ShortVector3(
-            (short)(scaledVelocity.X / ExpectedTicksPerTick),
-            (short)(scaledVelocity.Y / ExpectedTicksPerTick),
-            (short)(scaledVelocity.Z / ExpectedTicksPerTick)
-        );
-
-        LongVector3 target = LocalPosition + fractionalMovement;
+        var currentMs = MillisecondTicks32;
+        var deltaMs = currentMs - m_lastMsTick;
+        m_lastMsTick = currentMs;
+        var scaledVelocity = LocalVelocity * deltaMs;
+        LongVector3 target = LocalPosition + scaledVelocity;
         return TickResult.Move(this, target);
     }
 }

@@ -9,7 +9,7 @@ public partial class ParallelTests
     const int TASKS_PER_ITERATION = 16;
     const int BATCH_SIZE = 10000;
 
-    public void RunInsertBulk(Dictionary<int, List<ISpatialObject>> objectsToInsert)
+    public static void RunInsertBulk(Dictionary<int, List<ISpatialObject>> objectsToInsert)
     {
         var test = new LatticeParallelTest(TASKS_PER_ITERATION, BATCH_SIZE, benchmarkTest: true);
         for (int iter = 0; iter < ITERATIONS; iter++)
@@ -21,7 +21,7 @@ public partial class ParallelTests
         Console.WriteLine(test.GenerateReportString());
     }
 
-    public void RunInsertAsOne(Dictionary<int, List<ISpatialObject>> objectsToInsert)
+    public static void RunInsertAsOne(Dictionary<int, List<ISpatialObject>> objectsToInsert)
     {
         var test = new LatticeParallelTest(TASKS_PER_ITERATION, BATCH_SIZE, benchmarkTest: true);
         for (int iter = 0; iter < ITERATIONS; iter++)
@@ -32,27 +32,24 @@ public partial class ParallelTests
         Console.WriteLine($"Test complete after {ITERATIONS} iterations.");
         Console.WriteLine(test.GenerateReportString());
     }
-    
-    //[TestMethod]
-    public void InsertAsOneVsBulk_TinyClusters()
-    {
-        Console.WriteLine("=== InsertAsOne: Tiny Clustered Distribution (ignores batch size config, sets = 5) ===");
-        RunInsertAsOne(GetTinyClusteredObjects());
-        Console.WriteLine("=== BulkInsert: Tiny Clustered Distribution (ignores batch size config, sets = 5) ===");
-        RunInsertBulk(GetTinyClusteredObjects());
-    }
 
-    //[TestMethod]
-    public void InsertAsOneVsBulk_TinyDispersed()
+    // === ACTIVE STRESS TESTS ===
+
+    [TestMethod]
+    public void InsertStress_Singleton()
     {
-        Console.WriteLine("=== InsertAsOne: Tiny Dispersed Distribution (ignores batch size config, sets = 5) ===");
-        RunInsertAsOne(GetTinyDispersedObjects());
-        Console.WriteLine("=== BulkInsert: Tiny Dispersed Distribution (ignores batch size config, sets = 5) ===");
-        RunInsertBulk(GetTinyDispersedObjects());
+        var test = new LatticeParallelTest(TASKS_PER_ITERATION, BATCH_SIZE, benchmarkTest: true);
+        for (int iter = 0; iter < ITERATIONS; iter++)
+        {
+            test.InsertItems(GetUniformObjects());
+        }
+        test.CleanupAndGatherDiagnostics();
+        Console.WriteLine($"Test complete after {ITERATIONS} iterations.");
+        Console.WriteLine(test.GenerateReportString());
     }
 
     [TestMethod]
-    public void BulkInsertStress()
+    public void InsertStress_Bulk()
     {
         Console.WriteLine("=== Bimodal Distribution ===");
         RunInsertBulk(GetBimodalObjects());
@@ -62,16 +59,20 @@ public partial class ParallelTests
 
         Console.WriteLine("=== Skewed Distribution ===");
         RunInsertBulk(GetSkewedObjects());
+
         Console.WriteLine("=== Uniform Distribution ===");
         RunInsertBulk(GetUniformObjects());
 
         Console.WriteLine("=== Clustered Distribution ===");
         RunInsertBulk(GetClusteredObjects());
-
     }
 
+    // === COMPARATIVE BENCHMARKS (disabled by default) ===
+    // These tests compare InsertAsOne vs BulkInsert performance.
+    // Enable manually for performance analysis.
+
     //[TestMethod]
-    public void InsertAsOneStress()
+    public void Benchmark_InsertAsOne_Distributions()
     {
         Console.WriteLine("=== Single Path Distribution ===");
         RunInsertAsOne(GetSinglePathObjects());
@@ -83,26 +84,26 @@ public partial class ParallelTests
         RunInsertAsOne(GetBimodalObjects());
         Console.WriteLine("=== Clustered Distribution ===");
         RunInsertAsOne(GetClusteredObjects());
-
     }
 
-   // [TestMethod]
-    public void InsertStress_ConcurrentDictionary()
+    //[TestMethod]
+    public void Benchmark_InsertAsOneVsBulk_TinyBatches()
+    {
+        Console.WriteLine("=== InsertAsOne: Tiny Clustered Distribution (batch size = 5) ===");
+        RunInsertAsOne(GetTinyClusteredObjects());
+        Console.WriteLine("=== BulkInsert: Tiny Clustered Distribution (batch size = 5) ===");
+        RunInsertBulk(GetTinyClusteredObjects());
+
+        Console.WriteLine("=== InsertAsOne: Tiny Dispersed Distribution (batch size = 5) ===");
+        RunInsertAsOne(GetTinyDispersedObjects());
+        Console.WriteLine("=== BulkInsert: Tiny Dispersed Distribution (batch size = 5) ===");
+        RunInsertBulk(GetTinyDispersedObjects());
+    }
+
+    //[TestMethod]
+    public void Benchmark_SpatialLattice_vs_ConcurrentDictionary()
     {
         var test = new ConcurrentDictionaryParallelTest(TASKS_PER_ITERATION, BATCH_SIZE, benchmarkTest: true);
-        for (int iter = 0; iter < ITERATIONS; iter++)
-        {
-            test.InsertItems(GetUniformObjects());
-        }
-        test.CleanupAndGatherDiagnostics();
-        Console.WriteLine($"Test complete after {ITERATIONS} iterations.");
-        Console.WriteLine(test.GenerateReportString());
-    }
-
-    [TestMethod]
-    public void InsertStress()
-    {
-        var test = new LatticeParallelTest(TASKS_PER_ITERATION, BATCH_SIZE, benchmarkTest: true);
         for (int iter = 0; iter < ITERATIONS; iter++)
         {
             test.InsertItems(GetUniformObjects());
