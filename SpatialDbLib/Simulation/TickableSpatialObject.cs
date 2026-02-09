@@ -1,10 +1,11 @@
 ﻿using SpatialDbLib.Lattice;
 using SpatialDbLib.Math;
 using SpatialDbLib.Synchronize;
+using System.Diagnostics;
 //////////////////////////////////
 namespace SpatialDbLib.Simulation;
 
-public interface ITickable
+public interface ITickableObject
 {
     TickResult? Tick();
     void RegisterForTicks();
@@ -12,9 +13,9 @@ public interface ITickable
 
 }
 
-public interface IMoveable
+public interface IMoveableObject
     : ISpatialObject,
-      ITickable
+      ITickableObject
 {
     IntVector3 Velocity { get; set; }
 
@@ -24,15 +25,15 @@ public interface IMoveable
 }
 
 public interface ITickableMoveableObjectProxy
-    : IMoveable,
+    : IMoveableObject,
       ISpatialObjectProxy
 {
-    new IMoveable OriginalObject { get; }
+    new IMoveableObject OriginalObject { get; }
 }
 
 public abstract class TickableSpatialObjectBase(IList<LongVector3> position)
     : SpatialObject(position),
-      IMoveable
+      IMoveableObject
 {
     private IList<IntVector3> m_velocityStack = [new(0)];
     private int m_lastMsTick = 0;
@@ -88,18 +89,17 @@ public abstract class TickableSpatialObjectBase(IList<LongVector3> position)
     public void UnregisterForTicks()
     {
         m_lastMsTick = 0;
-
         m_occupyingLeaf?.UnregisterForTicks(this);
     }
-
 
     public static int MillisecondTicks32 => unchecked((int)((DateTime.Now.Ticks * 429497L) >> 32));
 
     public virtual TickResult? Tick()
     {
-        if (LocalVelocity.IsZero) return null;
+        if (LocalVelocity.IsZero) return null; 
         var currentMs = MillisecondTicks32;
         var deltaMs = currentMs - m_lastMsTick;
+        if (deltaMs == 0) return null;
         m_lastMsTick = currentMs;
         var scaledVelocity = LocalVelocity * deltaMs;
         LongVector3 target = LocalPosition + scaledVelocity;
@@ -127,7 +127,7 @@ public class TickableSpatialObjectProxy
     private ProxyState m_proxyState;
     public bool IsCommitted => ProxyState.Committed == m_proxyState;
     public TickableSpatialObject OriginalObject { get; }
-    IMoveable ITickableMoveableObjectProxy.OriginalObject => OriginalObject;
+    IMoveableObject ITickableMoveableObjectProxy.OriginalObject => OriginalObject;
     ISpatialObject ISpatialObjectProxy.OriginalObject => OriginalObject;
     public VenueLeafNode TargetLeaf { get; set; }
 

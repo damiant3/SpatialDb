@@ -511,7 +511,7 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
         ISpatialObject obj,
         LongVector3 proposedPosition)
     {
-        return new SpatialObjectProxy((SpatialObject)obj, this, proposedPosition);  // we might change proxy to take ISpatialObject next.
+        return new SpatialObjectProxy((SpatialObject)obj, this, proposedPosition);
     }
 
     internal bool m_isRetired = false;
@@ -605,7 +605,7 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
 
         foreach (var obj in buffer)
         {
-            var proxy = new SpatialObjectProxy(obj, this, obj.LocalPosition);
+            var proxy = CreateProxy(obj, obj.LocalPosition);
             Occupy(proxy);
             outProxies.Add(proxy);
         }
