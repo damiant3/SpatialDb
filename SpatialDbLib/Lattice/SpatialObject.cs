@@ -100,60 +100,37 @@ public class SpatialObject(IList<LongVector3> initialPosition)
 
 public class SpatialObjectProxy : SpatialObject, ISpatialObjectProxy
 {
-    public enum ProxyState
-    {
-        Uncommitted,
-        Committed,
-        RolledBack
-    }
-    private ProxyState m_proxyState;
-    public bool IsCommitted => ProxyState.Committed == m_proxyState;
-    public ISpatialObject OriginalObject { get; }
-    ISpatialObject ISpatialObjectProxy.OriginalObject => OriginalObject;
-    public VenueLeafNode TargetLeaf { get; set; }
+    private readonly ProxyCommitCoordinator<SpatialObject, SpatialObjectProxy> m_coordinator;
 
-    public SpatialObjectProxy(ISpatialObject originalObj, VenueLeafNode targetleaf, LongVector3 proposedPosition)
+    public bool IsCommitted => m_coordinator.IsCommitted;
+    public SpatialObject OriginalObject => m_coordinator.OriginalObject;
+    ISpatialObject ISpatialObjectProxy.OriginalObject => OriginalObject;
+
+    public VenueLeafNode TargetLeaf
+    {
+        get => m_coordinator.TargetLeaf;
+        set => m_coordinator.TargetLeaf = value;
+    }
+
+    public SpatialObjectProxy(SpatialObject originalObj, VenueLeafNode targetLeaf, LongVector3 proposedPosition)
         : base([.. originalObj.GetPositionStack()])
     {
 #if DEBUG
         if (originalObj.PositionStackDepth == 0)
             throw new InvalidOperationException("Original object has no position.");
-#endif
-        m_proxyState = ProxyState.Uncommitted;
-        OriginalObject = originalObj;
-        TargetLeaf = targetleaf;
-#if DEBUG
-        if (TargetLeaf.IsRetired)
+        if (targetLeaf.IsRetired)
             throw new InvalidOperationException("Target leaf is retired.");
 #endif
+        m_coordinator = new ProxyCommitCoordinator<SpatialObject, SpatialObjectProxy>(originalObj, targetLeaf);
         SetLocalPosition(proposedPosition);
     }
 
     public virtual void Commit()
-    {
-        if (IsCommitted)
-            throw new InvalidOperationException("Proxy already swapped!");
-
-        while (true)
-        {
-            var leaf = TargetLeaf;
-
-            using var s = new SlimSyncer(((ISync)leaf).Sync, SlimSyncer.LockMode.Write, "SpatialObjectProxy.Commit: Leaf");
-            if (leaf.IsRetired)
-                continue;
-
-            OriginalObject.SetPositionStack(GetPositionStack());
-            leaf.Replace(this);
-            SetPositionStack([]);
-            m_proxyState = ProxyState.Committed;
-            break;
-        }
-    }
+        => m_coordinator.Commit(
+            transferState: original => original.SetPositionStack(GetPositionStack()),
+            clearProxyState: () => SetPositionStack([]),
+            proxy: this);
 
     public void Rollback()
-    {
-        if (m_proxyState != ProxyState.Uncommitted) return;
-        TargetLeaf.Vacate(this);
-        m_proxyState = ProxyState.RolledBack;
-    }
+        => m_coordinator.Rollback(this);
 }

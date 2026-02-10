@@ -1,6 +1,5 @@
 ﻿using SpatialDbLib.Lattice;
 using SpatialDbLib.Math;
-using SpatialDbLib.Synchronize;
 //////////////////////////////////
 namespace SpatialDbLib.Simulation;
 
@@ -111,19 +110,18 @@ public class TickableSpatialObjectProxy
     : TickableSpatialObjectBase,
       ITickableMoveableObjectProxy
 {
-    public enum ProxyState
-    {
-        Uncommitted,
-        Committed,
-        RolledBack
-    }
+    private readonly ProxyCommitCoordinator<TickableSpatialObject, TickableSpatialObjectProxy> m_coordinator;
 
-    private ProxyState m_proxyState;
-    public bool IsCommitted => ProxyState.Committed == m_proxyState;
-    public TickableSpatialObject OriginalObject { get; }
+    public bool IsCommitted => m_coordinator.IsCommitted;
+    public TickableSpatialObject OriginalObject => m_coordinator.OriginalObject;
     IMoveableObject ITickableMoveableObjectProxy.OriginalObject => OriginalObject;
     ISpatialObject ISpatialObjectProxy.OriginalObject => OriginalObject;
-    public VenueLeafNode TargetLeaf { get; set; }
+    
+    public VenueLeafNode TargetLeaf
+    { 
+        get => m_coordinator.TargetLeaf;
+        set => m_coordinator.TargetLeaf = value;
+    }
 
     public TickableSpatialObjectProxy(
         TickableSpatialObject originalObj,
@@ -131,35 +129,24 @@ public class TickableSpatialObjectProxy
         LongVector3 proposedPosition)
         : base([.. originalObj.GetPositionStack()])
     {
-        m_proxyState = ProxyState.Uncommitted;
-        OriginalObject = originalObj;
-        TargetLeaf = targetLeaf;
+        m_coordinator = new ProxyCommitCoordinator<TickableSpatialObject, TickableSpatialObjectProxy>(
+            originalObj, 
+            targetLeaf);
         SetLocalPosition(proposedPosition);
         SetVelocityStack(originalObj.GetVelocityStack());
     }
 
     public virtual void Commit()
-    {
-        if (IsCommitted) throw new InvalidOperationException("Proxy already committed!");
+        => m_coordinator.Commit(
+            transferState: original =>
+            {
+                original.SetPositionStack(GetPositionStack());
+                original.SetVelocityStack(GetVelocityStack());
+            },
+            clearProxyState: () => SetPositionStack([]),
+            proxy: this);
 
-        while (true)
-        {
-            var leaf = TargetLeaf;
-            using var s = new SlimSyncer(((ISync)leaf).Sync, SlimSyncer.LockMode.Write, "TickableSpatialObjectProxy.Commit: Leaf");
-            if (leaf.IsRetired) continue;
-            OriginalObject.SetPositionStack(GetPositionStack());
-            OriginalObject.SetVelocityStack(GetVelocityStack());
-            leaf.Replace(this);
-            SetPositionStack([]);
-            m_proxyState = ProxyState.Committed;
-            break;
-        }
-    }
 
     public void Rollback()
-    {
-        if (m_proxyState != ProxyState.Uncommitted) return;
-        TargetLeaf.Vacate(this);
-        m_proxyState = ProxyState.RolledBack;
-    }
+        => m_coordinator.Rollback(this);
 }
