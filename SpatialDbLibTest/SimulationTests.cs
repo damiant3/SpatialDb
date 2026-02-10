@@ -280,7 +280,7 @@ public class SimulationTests
     [TestMethod]
     public void Test_TickPerformance()
     {
-        var counts = new[] { 50000, 250000, 1000000};
+        var counts = new[] { 50000, 250000, 1000000 };
 
         Console.WriteLine($"{"Count",-10} {"Insert (ms)",-15} {"Tick (ms)",-15} {"Objs/sec",-15}");
         Console.WriteLine(new string('-', 60));
@@ -295,15 +295,15 @@ public class SimulationTests
             for (int i = 0; i < count; i++)
             {
                 var pos = new LongVector3(
-                    Random.Shared.Next(1000000),
-                    Random.Shared.Next(1000000),
-                    Random.Shared.Next(1000000));
+                    FastRandom.NextLong(-LatticeUniverse.HalfExtent, LatticeUniverse.HalfExtent),
+                    FastRandom.NextLong(-LatticeUniverse.HalfExtent, LatticeUniverse.HalfExtent),
+                    FastRandom.NextLong(-LatticeUniverse.HalfExtent, LatticeUniverse.HalfExtent));
 
                 var obj = new TickableSpatialObject(pos);
                 obj.Velocity = new IntVector3(
-                    Random.Shared.Next(20, 100),
-                    Random.Shared.Next(20, 100),
-                    Random.Shared.Next(20, 100));
+                    FastRandom.NextInt(20, 100),
+                    FastRandom.NextInt(20, 100),
+                    FastRandom.NextInt(20, 100));
 
                 objects.Add(obj);
             }
@@ -661,9 +661,6 @@ public class SimulationTests
                 if (firstUnmovedUnregistered != null)
                 {
                     Console.WriteLine($"\n🔍 REGISTRATION HISTORY FOR UNMOVED OBJECT {firstUnmovedUnregistered.Guid}:");
-#if DEBUG
-                    Console.WriteLine(TickableVenueLeafNode.GetRegistrationHistory(firstUnmovedUnregistered.Guid));
-#endif
                 }
             }
             Console.WriteLine($"Post-tick check complete:");

@@ -1,7 +1,6 @@
 ﻿using SpatialDbLib.Lattice;
 using SpatialDbLib.Math;
 using SpatialDbLib.Synchronize;
-using System.Diagnostics;
 //////////////////////////////////
 namespace SpatialDbLib.Simulation;
 
@@ -10,7 +9,6 @@ public interface ITickableObject
     TickResult? Tick();
     void RegisterForTicks();
     void UnregisterForTicks();
-
 }
 
 public interface IMoveableObject
@@ -18,7 +16,6 @@ public interface IMoveableObject
       ITickableObject
 {
     IntVector3 Velocity { get; set; }
-
     void Accelerate(IntVector3 intVector3);
     IList<IntVector3> GetVelocityStack();
     void SetVelocityStack(IList<IntVector3> newStack);
@@ -43,10 +40,7 @@ public abstract class TickableSpatialObjectBase(IList<LongVector3> position)
 
     public IntVector3 LocalVelocity
     {
-        get
-        {
-            return m_velocityStack[^1];
-        }
+        get { return m_velocityStack[^1]; }
         set
         {
             var enforced = SimulationPolicy.EnforceMovementThreshold(value);
@@ -137,12 +131,6 @@ public class TickableSpatialObjectProxy
         LongVector3 proposedPosition)
         : base([.. originalObj.GetPositionStack()])
     {
-#if DEBUG
-        if (originalObj.PositionStackDepth == 0)
-            throw new InvalidOperationException("Original object has no position.");
-        if (targetLeaf.IsRetired)
-            throw new InvalidOperationException("Target leaf is retired.");
-#endif
         m_proxyState = ProxyState.Uncommitted;
         OriginalObject = originalObj;
         TargetLeaf = targetLeaf;

@@ -11,5 +11,8 @@ namespace SpatialDbLibTest
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int NextInt(int min, int max) => s_rng.Value!.Next(min, max);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static long NextLong(long min, long max) => s_rng.Value!.NextInt64(min, max);
     }
 }
