@@ -67,16 +67,13 @@ public class TickableVenueLeafNode(Region bounds, TickableOctetParentNode parent
 {
     public override int Capacity => 64;
     internal List<ITickableObject> m_tickableObjects = [];
-    protected override ISpatialObjectProxy CreateProxy(
-        ISpatialObject obj,
-        LongVector3 proposedPosition)
-    {
-         return obj is TickableSpatialObject tickable
+    protected override ISpatialObjectProxy CreateProxy<T>(T obj, LongVector3 proposedPosition)
+        => obj is TickableSpatialObject tickable
             ? new TickableSpatialObjectProxy(tickable, this, proposedPosition)
             : base.CreateProxy(obj, proposedPosition);
-    }
 
-    public new TickableOctetParentNode Parent { get; } = parent;
+    TickableOctetParentNode IChildNode<TickableOctetParentNode>.Parent
+        => (TickableOctetParentNode)Parent;
 
     public override void AdmitMigrants(IList<ISpatialObject> objs)
     {

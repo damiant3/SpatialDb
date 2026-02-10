@@ -5,7 +5,7 @@ using SpatialDbLibTest.Helpers;
 namespace SpatialDbLibTest.BaseTests;
 
 [TestClass]
-public partial class ParallelTests
+public class ParallelTests
 {
     const int ITERATIONS = 2;
     const int TASKS_PER_ITERATION = 16;

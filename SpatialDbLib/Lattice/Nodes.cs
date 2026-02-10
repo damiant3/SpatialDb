@@ -507,12 +507,9 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
 {
     internal IList<ISpatialObject> Occupants { get; } = [];
 
-    protected virtual ISpatialObjectProxy CreateProxy(
-        ISpatialObject obj,
-        LongVector3 proposedPosition)
-    {
-        return new SpatialObjectProxy((SpatialObject)obj, this, proposedPosition);
-    }
+    protected virtual ISpatialObjectProxy CreateProxy<T>(T obj, LongVector3 proposedPosition)
+    where T : SpatialObject, ISpatialObject
+        => new SpatialObjectProxy(obj, this, proposedPosition);
 
     internal bool m_isRetired = false;
     public bool IsRetired => m_isRetired;
@@ -582,7 +579,7 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
                 : AdmitResult.DelegateRequest(this);
         }
 
-        var proxy = CreateProxy(obj, proposedPosition);
+        var proxy = CreateProxy((SpatialObject)obj, proposedPosition);
         Occupy(proxy);
         return AdmitResult.Create(proxy);
     }
@@ -605,7 +602,7 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
 
         foreach (var obj in buffer)
         {
-            var proxy = CreateProxy(obj, obj.LocalPosition);
+            var proxy = CreateProxy((SpatialObject)obj, obj.LocalPosition);
             Occupy(proxy);
             outProxies.Add(proxy);
         }
