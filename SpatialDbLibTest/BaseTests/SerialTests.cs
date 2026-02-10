@@ -1,8 +1,9 @@
-﻿///////////////////////////
-using SpatialDbLib.Lattice;
+﻿using SpatialDbLib.Lattice;
 using SpatialDbLib.Math;
+using SpatialDbLibTest.Helpers;
 using static SpatialDbLib.Lattice.AdmitResult;
-namespace SpatialDbLibTest;
+///////////////////////////
+namespace SpatialDbLibTest.BaseTests;
 
 [TestClass]
 public class SerialTests

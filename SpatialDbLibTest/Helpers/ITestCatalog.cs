@@ -1,6 +1,6 @@
 ﻿using SpatialDbLib.Lattice;
 
-namespace SpatialDbLibTest
+namespace SpatialDbLibTest.Helpers
 {
     public interface ITestCatalog
     {

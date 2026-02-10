@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.Text;
 using SpatialDbLib.Lattice;
 //////////////////////////
-namespace SpatialDbLibTest;
+namespace SpatialDbLibTest.Helpers;
 
 public class TestSpatialLattice
     : SpatialLattice,

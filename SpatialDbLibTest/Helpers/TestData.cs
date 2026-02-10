@@ -1,13 +1,11 @@
 ﻿using SpatialDbLib.Lattice;
 using SpatialDbLib.Math;
-///////////////////////////
-namespace SpatialDbLibTest;
+///////////////////////////////////
+namespace SpatialDbLibTest.Helpers;
 
-public partial class ParallelTests
+public static class TestData
 {
-    public int SpaceRange = int.MaxValue;
-
-    public Dictionary<int, List<ISpatialObject>> GetTinyClusteredObjects()
+    public static Dictionary<int, List<ISpatialObject>> GetTinyClusteredObjects(int TASKS_PER_ITERATION, long SpaceRange)
     {
         var objsToInsert = new Dictionary<int, List<ISpatialObject>>();
         for (int i = 0; i < TASKS_PER_ITERATION; i++)
@@ -16,18 +14,18 @@ public partial class ParallelTests
 
             // Pick a random cluster center for this batch
             var clusterCenter = new LongVector3(
-                FastRandom.NextInt(-SpaceRange, SpaceRange),
-                FastRandom.NextInt(-SpaceRange, SpaceRange),
-                FastRandom.NextInt(-SpaceRange, SpaceRange));
+                FastRandom.NextLong(-SpaceRange, SpaceRange),
+                FastRandom.NextLong(-SpaceRange, SpaceRange),
+                FastRandom.NextLong(-SpaceRange, SpaceRange));
 
             // 12 objects tightly clustered around that center (fits in one leaf)
             for (int j = 0; j < 10000; j++)
             {
                 // Small offset from cluster center (within same leaf bounds)
                 var offset = new LongVector3(
-                    FastRandom.NextInt(-100, 100),
-                    FastRandom.NextInt(-100, 100),
-                    FastRandom.NextInt(-100, 100));
+                    FastRandom.NextLong(-100, 100),
+                    FastRandom.NextLong(-100, 100),
+                    FastRandom.NextLong(-100, 100));
 
                 objsToInsert[i].Add(
                     new SpatialObject([
@@ -41,7 +39,7 @@ public partial class ParallelTests
         return objsToInsert;
     }
 
-    public Dictionary<int, List<ISpatialObject>> GetTinyDispersedObjects()
+    public static Dictionary<int, List<ISpatialObject>> GetTinyDispersedObjects(int TASKS_PER_ITERATION, long SpaceRange)
     {
         var objsToInsert = new Dictionary<int, List<ISpatialObject>>();
         for (int i = 0; i < TASKS_PER_ITERATION; i++)
@@ -54,16 +52,16 @@ public partial class ParallelTests
                 objsToInsert[i].Add(
                     new SpatialObject([
                         new LongVector3(
-                        FastRandom.NextInt(-SpaceRange, SpaceRange),
-                        FastRandom.NextInt(-SpaceRange, SpaceRange),
-                        FastRandom.NextInt(-SpaceRange, SpaceRange))
+                        FastRandom.NextLong(-SpaceRange, SpaceRange),
+                        FastRandom.NextLong(-SpaceRange, SpaceRange),
+                        FastRandom.NextLong(-SpaceRange, SpaceRange))
                     ]));
             }
         }
         return objsToInsert;
     }
 
-    public Dictionary<int, List<ISpatialObject>> GetSkewedObjects()
+    public static Dictionary<int, List<ISpatialObject>> GetSkewedObjects(int TASKS_PER_ITERATION, int BATCH_SIZE, long SpaceRange)
     {
         var objsToInsert = new Dictionary<int, List<ISpatialObject>>();
 
@@ -88,9 +86,9 @@ public partial class ParallelTests
                     objsToInsert[i].Add(
                         new SpatialObject([
                             new LongVector3(
-                            FastRandom.NextInt(-SpaceRange, SpaceRange),
-                            FastRandom.NextInt(-SpaceRange, SpaceRange),
-                            FastRandom.NextInt(-SpaceRange, SpaceRange))
+                            FastRandom.NextLong(-SpaceRange, SpaceRange),
+                            FastRandom.NextLong(-SpaceRange, SpaceRange),
+                            FastRandom.NextLong(-SpaceRange, SpaceRange))
                         ]));
                 }
             }
@@ -99,7 +97,7 @@ public partial class ParallelTests
         return objsToInsert;
     }
 
-    public Dictionary<int, List<ISpatialObject>> GetBimodalObjects()
+    public static Dictionary<int, List<ISpatialObject>> GetBimodalObjects(int TASKS_PER_ITERATION, int BATCH_SIZE, long SpaceRange)
     {
         var objsToInsert = new Dictionary<int, List<ISpatialObject>>();
 
@@ -120,12 +118,12 @@ public partial class ParallelTests
         return objsToInsert;
     }
 
-    public Dictionary<int, List<ISpatialObject>> GetClusteredObjects()
+    public static Dictionary<int, List<ISpatialObject>> GetClusteredObjects(int TASKS_PER_ITERATION, int BATCH_SIZE, long SpaceRange)
     {
         var objsToInsert = new Dictionary<int, List<ISpatialObject>>();
 
         var center = LongVector3.Zero;
-        int variance = SpaceRange / 1024; // very tight cluster
+        var variance = SpaceRange / 1024L; // very tight cluster
 
         for (int i = 0; i < TASKS_PER_ITERATION; i++)
         {
@@ -135,9 +133,9 @@ public partial class ParallelTests
                 objsToInsert[i].Add(
                     new SpatialObject([
                         new LongVector3(
-                        center.X + FastRandom.NextInt(-variance, variance),
-                        center.Y + FastRandom.NextInt(-variance, variance),
-                        center.Z + FastRandom.NextInt(-variance, variance)
+                        center.X + FastRandom.NextLong(-variance, variance),
+                        center.Y + FastRandom.NextLong(-variance, variance),
+                        center.Z + FastRandom.NextLong(-variance, variance)
                     )
                     ]));
             }
@@ -146,7 +144,7 @@ public partial class ParallelTests
         return objsToInsert;
     }
 
-    public Dictionary<int, List<ISpatialObject>> GetSinglePathObjects()
+    public static Dictionary<int, List<ISpatialObject>> GetSinglePathObjects(int TASKS_PER_ITERATION, int BATCH_SIZE, long SpaceRange)
     {
         var objsToInsert = new Dictionary<int, List<ISpatialObject>>();
 
@@ -169,7 +167,7 @@ public partial class ParallelTests
         return objsToInsert;
     }
 
-    public Dictionary<int, List<ISpatialObject>> GetUniformObjects()
+    public static Dictionary<int, List<ISpatialObject>> GetUniformObjects(int TASKS_PER_ITERATION, int BATCH_SIZE, long SpaceRange)
     {
         var objsToInsert = new Dictionary<int, List<ISpatialObject>>();
         for (int i = 0; i < TASKS_PER_ITERATION; i++)
@@ -178,9 +176,9 @@ public partial class ParallelTests
             for (int j = 0; j < BATCH_SIZE; j++)
             {
                 list.Add(new SpatialObject([new LongVector3(
-                    FastRandom.NextInt(-SpaceRange, SpaceRange),
-                    FastRandom.NextInt(-SpaceRange, SpaceRange),
-                    FastRandom.NextInt(-SpaceRange, SpaceRange)
+                    FastRandom.NextLong(-SpaceRange, SpaceRange),
+                    FastRandom.NextLong(-SpaceRange, SpaceRange),
+                    FastRandom.NextLong(-SpaceRange, SpaceRange)
                 )]));
             }
             objsToInsert[i] = list;

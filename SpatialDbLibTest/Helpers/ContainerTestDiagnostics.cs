@@ -5,7 +5,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
 
-namespace SpatialDbLibTest;
+namespace SpatialDbLibTest.Helpers;
 
 public class ContainerTestDiagnostics<T>
     where T : class, ITestCatalog, new()
@@ -86,11 +86,11 @@ public class ContainerTestDiagnostics<T>
         const long GB = 1024 * MB;
 
         if (bytes >= GB)
-            return $"{(bytes / (double)GB):F2} GB";
+            return $"{bytes / (double)GB:F2} GB";
         if (bytes >= MB)
-            return $"{(bytes / (double)MB):F2} MB";
+            return $"{bytes / (double)MB:F2} MB";
         if (bytes >= KB)
-            return $"{(bytes / (double)KB):F2} KB";
+            return $"{bytes / (double)KB:F2} KB";
 
         return $"{bytes} B";
     }

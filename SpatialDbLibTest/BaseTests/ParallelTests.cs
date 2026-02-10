@@ -1,6 +1,8 @@
 ﻿using SpatialDbLib.Lattice;
+using SpatialDbLib.Math;
+using SpatialDbLibTest.Helpers;
 ///////////////////////////
-namespace SpatialDbLibTest;
+namespace SpatialDbLibTest.BaseTests;
 
 [TestClass]
 public partial class ParallelTests
@@ -41,7 +43,7 @@ public partial class ParallelTests
         var test = new LatticeParallelTest(TASKS_PER_ITERATION, BATCH_SIZE, benchmarkTest: true);
         for (int iter = 0; iter < ITERATIONS; iter++)
         {
-            test.InsertItems(GetUniformObjects());
+            test.InsertItems(TestData.GetUniformObjects(TASKS_PER_ITERATION, BATCH_SIZE, 100000));
         }
         test.CleanupAndGatherDiagnostics();
         Console.WriteLine($"Test complete after {ITERATIONS} iterations.");
@@ -52,19 +54,19 @@ public partial class ParallelTests
     public void InsertStress_Bulk()
     {
         Console.WriteLine("=== Bimodal Distribution ===");
-        RunInsertBulk(GetBimodalObjects());
+        RunInsertBulk(TestData.GetBimodalObjects(TASKS_PER_ITERATION, BATCH_SIZE, 100000));
 
         Console.WriteLine("=== Single Path Distribution ===");
-        RunInsertBulk(GetSinglePathObjects());
+        RunInsertBulk(TestData.GetSinglePathObjects(TASKS_PER_ITERATION, BATCH_SIZE, 100000 ));
 
         Console.WriteLine("=== Skewed Distribution ===");
-        RunInsertBulk(GetSkewedObjects());
+        RunInsertBulk(TestData.GetSkewedObjects(TASKS_PER_ITERATION, BATCH_SIZE, 100000));
 
         Console.WriteLine("=== Uniform Distribution ===");
-        RunInsertBulk(GetUniformObjects());
+        RunInsertBulk(TestData.GetUniformObjects(TASKS_PER_ITERATION, BATCH_SIZE, 100000));
 
         Console.WriteLine("=== Clustered Distribution ===");
-        RunInsertBulk(GetClusteredObjects());
+        RunInsertBulk(TestData.GetClusteredObjects(TASKS_PER_ITERATION, BATCH_SIZE, 100000));
     }
 
     // === COMPARATIVE BENCHMARKS (disabled by default) ===
@@ -75,29 +77,29 @@ public partial class ParallelTests
     public void Benchmark_InsertAsOne_Distributions()
     {
         Console.WriteLine("=== Single Path Distribution ===");
-        RunInsertAsOne(GetSinglePathObjects());
+        RunInsertAsOne(TestData.GetSinglePathObjects(TASKS_PER_ITERATION, BATCH_SIZE, 100000));
         Console.WriteLine("=== Skewed Distribution ===");
-        RunInsertAsOne(GetSkewedObjects());
+        RunInsertAsOne(TestData.GetSkewedObjects(TASKS_PER_ITERATION, BATCH_SIZE, 100000));
         Console.WriteLine("=== Uniform Distribution ===");
-        RunInsertAsOne(GetUniformObjects());
+        RunInsertAsOne(TestData.GetUniformObjects(TASKS_PER_ITERATION, BATCH_SIZE, 100000));
         Console.WriteLine("=== Bimodal Distribution ===");
-        RunInsertAsOne(GetBimodalObjects());
+        RunInsertAsOne(TestData.GetBimodalObjects(TASKS_PER_ITERATION, BATCH_SIZE, 100000));
         Console.WriteLine("=== Clustered Distribution ===");
-        RunInsertAsOne(GetClusteredObjects());
+        RunInsertAsOne(TestData.GetClusteredObjects(TASKS_PER_ITERATION, BATCH_SIZE, 100000));
     }
 
     //[TestMethod]
     public void Benchmark_InsertAsOneVsBulk_TinyBatches()
     {
         Console.WriteLine("=== InsertAsOne: Tiny Clustered Distribution (batch size = 5) ===");
-        RunInsertAsOne(GetTinyClusteredObjects());
+        RunInsertAsOne(TestData.GetTinyClusteredObjects(TASKS_PER_ITERATION, 100000));
         Console.WriteLine("=== BulkInsert: Tiny Clustered Distribution (batch size = 5) ===");
-        RunInsertBulk(GetTinyClusteredObjects());
+        RunInsertBulk(TestData.GetTinyClusteredObjects(TASKS_PER_ITERATION, 100000));
 
         Console.WriteLine("=== InsertAsOne: Tiny Dispersed Distribution (batch size = 5) ===");
-        RunInsertAsOne(GetTinyDispersedObjects());
+        RunInsertAsOne(TestData.GetTinyDispersedObjects(TASKS_PER_ITERATION, 100000));
         Console.WriteLine("=== BulkInsert: Tiny Dispersed Distribution (batch size = 5) ===");
-        RunInsertBulk(GetTinyDispersedObjects());
+        RunInsertBulk(TestData.GetTinyDispersedObjects(TASKS_PER_ITERATION, 100000));
     }
 
     //[TestMethod]
@@ -106,7 +108,7 @@ public partial class ParallelTests
         var test = new ConcurrentDictionaryParallelTest(TASKS_PER_ITERATION, BATCH_SIZE, benchmarkTest: true);
         for (int iter = 0; iter < ITERATIONS; iter++)
         {
-            test.InsertItems(GetUniformObjects());
+            test.InsertItems(TestData.GetUniformObjects(TASKS_PER_ITERATION, BATCH_SIZE, 100000));
         }
         test.CleanupAndGatherDiagnostics();
         Console.WriteLine($"Test complete after {ITERATIONS} iterations.");

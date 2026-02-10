@@ -1,7 +1,6 @@
-﻿////////////////////////////////////
-using System.Collections.Concurrent;
-namespace SpatialDbLibTest;
-
+﻿using System.Collections.Concurrent;
+///////////////////////////
+namespace SpatialDbLibTest.Helpers;
 public static class ConcurrentDictionaryTestExtensions
 {
     public static bool TryTakeRandomFast<TKey, TValue>(

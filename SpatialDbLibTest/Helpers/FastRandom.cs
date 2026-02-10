@@ -1,6 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
 
-namespace SpatialDbLibTest
+namespace SpatialDbLibTest.Helpers
 {
     internal static class FastRandom
     {
