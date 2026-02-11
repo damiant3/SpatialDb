@@ -4,7 +4,8 @@ A high-performance spatial database system for real-time simulations, built from
 
 ## Performance Highlights
 
-- **2+ million objects/second** sustained tick throughput
+- **5.4 million objects/second** parallel tick throughput (2.5x serial speedup)
+- **2+ million objects/second** sustained serial tick throughput
 - **800,000 concurrent moving entities** with near-linear scaling
 - **130x faster queries** than naive linear scans for distance searches
 - **Automatic pruning** reduces memory footprint in sparse regions
@@ -12,11 +13,13 @@ A high-performance spatial database system for real-time simulations, built from
 
 Performance at scale:
 
-| Object Count | Tick Time | Throughput      |
-|--------------|-----------|-----------------|
-| 50,000       | 25ms      | 2,000,000/sec   |
-| 200,000      | 77ms      | 2,597,403/sec   |
-| 800,000      | 385ms     | 2,077,922/sec   |
+| Object Count | Method   | Tick Time | Throughput      |
+|--------------|----------|-----------|-----------------|
+| 50,000       | Serial   | 25ms      | 2,000,000/sec   |
+| 200,000      | Serial   | 77ms      | 2,597,403/sec   |
+| 500,000      | Serial   | 234ms     | 2,136,752/sec   |
+| 500,000      | Parallel | 93ms      | 5,376,344/sec   |
+| 800,000      | Serial   | 385ms     | 2,077,922/sec   |
 
 Query Performance:
 
@@ -51,6 +54,7 @@ A hierarchical octree-based spatial database that dynamically creates nested "su
 - Automatic tick propagation through sublattice hierarchy
 - Boundary crossing with seamless movement between regions
 - Local neighbor queries for efficient proximity detection
+- Parallel ticking with 2.5x+ speedup on multi-core systems
 - Movement prediction and collision detection ready
 
 ### Thread Safety
@@ -93,9 +97,13 @@ Register for ticks and set velocity:
     obj.RegisterForTicks();
     obj.Accelerate(new IntVector3(100, 0, 0));
 
-Tick all objects (moves objects based on elapsed time):
+Tick all objects serially (moves objects based on elapsed time):
 
     lattice.Tick();
+
+Or tick in parallel for better performance:
+
+    SpatialTicker.TickParallel(lattice); // Uses available CPU cores
 
 
 Query local neighbors from a leaf:
@@ -169,7 +177,7 @@ Comprehensive test coverage with many test methods:
 - Integration tests: Multi-lattice coordination and deep insertions
 - Stress tests: Concurrent operations with 8+ threads
 - Performance tests: Scaling validation to 800k objects, query benchmarks
-- Simulation tests: Tickable systems, boundary crossing, pruning, local queries
+- Simulation tests: Tickable systems, boundary crossing, pruning, local queries, parallel ticking
 
 ## Technical Innovations
 
@@ -188,7 +196,10 @@ Empty branches are pruned after operations to reduce memory usage and traversal 
 ### 5. Efficient Spatial Queries
 O(log n + k) distance-based searches with sphere-octree intersection pruning, plus local neighbor queries starting from leaves.
 
-### 6. Shared Thread-Local State
+### 6. External Parallel Ticking
+`SpatialTicker` enables optional multi-core ticking without embedding threads in the lattice, providing 2.5x+ speedup on modern CPUs.
+
+### 7. Shared Thread-Local State
 Worked around critical C# generic type system bug where [ThreadStatic] fields create separate instances per closed generic type. Solution: non-generic holder class for shared state.
 
 ## Use Cases
@@ -204,11 +215,11 @@ Worked around critical C# generic type system bug where [ThreadStatic] fields cr
 
 Based on measured performance:
 
-| Target Rate | Budget per Tick | Capacity                |
-|-------------|------------------|-------------------------|
-| 10 ticks/sec| 100ms            | ~260,000 moving objects  |
-| 20 ticks/sec| 50ms             | ~130,000 moving objects  |
-| 60 ticks/sec| 16.6ms           | ~43,000 moving objects   |
+| Target Rate | Budget per Tick | Serial Capacity       | Parallel Capacity     |
+|-------------|------------------|------------------------|-----------------------|
+| 10 ticks/sec| 100ms            | ~260,000 moving objects| ~650,000 moving objects|
+| 20 ticks/sec| 50ms             | ~130,000 moving objects| ~325,000 moving objects|
+| 60 ticks/sec| 16.6ms           | ~43,000 moving objects | ~107,000 moving objects|
 
 Query Capacity:
 - Global distance queries: ~38,000 QPS on 1M objects

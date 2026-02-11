@@ -312,6 +312,32 @@ public class SimulationTests
             Console.WriteLine($"✓ PASSED ({neighbors.Count} neighbors)");
         }
 
+        {
+            Console.WriteLine("\n--- Parallel Ticking ---");
+            Console.Write("  Parallel ticking... ");
+            var lattice = new TickableSpatialLattice();
+            for (int i = 0; i < 10000; i++)
+            {
+                var pos = new LongVector3(i * 10L, 0, 0);
+                var obj = new TickableSpatialObject(pos);
+                lattice.Insert(obj);
+                obj.RegisterForTicks();
+                obj.Accelerate(new IntVector3(100, 0, 0));
+            }
+            var initialPositions = (lattice.GetRootNode() as OctetParentNode).Children
+                .OfType<VenueLeafNode>()
+                .SelectMany(l => l.Occupants.Select(o => o.LocalPosition.X))
+                .ToList();
+            // Tick in parallel
+            SpatialTicker.TickParallel(lattice, 4);
+            var finalPositions = (lattice.GetRootNode() as OctetParentNode).Children
+                .OfType<VenueLeafNode>()
+                .SelectMany(l => l.Occupants.Select(o => o.LocalPosition.X))
+                .ToList();
+            Assert.IsTrue(finalPositions.Zip(initialPositions, (f, i) => f > i).All(b => b), "All objects should have moved forward");
+            Console.WriteLine("✓ PASSED");
+        }
+
         Console.WriteLine("\n" + "=".PadRight(70, '='));
         Console.WriteLine("ALL SIMULATION FEATURE TESTS PASSED");
         Console.WriteLine("=".PadRight(70, '='));
@@ -326,8 +352,81 @@ public class SimulationTests
 
     // === PERFORMANCE BENCHMARK ===
 
+    [TestMethod]
+    public void Benchmark_ParallelTickPerformance()
+    {
+        // === PARALLEL VS SERIAL TICK PERFORMANCE ===
+        {
+            var count = 500_000;
+            Console.WriteLine($"Comparing Serial vs Parallel Tick for {count} objects");
+            Console.WriteLine($"{"Method",-10} {"Tick Time (ms)",-15} {"Objs/sec",-15}");
+            Console.WriteLine(new string('-', 40));
+
+            // Serial
+            {
+                var lattice = new TickableSpatialLattice();
+                var objects = new List<IMoveableObject>();
+                for (int i = 0; i < count; i++)
+                {
+                    var pos = new LongVector3(
+                        FastRandom.NextLong(-LatticeUniverse.HalfExtent, LatticeUniverse.HalfExtent),
+                        FastRandom.NextLong(-LatticeUniverse.HalfExtent, LatticeUniverse.HalfExtent),
+                        FastRandom.NextLong(-LatticeUniverse.HalfExtent, LatticeUniverse.HalfExtent));
+
+                    var obj = new TickableSpatialObject(pos)
+                    {
+                        Velocity = new IntVector3(
+                            FastRandom.NextInt(20, 100),
+                            FastRandom.NextInt(20, 100),
+                            FastRandom.NextInt(20, 100))
+                    };
+                    objects.Add(obj);
+                }
+                lattice.Insert(objects.Cast<ISpatialObject>().ToList());
+                foreach (var obj in objects)
+                    obj.RegisterForTicks();
+
+                var sw = Stopwatch.StartNew();
+                lattice.Tick();
+                var tickTime = sw.ElapsedMilliseconds;
+                var objsPerSec = count * 1000.0 / tickTime;
+                Console.WriteLine($"Serial   {tickTime,-15} {objsPerSec,-15:N0}");
+            }
+
+            // Parallel
+            {
+                var lattice = new TickableSpatialLattice();
+                var objects = new List<IMoveableObject>();
+                for (int i = 0; i < count; i++)
+                {
+                    var pos = new LongVector3(
+                        FastRandom.NextLong(-LatticeUniverse.HalfExtent, LatticeUniverse.HalfExtent),
+                        FastRandom.NextLong(-LatticeUniverse.HalfExtent, LatticeUniverse.HalfExtent),
+                        FastRandom.NextLong(-LatticeUniverse.HalfExtent, LatticeUniverse.HalfExtent));
+
+                    var obj = new TickableSpatialObject(pos)
+                    {
+                        Velocity = new IntVector3(
+                            FastRandom.NextInt(20, 100),
+                            FastRandom.NextInt(20, 100),
+                            FastRandom.NextInt(20, 100))
+                    };
+                    objects.Add(obj);
+                }
+                lattice.Insert(objects.Cast<ISpatialObject>().ToList());
+                foreach (var obj in objects)
+                    obj.RegisterForTicks();
+
+                var sw = Stopwatch.StartNew();
+                SpatialTicker.TickParallel(lattice);  // for better hallway vision.
+                var tickTime = sw.ElapsedMilliseconds;
+                var objsPerSec = count * 1000.0 / tickTime;
+                Console.WriteLine($"Parallel {tickTime,-15} {objsPerSec,-15:N0}");
+            }
+        }
+    }
     //[TestMethod]
-    public void Test_TickPerformance()
+    public void Benchmark_TickPerformance()
     {
         var counts = new[] { 50000, 250000, 1000000 };
         Console.WriteLine($"{"Count",-10} {"Insert (ms)",-15} {"Tick (ms)",-15} {"Objs/sec",-15}");

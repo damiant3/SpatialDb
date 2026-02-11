@@ -33,13 +33,13 @@ Expand functionality while maintaining O(log n) performance.
 ## Phase 3: Concurrency and Threading (High Impact, Higher Risk)
 Focus on scalability improvements.
 
-4. **Threaded Tick Propagation**  
-   - **Description**: Use `Channel<T>` for producer-consumer: enqueue leaf nodes needing ticks, spawn dynamic threads via `ThreadPool` or `Task`, shut down idle ones.  
-   - **Rationale**: Enables parallel ticks across cores; current single-threaded limit is ~2M/sec.  
-   - **Implementation Approach**: Modify `TickableSpatialLattice.Tick()` to partition space (e.g., by root children), enqueue work. Add thread lifecycle management.  
-   - **Challenges**: Deadlock prevention with existing locks; benchmark contention.  
+4. **External Spatial Ticker for Parallel Ticks**  (done)
+   - **Description**: Create a `SpatialTicker` class that partitions the lattice's root children across threads for parallel ticking. Users can opt-in to threading without modifying the core lattice.  
+   - **Rationale**: Enables parallel ticks across cores externally; avoids embedding threads in the lattice for simplicity. Current single-threaded limit is ~2M/sec.  
+   - **Implementation Approach**: `SpatialTicker` gets root children, assigns each to a thread/task, and coordinates completion. Use `Task.WhenAll` or `Channel<T>` for work distribution.  
+   - **Challenges**: Ensure thread safety with existing locks; benchmark contention and overhead.  
    - **Expected Impact**: Potential 4-16x throughput on multi-core; test to 800k objects.  
-   - **Estimated Time**: 4-5 days; integrate with Phase 1 diagnostics for partitioning.
+   - **Estimated Time**: 2-3 days; bolt-on design for easy adoption. (actual: implemented in ~1 hour)
 
 ## Phase 4: Persistence and Reliability (Medium Impact)
 Add robustness features.

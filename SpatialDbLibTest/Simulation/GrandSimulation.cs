@@ -312,7 +312,7 @@ public class GrandSimulation
             {
                 while (!shouldStop)
                 {
-                    lattice.Tick();
+                    SpatialTicker.TickParallel(lattice);
                     Interlocked.Increment(ref tickCount);
                     Thread.Yield(); // GC concession
                 }
