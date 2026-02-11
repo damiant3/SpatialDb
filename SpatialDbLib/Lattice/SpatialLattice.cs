@@ -1,5 +1,6 @@
 ﻿using SpatialDbLib.Math;
 using SpatialDbLib.Synchronize;
+using System.Numerics;
 ///////////////////////////////
 namespace SpatialDbLib.Lattice;
 
@@ -20,6 +21,7 @@ public interface ISpatialLattice : ISpatialNode
     VenueLeafNode? ResolveLeafFromOuterLattice(ISpatialObject obj);
     AdmitResult AdmitForInsert(Span<ISpatialObject> buffer);
     ParentToSubLatticeTransform BoundsTransform { get; }
+    IEnumerable<ISpatialObject> QueryWithinDistance(LongVector3 center, ulong radius);
 }
 internal static class LatticeDepthContext
 {
@@ -196,5 +198,55 @@ public class SpatialLattice<TRoot>
     {
         using var s = PushLatticeDepth(LatticeDepth);
         return m_root.ResolveLeaf(obj);
+    }
+
+    public IEnumerable<ISpatialObject> QueryWithinDistance(LongVector3 center, ulong radius)
+    {
+        var results = new List<ISpatialObject>();
+        QueryWithinDistanceRecursive(m_root, center, radius, results);
+        return results;
+    }
+
+    private void QueryWithinDistanceRecursive(ISpatialNode node, LongVector3 center, ulong radius, List<ISpatialObject> results)
+    {
+        if (!SphereIntersectsRegion(center, radius, node.Bounds)) return;
+
+        switch (node)
+        {
+            case VenueLeafNode leaf:
+                foreach (var obj in leaf.Occupants)
+                {
+                    var distSq = (obj.LocalPosition - center).MagnitudeSquaredBig;
+                    if (distSq <= (BigInteger)radius * radius) results.Add(obj);
+                }
+                break;
+            case OctetParentNode parent:
+                foreach (var child in parent.Children)
+                    if (SphereIntersectsRegion(center, radius, child.Bounds))
+                        QueryWithinDistanceRecursive(child, center, radius, results);
+                break;
+            case SubLatticeBranchNode sub:
+                // Transform to inner coordinates
+                var innerCenter = sub.Sublattice.BoundsTransform.OuterToInnerCanonical(center);
+                // Scale radius assuming uniform scale
+                var innerSize = LatticeUniverse.RootRegion.Size;
+                var outerSize = sub.Sublattice.BoundsTransform.OuterLatticeBounds.Size;
+                var scale = innerSize.X / (double)outerSize.X; // Use double for precision
+                var innerRadius = (ulong)(radius * scale);
+                var subResults = sub.Sublattice.QueryWithinDistance(innerCenter, innerRadius);
+                results.AddRange(subResults);
+                break;
+        }
+    }
+
+    private static bool SphereIntersectsRegion(LongVector3 center, ulong radius, Region region)
+    {
+        var closest = new LongVector3(
+            System.Math.Max(region.Min.X, System.Math.Min(center.X, region.Max.X)),
+            System.Math.Max(region.Min.Y, System.Math.Min(center.Y, region.Max.Y)),
+            System.Math.Max(region.Min.Z, System.Math.Min(center.Z, region.Max.Z))
+        );
+        var distSq = (closest - center).MagnitudeSquaredBig;
+        return distSq <= (BigInteger)radius * radius;
     }
 }

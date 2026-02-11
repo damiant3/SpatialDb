@@ -1,6 +1,8 @@
 ﻿using SpatialDbLib.Lattice;
 using SpatialDbLib.Math;
 using SpatialDbLibTest.Helpers;
+using System.Diagnostics;
+using System.Numerics;
 using static SpatialDbLib.Lattice.AdmitResult;
 ///////////////////////////
 namespace SpatialDbLibTest.BaseTests;
@@ -321,5 +323,110 @@ public class SerialTests
 
             Console.WriteLine("Prune and insert contentious passed.");
         }
+
+        // === I17: Distance-based queries ===
+        {
+            var queryLattice = new SpatialLattice();
+            var center = LongVector3.Zero;
+            var radius = 100UL;
+
+            // Insert objects within and outside radius
+            var obj1 = new SpatialObject([new LongVector3(50, 0, 0)]);
+            queryLattice.Insert(obj1);
+            var obj2 = new SpatialObject([new LongVector3(150, 0, 0)]);
+            queryLattice.Insert(obj2);
+            var obj3 = new SpatialObject([new LongVector3(0, 50, 0)]);
+            queryLattice.Insert(obj3);
+            var results = queryLattice.QueryWithinDistance(center, radius).ToList();
+            Assert.AreEqual(2, results.Count, "Should find 2 objects within radius");
+            Assert.IsTrue(results.Contains(obj1), "Should contain obj1");
+            Assert.IsTrue(results.Contains(obj3), "Should contain obj3");
+            Assert.IsFalse(results.Contains(obj2), "Should not contain obj2");
+
+            Console.WriteLine("Distance-based queries passed.");
+        }
+    }
+
+    // === PERFORMANCE BENCHMARK ===
+
+    [TestMethod]
+    public void Test_QueryPerformance()
+    {
+        var lattice = new SpatialLattice();
+        var objects = new List<ISpatialObject>();
+        var sw = Stopwatch.StartNew();
+        for (int i = 0; i < 1000000; i++)
+        {
+            var pos = new LongVector3(
+                FastRandom.NextLong(-LatticeUniverse.HalfExtent, LatticeUniverse.HalfExtent),
+                FastRandom.NextLong(-LatticeUniverse.HalfExtent, LatticeUniverse.HalfExtent),
+                FastRandom.NextLong(-LatticeUniverse.HalfExtent, LatticeUniverse.HalfExtent));
+            var obj = new SpatialObject([pos]);
+            objects.Add(obj);
+        }
+        lattice.Insert(objects);
+        var insertTime = sw.ElapsedMilliseconds;
+        // Now queries
+        int queryCount = 10000;
+        sw.Restart();
+        long totalResults = 0;
+        for (int i = 0; i < queryCount; i++)
+        {
+            var center = new LongVector3(
+                FastRandom.NextLong(-LatticeUniverse.HalfExtent, LatticeUniverse.HalfExtent),
+                FastRandom.NextLong(-LatticeUniverse.HalfExtent, LatticeUniverse.HalfExtent),
+                FastRandom.NextLong(-LatticeUniverse.HalfExtent, LatticeUniverse.HalfExtent));
+            var radius = (ulong)FastRandom.NextLong(5000000000000000L, 15000000000000000L); // 5e15 to 1.5e16
+            var results = lattice.QueryWithinDistance(center, radius);
+            totalResults += results.Count();
+        }
+        var queryTime = sw.ElapsedMilliseconds;
+        var avgQueryTime = queryTime / (double)queryCount;
+        var queriesPerSec = queryCount * 1000.0 / queryTime;
+        Console.WriteLine($"Insert 1M: {insertTime} ms");
+        Console.WriteLine($"Queries: {queryCount}, Total time: {queryTime} ms, Avg: {avgQueryTime:F2} ms/query, QPS: {queriesPerSec:F0}");
+        Console.WriteLine($"Total results: {totalResults}, Avg results/query: {totalResults / (double)queryCount:F2}");
+    }
+
+    [TestMethod]
+    public void Test_NaiveQueryPerformance()
+    {
+        var objects = new List<ISpatialObject>();
+        var sw = Stopwatch.StartNew();
+        for (int i = 0; i < 10000; i++)
+        {
+            var pos = new LongVector3(
+                FastRandom.NextLong(-LatticeUniverse.HalfExtent, LatticeUniverse.HalfExtent),
+                FastRandom.NextLong(-LatticeUniverse.HalfExtent, LatticeUniverse.HalfExtent),
+                FastRandom.NextLong(-LatticeUniverse.HalfExtent, LatticeUniverse.HalfExtent));
+            var obj = new SpatialObject([pos]);
+            objects.Add(obj);
+        }
+        var insertTime = sw.ElapsedMilliseconds;
+        // Now queries
+        int queryCount = 10000;
+        sw.Restart();
+        long totalResults = 0;
+        for (int i = 0; i < queryCount; i++)
+        {
+            var center = new LongVector3(
+                FastRandom.NextLong(-LatticeUniverse.HalfExtent, LatticeUniverse.HalfExtent),
+                FastRandom.NextLong(-LatticeUniverse.HalfExtent, LatticeUniverse.HalfExtent),
+                FastRandom.NextLong(-LatticeUniverse.HalfExtent, LatticeUniverse.HalfExtent));
+            var radius = (ulong)FastRandom.NextLong(5000000000000000L, 15000000000000000L); // 5e15 to 1.5e16
+            int count = 0;
+            foreach (var obj in objects)
+            {
+                var distSq = (obj.LocalPosition - center).MagnitudeSquaredBig;
+                if (distSq <= (BigInteger)radius * radius) count++;
+            }
+            totalResults += count;
+        }
+        var queryTime = sw.ElapsedMilliseconds;
+        var avgQueryTime = queryTime / (double)queryCount;
+        var queriesPerSec = queryCount * 1000.0 / queryTime;
+        Console.WriteLine($"Naive Insert 10K: {insertTime} ms");
+        Console.WriteLine($"Naive Queries: {queryCount}, Total time: {queryTime} ms, Avg: {avgQueryTime:F2} ms/query, QPS: {queriesPerSec:F0}");
+        Console.WriteLine($"Naive Total results: {totalResults}, Avg results/query: {totalResults / (double)queryCount:F2}");
     }
 }

@@ -1,7 +1,3 @@
-﻿GitHub Copilot Premium limits me to 300 prompts of Sonnet 4.5 which means I used up my month of premium in 10 days.
-I switch to grok code fast 1, which is free and has its problems, but it does figure out hard stuff where gpt 4.x just
-produces garbage.  I asked grok to write this up and will be working with it for the forseeable future.
-
 # Future Enhancement Plan for Spatial Lattice Engine
 
 ## Overview
@@ -17,22 +13,22 @@ Start with these to improve efficiency before adding features.
    - **Expected Impact**: Could save 10-20% memory in sparse lattices; validate with stress tests.  
    - **Estimated Time**: 1-2 days. (actual time: 2 hours with grok including making coffee, smoke breaks, and a nap lol.)
 
-2. **Occupant Count Diagnostics**  
-   - **Description**: Create a `DiagnosticSpatialLattice` family (via generics) that tracks occupant counts per branch/node. Use for smarter tick routing (skip empty leaves).  
-   - **Rationale**: Current tick system hits all leaves; this enables conditional propagation.  
-   - **Implementation Approach**: Add `int OccupantCount` to `ISpatialNode`, update on insert/remove. Override tick methods to check counts.  
-   - **Expected Impact**: Significant speedup for sparse simulations (e.g., avoid ticking empty regions).  
-   - **Estimated Time**: 2-3 days; follows existing extension guide.
+~~2. **Occupant Count Diagnostics**~~  (skipped - value lessened by pruning; not critical now)
+   - ~~**Description**: Create a `DiagnosticSpatialLattice` family (via generics) that tracks occupant counts per branch/node. Use for smarter tick routing (skip empty leaves).~~  
+   - ~~**Rationale**: Current tick system hits all leaves; this enables conditional propagation.~~  
+   - ~~**Implementation Approach**: Add `int OccupantCount` to `ISpatialNode`, update on insert/remove. Override tick methods to check counts.~~  
+   - ~~**Expected Impact**: Significant speedup for sparse simulations (e.g., avoid ticking empty regions).~~  
+   - ~~**Estimated Time**: 2-3 days; follows existing extension guide.~~
 
 ## Phase 2: Query and Search Enhancements (Medium Impact)
 Expand functionality while maintaining O(log n) performance.
 
-3. **Distance-Based Searches ("All Things Within a Distance")**  
+3. **Distance-Based Searches ("All Things Within a Distance")**  (done)
    - **Description**: Add `QueryWithinDistance(LongVector3 center, long radius)` to `SpatialLattice`. Use octree traversal to prune irrelevant branches.  
    - **Rationale**: Essential for spatial queries (e.g., neighbor detection in games).  
    - **Implementation Approach**: Implement sphere-octree intersection checks; collect results in a list. Handle sublattices recursively.  
-   - **Expected Impact**: O(log n + k) where k is result count; faster than full scans.  
-   - **Estimated Time**: 3-4 days; benchmark against ConcurrentDictionary.
+   - **Expected Impact**: O(log n + k) where k is result count; faster than full scans.  (actual: implemented with BigInteger for large distances, benchmarked ~130x faster than naive)
+   - **Estimated Time**: 3-4 days; benchmark against ConcurrentDictionary. (actual, about an hour.)
 
 ## Phase 3: Concurrency and Threading (High Impact, Higher Risk)
 Focus on scalability improvements.
@@ -72,8 +68,8 @@ Add robustness features.
    - **Estimated Time**: 3-4 days; stress-test.
 
 ## Overall Strategy
-- **Prioritization**: Begin with Phase 1 for quick wins, then Phase 3 for scalability. Use existing tests to validate changes.
-- **Extensibility**: New features as generic families (e.g., `TickableSpatialLattice` → `ThreadedTickableSpatialLattice`) to preserve core code.
+- **Prioritization**: Begin with these to improve efficiency before adding features, then Phase 3 for scalability. Use existing tests to validate changes.
+- **Extensibility**: New features as generic families (e.g., `TickableSpatialLattice` ? `ThreadedTickableSpatialLattice`) to preserve core code.
 - **Testing**: Add benchmarks; update `PerformanceReport.txt`. Stress-test concurrency and memory.
 - **Dependencies**: Phase 3 relies on Phase 1's diagnostics.
 - **Total Timeline**: 2-4 weeks.

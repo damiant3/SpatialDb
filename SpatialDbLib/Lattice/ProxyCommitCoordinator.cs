@@ -26,10 +26,7 @@ public class ProxyCommitCoordinator<TOriginal, TProxy>(TOriginal originalObject,
         while (true)
         {
             var leaf = TargetLeaf;
-            using var leafLock = new SlimSyncer(
-                ((ISync)leaf).Sync, 
-                SlimSyncer.LockMode.Write, 
-                "ProxyCommitCoordinator.Commit: Leaf");
+            using var leafLock = new SlimSyncer(((ISync)leaf).Sync, SlimSyncer.LockMode.Write, "ProxyCommitCoordinator.Commit: Leaf");
 
             if (leaf.IsRetired)
                 continue; // Retry with potentially updated TargetLeaf

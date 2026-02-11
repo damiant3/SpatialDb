@@ -1,4 +1,4 @@
-﻿using SystemMath = System.Math;
+﻿using System.Numerics;
 ////////////////////////////
 namespace SpatialDbLib.Math;
 
@@ -18,10 +18,11 @@ public readonly struct LongVector3(long x, long y, long z)
     );
 
     public long MaxComponentAbs()
-        => SystemMath.Max(SystemMath.Abs(X), SystemMath.Max(SystemMath.Abs(Y), SystemMath.Abs(Z)));
+        => System.Math.Max(System.Math.Abs(X), System.Math.Max(System.Math.Abs(Y), System.Math.Abs(Z)));
 
+    public BigInteger MagnitudeSquaredBig => (BigInteger)X * X + (BigInteger)Y * Y + (BigInteger)Z * Z;
     public long SumAbs()
-        => SystemMath.Abs(X) + SystemMath.Abs(Y) + SystemMath.Abs(Z);
+        => System.Math.Abs(X) + System.Math.Abs(Y) + System.Math.Abs(Z);
 
     public override string ToString() => $"({X}, {Y}, {Z})";
 
@@ -72,7 +73,7 @@ public readonly struct LongVector3(long x, long y, long z)
         long dx = X - other.X;
         long dy = Y - other.Y;
         long dz = Z - other.Z;
-        return (int)SystemMath.Sqrt(dx * dx + dy * dy + dz * dz);
+        return (int)System.Math.Sqrt(dx * dx + dy * dy + dz * dz);
     }
 
     public static readonly LongVector3 Zero = new(0);
