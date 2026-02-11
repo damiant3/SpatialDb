@@ -9,6 +9,7 @@ public interface ISpatialNode
     AdmitResult Admit(ISpatialObject obj, LongVector3 proposedPosition);
     AdmitResult Admit(Span<ISpatialObject> buffer);
     void AdmitMigrants(IList<ISpatialObject> obj);
+    Region Bounds { get; }
 }
 
 public abstract class SpatialNode(Region bounds)
@@ -85,6 +86,7 @@ public abstract class ParentNode(Region bounds)
     : SpatialNode(bounds)
 {
     public abstract IChildNode<OctetParentNode>[] Children { get; }
+    public abstract void PruneIfEmpty();
 }
 
 public abstract class OctetParentNode
@@ -425,7 +427,7 @@ public abstract class OctetParentNode
                     frame.NextBucket++;
                     continue;
                 }
-                
+
                 var slice = bucket.GetSpan(buffer);
                 var leaf = (LeafNode)child ?? throw new InvalidOperationException("Child is not a LeafNode");
                 var result = leaf is VenueLeafNode venue && NeedsDeeper(slice) // deep insert
@@ -476,6 +478,54 @@ public abstract class OctetParentNode
                     return true;
             return false;
         }
+    }
+    public override void PruneIfEmpty()
+    {
+        if (Children.All(IsChildEmpty))
+        {
+            if (this is IChildNode<OctetParentNode> child)
+            {
+                var parent = child.Parent;
+                int index = Array.IndexOf(parent.Children, this);
+                if (index >= 0)
+                {
+                    using var s = new SlimSyncer(parent.Sync, SlimSyncer.LockMode.Write, "PruneIfEmpty: Parent");
+                    parent.Children[index] = parent.CreateNewVenueNode((byte)index, Bounds.Min, Bounds.Max);
+                    parent.PruneIfEmpty();
+                }
+            }
+        }
+    }
+    public void PruneChild(int index)
+    {
+        var child = Children[index];
+        if (IsChildEmpty(child))
+        {
+            using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "OctetParentNode.PruneChild");
+            Children[index] = CreateNewVenueNode(index, child.Bounds.Min, child.Bounds.Max);
+        }
+    }
+
+    private bool IsChildEmpty(IChildNode<OctetParentNode> child)
+    {
+        return child switch
+        {
+            VenueLeafNode leaf => leaf.Occupants.Count == 0,
+            OctetParentNode parent => parent.Children.All(IsChildEmpty),
+            SubLatticeBranchNode sub => GetTotalOccupantCount(sub.Sublattice.GetRootNode()) == 0,
+            _ => false
+        };
+    }
+
+    protected static int GetTotalOccupantCount(ISpatialNode node)
+    {
+        return node switch
+        {
+            VenueLeafNode leaf => leaf.Occupants.Count,
+            OctetParentNode parent => parent.Children.Sum(GetTotalOccupantCount),
+            SubLatticeBranchNode sub => GetTotalOccupantCount(sub.Sublattice.GetRootNode()),
+            _ => 0
+        };
     }
 }
 public class OctetBranchNode
@@ -658,19 +708,13 @@ public interface ISubLatticeBranch
     ISpatialLattice GetSublattice();
 }
 
-public abstract class SubLatticeBranchNode<TLattice>
-    : LeafNode,
+public abstract class SubLatticeBranchNode<TLattice>(Region bounds, OctetParentNode parent)
+    : LeafNode(bounds, parent),
       ISubLatticeBranch
     where TLattice : ISpatialLattice
 {
-    internal TLattice Sublattice { get; set; }
+    internal TLattice Sublattice { get; set; } = default!;  // to be initialized by subclass constructor
     public ISpatialLattice GetSublattice() => Sublattice;
-
-    protected SubLatticeBranchNode(Region bounds, OctetParentNode parent)
-        : base(bounds, parent)
-    {
-        Sublattice = default!;  // to be initialized by subclass constructor
-    }
 
     public override void AdmitMigrants(IList<ISpatialObject> objs)
         => Sublattice.AdmitMigrants(objs);
@@ -705,7 +749,6 @@ public abstract class SubLatticeBranchNode<TLattice>
         return Sublattice.AdmitForInsert(buffer);
     }
 }
-
 
 public class SubLatticeBranchNode
     : SubLatticeBranchNode<ISpatialLattice>

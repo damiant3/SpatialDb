@@ -255,5 +255,71 @@ public class SerialTests
             Assert.IsTrue(atLeastOne, "No inserted objects have LatticePositionStackDepth > 1 to validate.");
             Console.WriteLine("All deep lattice projections matches original passed.");
         }
+
+        // === I15: Pruning works in isolation ===
+        {
+            var pruneLattice = new SpatialLattice();
+            SpatialLattice.EnablePruning = true;
+            List<ISpatialObject> testObjects = [];
+
+            // Insert objects to force branch creation
+            for (int i = 0; i < 20; i++)
+            {
+                var obj = new SpatialObject([new LongVector3(i * 10, 0, 0)]);
+                testObjects.Add(obj);
+                pruneLattice.Insert(obj);
+            }
+
+            // Count nodes before pruning
+            int nodeCountBefore = 0;
+            void CountNodes(ISpatialNode n)
+            {
+                nodeCountBefore++;
+                if (n is OctetParentNode p)
+                    foreach (var c in p.Children) CountNodes(c);
+            }
+            CountNodes(pruneLattice.m_root);
+
+            // Remove all objects to trigger pruning
+            foreach (var obj in testObjects)
+                pruneLattice.Remove(obj);
+
+            // Count nodes after pruning
+            int nodeCountAfter = 0;
+            CountNodes(pruneLattice.m_root);
+
+            Assert.IsTrue(nodeCountAfter < nodeCountBefore, "Pruning did not reduce node count");
+            Console.WriteLine("Pruning in isolation passed.");
+        }
+
+        // === I16: Prune and insert contentious (not exactly what I was prompting for fix later) ===
+        {
+            var pruneLattice = new SpatialLattice();
+            SpatialLattice.EnablePruning = true;
+
+            var pos = new LongVector3(100, 100, 100);
+            var obj1 = new SpatialObject([pos]);
+            pruneLattice.Insert(obj1);
+
+            // Force sublattice creation
+            var forceObjs = LatticeTestHelpers.ForceSublattice(pruneLattice, pos);
+
+            // Remove obj1, potentially triggering pruning
+            pruneLattice.Remove(obj1);
+
+            // Immediately insert new object at same position
+            var obj2 = new SpatialObject([pos]);
+            var insertResult = pruneLattice.Insert(obj2);
+            Assert.IsTrue(insertResult is Created, "Insert after prune failed");
+
+            var leaf = pruneLattice.ResolveOccupyingLeaf(obj2);
+            Assert.IsNotNull(leaf, "New object not found after contentious prune/insert");
+
+            // Clean up force objects
+            foreach (var obj in forceObjs)
+                pruneLattice.Remove(obj);
+
+            Console.WriteLine("Prune and insert contentious passed.");
+        }
     }
 }

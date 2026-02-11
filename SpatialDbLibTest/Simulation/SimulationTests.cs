@@ -12,7 +12,7 @@ public class SimulationTests
 {
     // === BASIC FUNCTIONALITY ===
     [TestMethod]
-    public void Test_SimulationFeatures()
+    public void SimulationTests_Omnibus()
     {
         Console.WriteLine("=".PadRight(70, '='));
         Console.WriteLine("SIMULATION FEATURES TEST SUITE");
@@ -233,6 +233,61 @@ public class SimulationTests
                 Assert.AreEqual(50, obj.Velocity.X, "LocalVelocity should match last element");
                 Console.WriteLine("✓ PASSED");
             }
+        }
+
+        // === TICKABLE PRUNING ===
+        {
+            Console.WriteLine("\n--- Tickable Pruning ---");
+            Console.Write("  Prune works... ");
+            var tickableLattice = new TickableSpatialLattice();
+            SpatialLattice.EnablePruning = true;
+            List<ISpatialObject> testObjects = [];
+
+            var obj = new TickableSpatialObject([new LongVector3(10, 10, 10)]);
+            testObjects.Add(obj);
+            tickableLattice.Insert(obj);
+
+            for (int i = 0; i < 10; i++)
+            {
+                var o = new TickableSpatialObject([new LongVector3(10 + i, 10, 10)]);
+                testObjects.Add(o);
+                tickableLattice.Insert(o);
+            }
+
+            int nodeCountBefore = 0;
+            void CountNodes(ISpatialNode n)
+            {
+                nodeCountBefore++;
+                if (n is OctetParentNode p)
+                    foreach (var c in p.Children) CountNodes(c);
+            }
+            CountNodes(tickableLattice.m_root);
+
+            // Set the object's velocity to move it out of bounds
+            obj.Velocity = new IntVector3(-1000, 0, 0); // Large velocity to exit bounds
+
+            var initialPosition = obj.LocalPosition;
+            var leafBefore = tickableLattice.ResolveOccupyingLeaf(obj);
+
+            // Tick the lattice to process movement and trigger pruning
+            tickableLattice.Tick();
+
+            var newPosition = obj.LocalPosition;
+            
+            // Verify the object has moved or been removed
+            var leafAfter = tickableLattice.ResolveOccupyingLeaf(obj);
+            Assert.IsNotNull(leafAfter, "Object should still be findable after tick");
+            Assert.AreNotEqual(initialPosition, newPosition, "Object should have moved");
+            Assert.AreNotEqual(leafBefore, leafAfter, "Object should have moved to a different leaf");
+
+            // Count nodes after ticking
+            int nodeCountAfter = 0;
+            CountNodes(tickableLattice.m_root);
+
+            // Pruning should have reduced node count if branches became empty
+            Assert.IsTrue(nodeCountAfter <= nodeCountBefore, "Pruning should not increase node count");
+
+            Console.WriteLine("✓ PASSED");
         }
 
         Console.WriteLine("\n" + "=".PadRight(70, '='));

@@ -40,6 +40,9 @@ public class TickableOctetParentNode(Region bounds)
     {
         for (int i = 0; i < 8; i++)
             GetTickableChild(i).Tick();
+
+        if (SpatialLattice.EnablePruning)
+            PruneIfEmpty();
     }
 }
 

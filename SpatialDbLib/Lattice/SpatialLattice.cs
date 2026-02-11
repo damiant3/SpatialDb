@@ -10,6 +10,7 @@ public class SpatialLattice: SpatialLattice<OctetRootNode>
 {
     public SpatialLattice() : base() { }
     public SpatialLattice(Region outerBounds, byte latticeDepth) : base(outerBounds, latticeDepth) { }
+    public static bool EnablePruning { get; set; } = false;
 }
 
 public interface ISpatialLattice : ISpatialNode
@@ -35,11 +36,11 @@ public class SpatialLattice<TRoot>
       ISpatialNode
     where TRoot : IRootNode<OctetParentNode, OctetBranchNode, VenueLeafNode, TRoot>
 {
-
     public static byte CurrentThreadLatticeDepth => LatticeDepthContext.CurrentDepth;
 
     public ISpatialNode GetRootNode() => m_root;
     internal protected readonly TRoot m_root;
+    public Region Bounds => m_root.Bounds;
     public ParentToSubLatticeTransform BoundsTransform { get; protected set; }
 
     public SpatialLattice() // for the rootiest of roots
@@ -75,7 +76,6 @@ public class SpatialLattice<TRoot>
 
         public void Dispose()
             => LatticeDepthContext.CurrentDepth = m_previousDepth;
-
     }
 
     public AdmitResult InsertAsOne(List<ISpatialObject> objs)
@@ -106,7 +106,6 @@ public class SpatialLattice<TRoot>
     {
         return Insert(objs.ToArray());
     }
-
     public AdmitResult Insert(ISpatialObject[] objs)
     {
         using var s = PushLatticeDepth(LatticeDepth);
@@ -121,7 +120,6 @@ public class SpatialLattice<TRoot>
         }
         return admitResult;
     }
-
     public AdmitResult Insert(ISpatialObject obj)
     {
         using var s = PushLatticeDepth(LatticeDepth);
@@ -141,6 +139,8 @@ public class SpatialLattice<TRoot>
             var leaf = m_root.ResolveOccupyingLeaf(obj);
             if (leaf == null) return;
             leaf.Vacate(obj);
+            if (SpatialLattice.EnablePruning)
+                leaf.Parent.PruneIfEmpty();
             return;
         }
     }
