@@ -1,6 +1,7 @@
 ﻿using SpatialDbLib.Math;
 using SpatialDbLib.Synchronize;
 using System.Buffers;
+using System.Numerics;
 ///////////////////////////////
 namespace SpatialDbLib.Lattice;
 
@@ -693,6 +694,41 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
             foreach (var l in locksAcquired)
                 try { l.Dispose(); } catch { }
             throw;
+        }
+    }
+
+    public IEnumerable<ISpatialObject> QueryNeighbors(LongVector3 center, ulong radius)
+    {
+        var results = new List<ISpatialObject>();
+        QueryNeighborsRecursive(this, center, radius, results);
+        return results;
+    }
+
+    private static void QueryNeighborsRecursive(ISpatialNode node, LongVector3 center, ulong radius, List<ISpatialObject> results)
+    {
+        if (!node.Bounds.IntersectsSphere(center, radius)) return;
+
+        switch (node)
+        {
+            case VenueLeafNode leaf:
+                foreach (var obj in leaf.Occupants)
+                {
+                    var distSq = (obj.LocalPosition - center).MagnitudeSquaredBig;
+                    if (distSq <= (BigInteger)radius * radius) results.Add(obj);
+                }
+                break;
+            case OctetParentNode parent:
+                foreach (var child in parent.Children)
+                    if (child.Bounds.IntersectsSphere(center, radius))
+                        QueryNeighborsRecursive(child, center, radius, results);
+                break;
+            case SubLatticeBranchNode sub:
+                var innerCenter = sub.Sublattice.BoundsTransform.OuterToInnerCanonical(center);
+                var scale = LatticeUniverse.RootRegion.Size.X / (double)sub.Sublattice.BoundsTransform.OuterLatticeBounds.Size.X;
+                var innerRadius = (ulong)(radius * scale);
+                var subResults = sub.Sublattice.QueryWithinDistance(innerCenter, innerRadius);
+                results.AddRange(subResults);
+                break;
         }
     }
 }

@@ -289,6 +289,28 @@ public class SimulationTests
 
             Console.WriteLine("✓ PASSED");
         }
+        // === LOCAL NEIGHBOR QUERIES ===
+        {
+            Console.WriteLine("\n--- Queries ---");
+            Console.Write("  Local neighbor queries... ");
+            var lattice = new TickableSpatialLattice();
+            List<TickableSpatialObject> objects = [];
+            for (int i = 0; i < 1000; i++)
+            {
+                var pos = new LongVector3(i * 100L, 0, 0);
+                var obj = new TickableSpatialObject(pos);
+                objects.Add(obj);
+                lattice.Insert(obj);
+            }
+            var testObj = objects[500];
+            var leaf = lattice.ResolveOccupyingLeaf(testObj);
+            Assert.IsNotNull(leaf);
+            var radius = 500UL; // Should cover ~10 objects
+            var neighbors = leaf.QueryNeighbors(testObj.LocalPosition, radius).ToList();
+            Assert.IsTrue(neighbors.Count > 0, "Should find neighbors");
+            Assert.IsTrue(neighbors.Contains(testObj), "Should include self");
+            Console.WriteLine($"✓ PASSED ({neighbors.Count} neighbors)");
+        }
 
         Console.WriteLine("\n" + "=".PadRight(70, '='));
         Console.WriteLine("ALL SIMULATION FEATURE TESTS PASSED");

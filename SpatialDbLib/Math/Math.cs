@@ -1,4 +1,6 @@
 ﻿////////////////////////////
+using System.Numerics;
+
 namespace SpatialDbLib.Math;
 
 public static class LatticeUniverse
@@ -227,6 +229,17 @@ public readonly struct Region
         => position.X >= Min.X && position.X < Max.X
         && position.Y >= Min.Y && position.Y < Max.Y
         && position.Z >= Min.Z && position.Z < Max.Z;
+
+    public bool IntersectsSphere(LongVector3 center, ulong radius)
+    {
+        var closest = new LongVector3(
+            System.Math.Max(Min.X, System.Math.Min(center.X, Max.X)),
+            System.Math.Max(Min.Y, System.Math.Min(center.Y, Max.Y)),
+            System.Math.Max(Min.Z, System.Math.Min(center.Z, Max.Z))
+        );
+        var distSq = (closest - center).MagnitudeSquaredBig;
+        return distSq <= (BigInteger)radius * radius;
+    }
 
     public override string ToString() => $"Min={Min}, Max={Max}";
 }

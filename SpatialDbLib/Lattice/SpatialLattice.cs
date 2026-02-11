@@ -209,7 +209,7 @@ public class SpatialLattice<TRoot>
 
     private void QueryWithinDistanceRecursive(ISpatialNode node, LongVector3 center, ulong radius, List<ISpatialObject> results)
     {
-        if (!SphereIntersectsRegion(center, radius, node.Bounds)) return;
+        if (!node.Bounds.IntersectsSphere(center, radius)) return;
 
         switch (node)
         {
@@ -222,7 +222,7 @@ public class SpatialLattice<TRoot>
                 break;
             case OctetParentNode parent:
                 foreach (var child in parent.Children)
-                    if (SphereIntersectsRegion(center, radius, child.Bounds))
+                    if (child.Bounds.IntersectsSphere(center, radius))
                         QueryWithinDistanceRecursive(child, center, radius, results);
                 break;
             case SubLatticeBranchNode sub:
@@ -237,16 +237,5 @@ public class SpatialLattice<TRoot>
                 results.AddRange(subResults);
                 break;
         }
-    }
-
-    private static bool SphereIntersectsRegion(LongVector3 center, ulong radius, Region region)
-    {
-        var closest = new LongVector3(
-            System.Math.Max(region.Min.X, System.Math.Min(center.X, region.Max.X)),
-            System.Math.Max(region.Min.Y, System.Math.Min(center.Y, region.Max.Y)),
-            System.Math.Max(region.Min.Z, System.Math.Min(center.Z, region.Max.Z))
-        );
-        var distSq = (closest - center).MagnitudeSquaredBig;
-        return distSq <= (BigInteger)radius * radius;
     }
 }

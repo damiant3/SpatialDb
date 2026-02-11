@@ -389,6 +389,41 @@ public class SerialTests
     }
 
     [TestMethod]
+    public void Test_LocalQueryPerformance()
+    {
+        var lattice = new SpatialLattice();
+        var objects = new List<ISpatialObject>();
+        for (int i = 0; i < 100000; i++)
+        {
+            var pos = new LongVector3(
+                FastRandom.NextLong(-LatticeUniverse.HalfExtent, LatticeUniverse.HalfExtent),
+                FastRandom.NextLong(-LatticeUniverse.HalfExtent, LatticeUniverse.HalfExtent),
+                FastRandom.NextLong(-LatticeUniverse.HalfExtent, LatticeUniverse.HalfExtent));
+            var obj = new SpatialObject([pos]);
+            objects.Add(obj);
+            lattice.Insert(obj);
+        }
+        // Now queries
+        int queryCount = 10000;
+        var sw = Stopwatch.StartNew();
+        long totalResults = 0;
+        for (int i = 0; i < queryCount; i++)
+        {
+            var obj = objects[FastRandom.NextInt(0, objects.Count)];
+            var leaf = lattice.ResolveOccupyingLeaf(obj);
+            if (leaf == null) continue;
+            var radius = 1000000000000UL; // 1e12
+            var results = leaf.QueryNeighbors(obj.LocalPosition, radius);
+            totalResults += results.Count();
+        }
+        var queryTime = sw.ElapsedMilliseconds;
+        var avgQueryTime = queryTime / (double)queryCount;
+        var queriesPerSec = queryCount * 1000.0 / queryTime;
+        Console.WriteLine($"Local Queries: {queryCount}, Total time: {queryTime} ms, Avg: {avgQueryTime:F2} ms/query, QPS: {queriesPerSec:F0}");
+        Console.WriteLine($"Local Total results: {totalResults}, Avg results/query: {totalResults / (double)queryCount:F2}");
+    }
+
+    [TestMethod]
     public void Test_NaiveQueryPerformance()
     {
         var objects = new List<ISpatialObject>();
