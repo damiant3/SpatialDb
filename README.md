@@ -6,14 +6,24 @@ A high-performance spatial database system for real-time simulations, built from
 
 - **2+ million objects/second** sustained tick throughput
 - **800,000 concurrent moving entities** with near-linear scaling
-- **2-5x faster** than Unity/Unreal spatial systems for dynamic objects
+- **130x faster queries** than naive linear scans for distance searches
+- **Automatic pruning** reduces memory footprint in sparse regions
 - **Zero external dependencies** - pure C#/.NET implementation
 
 Performance at scale:
 
-Object Count: 50,000   | Tick Time: 25ms  | Throughput: 2,000,000/sec
-Object Count: 200,000  | Tick Time: 77ms  | Throughput: 2,597,403/sec
-Object Count: 800,000  | Tick Time: 385ms | Throughput: 2,077,922/sec
+| Object Count | Tick Time | Throughput      |
+|--------------|-----------|-----------------|
+| 50,000       | 25ms      | 2,000,000/sec   |
+| 200,000      | 77ms      | 2,597,403/sec   |
+| 800,000      | 385ms     | 2,077,922/sec   |
+
+Query Performance:
+
+| Query Type                | Object Count | Queries | Time  | QPS     |
+|---------------------------|--------------|---------|-------|---------|
+| Global Distance Queries   | 1M           | 10K     | 263ms | 38,023  |
+| Local Neighbor Queries    | 100K         | 10K     | 56ms  | 178,571 |
 
 ## What Is This?
 
@@ -22,6 +32,7 @@ A hierarchical octree-based spatial database that dynamically creates nested "su
 - **Infinite precision**: 64-bit integer coordinates without floating-point error
 - **Automatic load balancing**: Hot spots spawn deeper subdivisions
 - **Thread-safe operations**: Concurrent inserts, removes, and queries
+- **Memory optimization**: Pruning removes empty branches to save space
 - **Generic extensibility**: Add custom behaviors without modifying core code
 
 ## Key Features
@@ -30,13 +41,16 @@ A hierarchical octree-based spatial database that dynamically creates nested "su
 - Dynamic sublattice generation for adaptive spatial partitioning
 - Proxy-based transactional insertion with two-phase commit
 - Multi-object locking with deadlock prevention
-- O(log n) spatial queries and neighbor detection
+- O(log n) spatial queries and neighbor detection (global and local)
 - Stack-based position tracking for nested coordinate spaces
+- Automatic pruning of empty branches to optimize memory
 
 ### Real-Time Simulation System
 - Time-based tick system with velocity thresholds
 - Handles 260,000+ moving objects at 10 ticks/second
 - Automatic tick propagation through sublattice hierarchy
+- Boundary crossing with seamless movement between regions
+- Local neighbor queries for efficient proximity detection
 - Movement prediction and collision detection ready
 
 ### Thread Safety
@@ -57,9 +71,14 @@ Query by position:
 
     var leaf = lattice.ResolveOccupyingLeaf(obj);
 
+Query objects within a distance:
+
+    var results = lattice.QueryWithinDistance(new LongVector3(1000, 2000, 3000), 1000UL);
+
 Remove when done:
 
     lattice.Remove(obj);
+
 
 ### Tickable Simulation
 
@@ -69,15 +88,20 @@ Create tickable lattice and insert moving object:
     var obj = new TickableSpatialObject(new LongVector3(1000, 1000, 1000));
     lattice.Insert(obj);
 
-Register for ticks:
+Register for ticks and set velocity:
 
-    var leaf = lattice.ResolveOccupyingLeaf(obj) as TickableVenueLeafNode;
     obj.RegisterForTicks();
     obj.Accelerate(new IntVector3(100, 0, 0));
 
 Tick all objects (moves objects based on elapsed time):
 
     lattice.Tick();
+
+
+Query local neighbors from a leaf:
+
+    var leaf = lattice.ResolveOccupyingLeaf(obj);
+    var neighbors = leaf.QueryNeighbors(obj.LocalPosition, 500UL);
 
 ## Architecture
 
@@ -144,7 +168,8 @@ Comprehensive test coverage with many test methods:
 - Unit tests: Core functionality and invariant verification
 - Integration tests: Multi-lattice coordination and deep insertions
 - Stress tests: Concurrent operations with 8+ threads
-- Performance tests: Scaling validation to 800k objects
+- Performance tests: Scaling validation to 800k objects, query benchmarks
+- Simulation tests: Tickable systems, boundary crossing, pruning, local queries
 
 ## Technical Innovations
 
@@ -157,7 +182,13 @@ Zero-overhead polymorphism through compile-time specialization. Add new behavior
 ### 3. Transactional Semantics
 Two-phase commit for insertions: acquire locks → validate → create proxy → commit/rollback. Enables thread-safe bulk operations with atomicity guarantees.
 
-### 4. Shared Thread-Local State
+### 4. Automatic Pruning
+Empty branches are pruned after operations to reduce memory usage and traversal depth in sparse areas.
+
+### 5. Efficient Spatial Queries
+O(log n + k) distance-based searches with sphere-octree intersection pruning, plus local neighbor queries starting from leaves.
+
+### 6. Shared Thread-Local State
 Worked around critical C# generic type system bug where [ThreadStatic] fields create separate instances per closed generic type. Solution: non-generic holder class for shared state.
 
 ## Use Cases
@@ -173,9 +204,15 @@ Worked around critical C# generic type system bug where [ThreadStatic] fields cr
 
 Based on measured performance:
 
-Target Rate: 10 ticks/sec  | Budget: 100ms per tick  | Capacity: ~260,000 moving objects
-Target Rate: 20 ticks/sec  | Budget: 50ms per tick   | Capacity: ~130,000 moving objects
-Target Rate: 60 ticks/sec  | Budget: 16.6ms per tick | Capacity: ~43,000 moving objects
+| Target Rate | Budget per Tick | Capacity                |
+|-------------|------------------|-------------------------|
+| 10 ticks/sec| 100ms            | ~260,000 moving objects  |
+| 20 ticks/sec| 50ms             | ~130,000 moving objects  |
+| 60 ticks/sec| 16.6ms           | ~43,000 moving objects   |
+
+Query Capacity:
+- Global distance queries: ~38,000 QPS on 1M objects
+- Local neighbor queries: Efficient for proximity detection
 
 For reference: Most MMORPGs support 1,000-5,000 concurrent players per shard.
 This engine supports 50-250x that capacity at standard game tick rates on a home pc.
@@ -190,6 +227,7 @@ This engine supports 50-250x that capacity at standard game tick rates on a home
 
 - PerformanceReport.txt - Detailed benchmarks and comparative analysis
 - LatticeExtensionGuide.txt - How to add custom behaviors
+- FuturePlansWithMichaelValentine.txt - Roadmap and phase progress
 - ReadMe.txt - Development history and design decisions
 
 ## Performance Notes
