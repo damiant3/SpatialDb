@@ -7,7 +7,9 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
-
+  <PropertyGroup>
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\SpatialDbLib\SpatialDbLib.csproj" />
   </ItemGroup>

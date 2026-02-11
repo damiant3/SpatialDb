@@ -298,7 +298,7 @@ public class GrandSimulation
                 Console.WriteLine($"✓ Post-tick validation PASSED - {movedCount} objects moved successfully");
 
             // after testing one tick, we have high confidence that all objects are properly set up and will move when ticked.
-            // Now we can start the concurrent simulation with one thread pumping ticks and another monitoring object movement.
+            // Now we can start the concurrent simulation with many threads pumping ticks and another monitoring object movement.
             Console.WriteLine($"\nStarting concurrent ticker and monitor threads for {durationMs}ms...");
 
             var tickCount = 0;

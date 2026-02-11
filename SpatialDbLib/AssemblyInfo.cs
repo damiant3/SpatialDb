@@ -1,6 +1,7 @@
 ﻿using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("SpatialDbLibTest")]
+[assembly: InternalsVisibleTo("SpatialDbApp")]
 
 // **********************************************************************
 // Reference / further reading:

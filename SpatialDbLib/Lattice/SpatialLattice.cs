@@ -188,13 +188,13 @@ public class SpatialLattice<TRoot>
         return Admit(buffer);
     }
 
-    internal VenueLeafNode? ResolveOccupyingLeaf(ISpatialObject obj)
+    public VenueLeafNode? ResolveOccupyingLeaf(ISpatialObject obj)
     {
         using var s = PushLatticeDepth(LatticeDepth);
         return m_root.ResolveOccupyingLeaf(obj);
     }
 
-    internal VenueLeafNode? ResolveLeaf(ISpatialObject obj)
+    public VenueLeafNode? ResolveLeaf(ISpatialObject obj)
     {
         using var s = PushLatticeDepth(LatticeDepth);
         return m_root.ResolveLeaf(obj);

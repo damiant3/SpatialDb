@@ -1,5 +1,6 @@
 ﻿using SpatialDbLib.Lattice;
 using SpatialDbLib.Math;
+using SpatialDbLib.Synchronize;
 //////////////////////////////////
 namespace SpatialDbLib.Simulation;
 
@@ -39,9 +40,14 @@ public abstract class TickableSpatialObjectBase(IList<LongVector3> position)
 
     public IntVector3 LocalVelocity
     {
-        get { return m_velocityStack[^1]; }
+        get
+        {
+            using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Read, "TickableSpatialObjectBase.LocalVelocity");
+            return m_velocityStack[^1];
+        }
         set
         {
+            using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "TickableSpatialObjectBase.LocalVelocity");
             var enforced = SimulationPolicy.EnforceMovementThreshold(value);
             m_velocityStack[^1] = enforced;
         }
@@ -55,11 +61,13 @@ public abstract class TickableSpatialObjectBase(IList<LongVector3> position)
 
     public IList<IntVector3> GetVelocityStack()
     {
+        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Read, "TickableSpatialObjectBase.LocalVelocity");
         return [.. m_velocityStack];
     }
 
     public void SetVelocityStack(IList<IntVector3> newStack)
     {
+        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "TickableSpatialObjectBase.LocalVelocity");
         m_velocityStack = newStack;
     }
 

@@ -35,7 +35,7 @@ public class SpatialObject(IList<LongVector3> initialPosition)
     protected ReaderWriterLockSlim Sync = new(LockRecursionPolicy.SupportsRecursion);
     ReaderWriterLockSlim ISync.Sync => Sync;
 
-    IList<LongVector3> m_positionStack = initialPosition;
+    IList<LongVector3> m_positionStack = [.. initialPosition];
 
     public IList<LongVector3> GetPositionStack()
     {
@@ -58,7 +58,7 @@ public class SpatialObject(IList<LongVector3> initialPosition)
     public void SetPositionStack(IList<LongVector3> newStack)
     {
         using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "SpatialObject.SetPositionStack");
-        m_positionStack = newStack;
+        m_positionStack = [.. newStack];
     }
 
     public int PositionStackDepth
