@@ -12,7 +12,7 @@ public static class HelixUtils
     {
         return new HelixViewport3D
         {
-            Background = Brushes.LightGray,
+            Background = Brushes.Black, // Changed from LightGray to Black
             ShowCoordinateSystem = true,
             ShowViewCube = true,
             ShowFrameRate = true,
@@ -112,4 +112,15 @@ public static class HelixUtils
 
         return mesh;
     }
+
+    public static Material DefaultMaterial { get; }
+        = new MaterialGroup
+        {
+            Children =
+            {
+                new DiffuseMaterial(new SolidColorBrush(Color.FromRgb(40, 120, 255))), // bright blue
+                new EmissiveMaterial(new SolidColorBrush(Color.FromRgb(80, 180, 255))), // self-illuminating
+                new SpecularMaterial(new SolidColorBrush(Colors.White), 100.0) // shiny
+            }
+        };
 }

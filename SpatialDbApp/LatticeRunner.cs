@@ -1,14 +1,14 @@
-﻿using SpatialDbLib.Lattice;
+﻿using System.Diagnostics;
+using SpatialDbLib.Lattice;
 using SpatialDbLib.Math;
 using SpatialDbLib.Simulation;
 using System.Collections.Concurrent;
-using System.Diagnostics;
 
 namespace SpatialDbApp;
 
-internal class LatticeRunner(RichTextBox logRtb)
+internal class LatticeRunner
 {
-    readonly RichTextBox m_logRtb = logRtb;
+    readonly RichTextBox m_logRtb;
     bool m_isRunning = false;
 
     int m_tickCount = 0;
@@ -24,6 +24,17 @@ internal class LatticeRunner(RichTextBox logRtb)
     int m_objectCount;
     int m_spaceRange;
     int m_durationMs;
+
+    private List<TickableSpatialObject> m_closestObjects = new();
+    private Stopwatch m_renderStopwatch = new();
+    private MainForm? m_form;
+    private bool m_useFrontBuffer = true;
+
+    public LatticeRunner(MainForm form, RichTextBox logRtb)
+    {
+        m_form = form;
+        m_logRtb = logRtb;
+    }
 
     void LogLine(string message)
     {
@@ -58,6 +69,8 @@ internal class LatticeRunner(RichTextBox logRtb)
         m_logRtb.AppendText(message + Environment.NewLine);
     }
 
+    public List<TickableSpatialObject> ClosestObjects => m_closestObjects;
+
     public void RunGrandSimulation(int objectCount, int durationMs, int spaceRange = int.MaxValue)
     {
         if(m_isRunning)
@@ -77,6 +90,13 @@ internal class LatticeRunner(RichTextBox logRtb)
             m_lastPositions = new ConcurrentDictionary<TickableSpatialObject, LongVector3>();
 
             PerformPreflight();
+
+            // Query for 5000 closest objects after preflight
+            m_closestObjects = FindClosestObjectsToOrigin(5000, 5000);
+            m_form?.Setup3DView(m_closestObjects);
+
+            m_renderStopwatch.Restart();
+
             TickOnceAndTest();
             RunSimulationForDuration();
             CleanupAndReport();
@@ -99,6 +119,7 @@ internal class LatticeRunner(RichTextBox logRtb)
         LogLine($"Creating and inserting {m_objectCount} objects with random positions and velocities...");
         for (int i = 0; i < m_objectCount; i++)
         {
+            var velspan = 15000;
             var pos = new LongVector3(
                 FastRandom.NextInt(-m_spaceRange, m_spaceRange),
                 FastRandom.NextInt(-m_spaceRange, m_spaceRange),
@@ -106,9 +127,9 @@ internal class LatticeRunner(RichTextBox logRtb)
             var obj = new TickableSpatialObject(pos)
             {
                 Velocity = new IntVector3(
-                    FastRandom.NextInt(50, 500),
-                    FastRandom.NextInt(50, 500),
-                    FastRandom.NextInt(50, 500))
+                    FastRandom.NextInt(-velspan, velspan),
+                    FastRandom.NextInt(-velspan, velspan),
+                    FastRandom.NextInt(-velspan, velspan))
             };
             if (!SimulationPolicy.MeetsMovementThreshold(obj.Velocity))
                 throw new InvalidOperationException($"Object velocity {obj.Velocity} should meet movement threshold");
@@ -543,5 +564,49 @@ internal class LatticeRunner(RichTextBox logRtb)
         if (m_totalMovementDetected <= 0)
             throw new InvalidOperationException("Monitor should have detected movement");
         LogLine("\n✓ Grand simulation test PASSED");
+    }
+
+    // Call this from your tick loop (or from CompositionTarget.Rendering)
+    public void Update3DIfNeeded()
+    {
+        if (m_renderStopwatch.ElapsedMilliseconds > 30)
+        {
+            m_form?.Update3DView(m_closestObjects, m_useFrontBuffer);
+            m_useFrontBuffer = !m_useFrontBuffer;
+            m_renderStopwatch.Restart();
+        }
+    }
+
+    public List<TickableSpatialObject> FindClosestObjectsToOrigin(int minCount, int maxCount)
+    {
+        var center = new LongVector3(0, 0, 0);
+        ulong radius = 1000; // start with a small radius
+        var collected = new HashSet<TickableSpatialObject>();
+
+        // Expand radius until we have at least minCount objects or hit a large enough radius
+        while (collected.Count < minCount && radius < (ulong)long.MaxValue / 2)
+        {
+            var query = m_lattice!.QueryWithinDistance(center, radius);
+            foreach (var obj in query)
+            {
+                if (obj is TickableSpatialObject tickable)
+                    collected.Add(tickable);
+            }
+            radius *= 2; // double the radius
+        }
+
+        // Sort by squared distance to get the closest
+        var sorted = collected.OrderBy(obj =>
+        {
+            var pos = obj.LocalPosition;
+            long sqDist = pos.X * pos.X + pos.Y * pos.Y + pos.Z * pos.Z;
+            return sqDist;
+        }).ToList();
+
+        int targetCount = Math.Min(maxCount, sorted.Count);
+        if (targetCount < minCount && sorted.Count >= minCount)
+            targetCount = minCount;
+
+        return sorted.Take(targetCount).ToList();
     }
 }
