@@ -29,8 +29,21 @@ public partial class MainForm : Form
         var sphereModel = HelixUtils.CreateSphereModel(new Point3D(0, 0, 0), 18.0, 60, 30);
         m_modelGroup.Children.Add(sphereModel);
 
-        m_elementHost = HelixUtils.CreateElementHost(m_viewport);
+        m_elementHost = HelixUtils.CreateElementHost(m_viewport, rtbLog.Top, rtbLog.Right+3, Height-rtbLog.Top-45, Width-rtbLog.Width-25);
         Controls.Add(m_elementHost);
         m_elementHost.SendToBack();
+    }
+
+    private void btnRun_Click(object sender, EventArgs e)
+    {
+        var latticeRunner = new LatticeRunner(rtbLog);
+
+        // Run the simulation in a background thread to keep the UI responsive
+        Task.Run(() =>
+        {
+            latticeRunner.RunGrandSimulation(
+                objectCount: (int)nudObjCount.Value,
+                durationMs: (int)(nudTime.Value * 1000));
+        });
     }
 }

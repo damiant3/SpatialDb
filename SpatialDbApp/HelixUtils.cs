@@ -42,7 +42,7 @@ public static class HelixUtils
 
     public static GeometryModel3D CreateSphereModel(Point3D center, double radius, int thetaDiv, int phiDiv)
     {
-        var mesh = HelixUtils.CreateSphereMesh(center, radius, thetaDiv, phiDiv);
+        var mesh = CreateSphereMesh(center, radius, thetaDiv, phiDiv);
 
         var materials = new MaterialGroup();
         materials.Children.Add(new DiffuseMaterial(new SolidColorBrush(Color.FromRgb(0, 180, 0))));
@@ -56,11 +56,15 @@ public static class HelixUtils
         };
     }
 
-    public static ElementHost CreateElementHost(HelixViewport3D viewport)
+    public static ElementHost CreateElementHost(HelixViewport3D viewport, int top, int left, int height, int width)
     {
         return new ElementHost
         {
-            Dock = DockStyle.Fill,
+            Left = left,
+            Top = top,
+            Height = height,
+            Width = width,
+            Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right | AnchorStyles.Bottom,
             Child = viewport
         };
     }
