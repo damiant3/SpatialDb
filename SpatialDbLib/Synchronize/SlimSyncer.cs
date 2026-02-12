@@ -79,6 +79,9 @@ public class SlimSyncer : IDisposable
         if (m_isNoOp)
             return;
 
+        if (SpatialLatticeOptions.TrackLocks)
+            LockTracker.TrackLockExit(m_lock);
+
         if (m_writeUpgraded)
         {
             SlimSyncerDiagnostics.OnExit(m_lock, m_resourceName, LockMode.Write);

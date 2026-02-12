@@ -32,7 +32,7 @@ public class SpatialObject(IList<LongVector3> initialPosition)
 {
     public Guid Guid { get; } = Guid.NewGuid();
 
-    protected ReaderWriterLockSlim Sync = new(LockRecursionPolicy.SupportsRecursion);
+    internal protected ReaderWriterLockSlim Sync = new(LockRecursionPolicy.SupportsRecursion);
     ReaderWriterLockSlim ISync.Sync => Sync;
 
     IList<LongVector3> m_positionStack = [.. initialPosition];

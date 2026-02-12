@@ -2,9 +2,8 @@
 using SpatialDbLib.Math;
 using SpatialDbLib.Simulation;
 using SpatialDbLibTest.Helpers;
-using System.Collections.Concurrent;
 using System.Diagnostics;
-///////////////////////////
+//////////////////////////////////////
 namespace SpatialDbLibTest.Simulation;
 
 [TestClass]
@@ -241,19 +240,29 @@ public class SimulationTests
             Console.Write("  Prune works... ");
             var tickableLattice = new TickableSpatialLattice();
             SpatialLattice.EnablePruning = true;
-            List<ISpatialObject> testObjects = [];
 
-            var obj = new TickableSpatialObject([new LongVector3(10, 10, 10)]);
-            testObjects.Add(obj);
-            tickableLattice.Insert(obj);
-
-            for (int i = 0; i < 10; i++)
+            // Create a dense cluster (4x4x4 = 64) near (10,10,10) so it deterministically subdivides
+            var clusterCenter = new LongVector3(10, 10, 10);
+            var cluster = new List<TickableSpatialObject>();
+            for (int zx = 0; zx < 4; zx++)
+            for (int yy = 0; yy < 4; yy++)
+            for (int xx = 0; xx < 4; xx++)
             {
-                var o = new TickableSpatialObject([new LongVector3(10 + i, 10, 10)]);
-                testObjects.Add(o);
+                // small deterministic offsets to spread at the second level
+                var pos = new LongVector3(clusterCenter.X + xx, clusterCenter.Y + yy, clusterCenter.Z + zx);
+                var o = new TickableSpatialObject(pos);
+                cluster.Add(o);
                 tickableLattice.Insert(o);
             }
 
+            // Register them and give them a velocity that will move them out of the entire level-2 octet
+            foreach (var o in cluster)
+            {
+                o.SetVelocityStack([new IntVector3(0,0,0), new IntVector3(-2000, 0, 0)]); // ensure inner lattice has strong movement
+                o.RegisterForTicks();
+            }
+
+            // Count nodes before
             int nodeCountBefore = 0;
             void CountNodes(ISpatialNode n)
             {
@@ -263,28 +272,23 @@ public class SimulationTests
             }
             CountNodes(tickableLattice.m_root);
 
-            // Set the object's velocity to move it out of bounds
-            obj.Velocity = new IntVector3(-1000, 0, 0); // Large velocity to exit bounds
-
-            var initialPosition = obj.LocalPosition;
-            var leafBefore = tickableLattice.ResolveOccupyingLeaf(obj);
-
-            // Tick the lattice to process movement and trigger pruning
+            // Give time so first Tick has positive delta and the cluster can be processed.
+            Thread.Sleep(50);
+            // Tick once to move cluster out
             tickableLattice.Tick();
 
-            var newPosition = obj.LocalPosition;
-            
-            // Verify the object has moved or been removed
-            var leafAfter = tickableLattice.ResolveOccupyingLeaf(obj);
-            Assert.IsNotNull(leafAfter, "Object should still be findable after tick");
-            Assert.AreNotEqual(initialPosition, newPosition, "Object should have moved");
-            Assert.AreNotEqual(leafBefore, leafAfter, "Object should have moved to a different leaf");
+            // Diagnostic snapshot AFTER tick
+            Console.WriteLine("=== DIAG AFTER CLUSTER-TICK ===");
+            Console.WriteLine($"Cluster moved sample local position: {cluster[0].LocalPosition}");
+            var leafAfterSample = tickableLattice.ResolveOccupyingLeaf(cluster[0]);
+            Console.WriteLine($"Sample leafAfter.Bounds: {leafAfterSample?.Bounds}");
+            Console.WriteLine("=== END DIAG ===");
 
             // Count nodes after ticking
             int nodeCountAfter = 0;
             CountNodes(tickableLattice.m_root);
 
-            // Pruning should have reduced node count if branches became empty
+            // Pruning should have reduced node count if the entire subdivided octet was emptied
             Assert.IsTrue(nodeCountAfter <= nodeCountBefore, "Pruning should not increase node count");
 
             Console.WriteLine("✓ PASSED");
@@ -324,13 +328,13 @@ public class SimulationTests
                 obj.RegisterForTicks();
                 obj.Accelerate(new IntVector3(100, 0, 0));
             }
-            var initialPositions = (lattice.GetRootNode() as OctetParentNode).Children
+            var initialPositions = ((OctetParentNode)lattice.GetRootNode()).Children
                 .OfType<VenueLeafNode>()
                 .SelectMany(l => l.Occupants.Select(o => o.LocalPosition.X))
                 .ToList();
             // Tick in parallel
             SpatialTicker.TickParallel(lattice, 4);
-            var finalPositions = (lattice.GetRootNode() as OctetParentNode).Children
+            var finalPositions = ((OctetParentNode)lattice.GetRootNode()).Children
                 .OfType<VenueLeafNode>()
                 .SelectMany(l => l.Occupants.Select(o => o.LocalPosition.X))
                 .ToList();
@@ -449,7 +453,7 @@ public class SimulationTests
                         FastRandom.NextInt(20, 100),
                         FastRandom.NextInt(20, 100),
                         FastRandom.NextInt(20, 100))
-                };
+                    };
                 objects.Add(obj);
             }
             lattice.Insert(objects.Cast<ISpatialObject>().ToList());

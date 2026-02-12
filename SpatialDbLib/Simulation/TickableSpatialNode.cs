@@ -120,6 +120,25 @@ public class TickableVenueLeafNode(Region bounds, TickableOctetParentNode parent
 
     public void Tick()
     {
+        // Publish ticker thread id so a test can learn it before the tick acquires the leaf lock.
+        try
+        {
+            OctetParentNode.DiagnosticHooks.CurrentTickerThreadId = Thread.CurrentThread.ManagedThreadId;
+            OctetParentNode.DiagnosticHooks.SignalTickerStart?.Set();
+            // allow the test to set SleepThreadId or other controls before we proceed
+            OctetParentNode.DiagnosticHooks.WaitTickerProceed?.Wait();
+        }
+        catch { /* test-only */ }
+
+        // TEST-CHEAT: optional deterministic delay for this thread before taking the venue lock.
+        if (OctetParentNode.DiagnosticHooks.SleepThreadId.HasValue && OctetParentNode.DiagnosticHooks.SleepThreadId.Value == Thread.CurrentThread.ManagedThreadId)
+        {
+            if (OctetParentNode.DiagnosticHooks.UseYield)
+                Thread.Yield();
+            else
+                Thread.Sleep(System.Math.Max(1, OctetParentNode.DiagnosticHooks.SleepMs));
+        }
+
         using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.UpgradableRead, "tick");
         foreach (var obj in m_tickableObjects.ToList())
         {
@@ -162,7 +181,7 @@ public class TickableVenueLeafNode(Region bounds, TickableOctetParentNode parent
 
             if (admitResult is AdmitResult.Escalate)
             {
-                if (currentParent is IChildNode<TickableOctetParentNode> { Parent: not null } child)
+                if (currentParent is IChildNode<TickableOctetParentNode> child)
                 {
                     currentParent = child.Parent;
                     continue;
@@ -181,18 +200,84 @@ public class TickableVenueLeafNode(Region bounds, TickableOctetParentNode parent
         switch (admitResult)
         {
             case AdmitResult.Created created:
-                created.Proxy.Commit();
-                Vacate(obj);
+            {
+                // Atomic move: try to acquire source and target leaf write locks in a deterministic order,
+                // verify neither leaf is retired *after* locking, then commit the proxy into the target leaf
+                // while both locks are held, then vacate the source. If target/source is retired during
+                // the attempt, release locks and retry a bounded number of times, then fall back to
+                // the regular commit/vacate path.
+                var sourceLeaf = this;
+                var rawTarget = created.Proxy.TargetLeaf;
+
+                // If the target is not a tickable leaf or the target equals source, fall back to simple commit/vacate
+                if (rawTarget is not TickableVenueLeafNode targetLeaf || ReferenceEquals(targetLeaf, sourceLeaf))
+                {
+                    created.Proxy.Commit();
+                    if (!ReferenceEquals(rawTarget, sourceLeaf))
+                        Vacate(obj);
+                    break;
+                }
+
+                static int CompareBoundsMin(LongVector3 a, LongVector3 b)
+                {
+                    var c = a.X.CompareTo(b.X);
+                    if (c != 0) return c;
+                    c = a.Y.CompareTo(b.Y);
+                    if (c != 0) return c;
+                    return a.Z.CompareTo(b.Z);
+                }
+
+                // Deterministic ordering to avoid new deadlocks
+                VenueLeafNode first = sourceLeaf;
+                VenueLeafNode second = targetLeaf;
+                if (CompareBoundsMin(sourceLeaf.Bounds.Min, targetLeaf.Bounds.Min) > 0)
+                {
+                    first = targetLeaf;
+                    second = sourceLeaf;
+                }
+
+                const int maxAttempts = 3;
+                var moved = false;
+                for (int attempt = 0; attempt < maxAttempts; attempt++)
+                {
+                    using (var l1 = new SlimSyncer(((ISync)first).Sync, SlimSyncer.LockMode.Write, "HandleBoundaryCrossing: move-first"))
+                    using (var l2 = new SlimSyncer(((ISync)second).Sync, SlimSyncer.LockMode.Write, "HandleBoundaryCrossing: move-second"))
+                    {
+                        // Double-check retirement while holding both leaf locks.
+                        if (sourceLeaf.IsRetired || targetLeaf.IsRetired)
+                        {
+                            // Something changed while acquiring locks; retry after a tiny backoff.
+                            // Release locks by exiting using-scope and loop to retry.
+                            Thread.Yield();
+                            continue;
+                        }
+
+                        // With both leaf locks held and neither retired, commit then vacate.
+                        created.Proxy.Commit();
+                        Vacate(obj);
+                        moved = true;
+                        break;
+                    }
+                }
+
+                if (!moved)
+                {
+                    // Bounded retries exhausted — fall back to the robust single-leaf commit path.
+                    // Let ProxyCommitCoordinator handle any internal retry on retired leafs.
+                    created.Proxy.Commit();
+                    Vacate(obj);
+                }
                 break;
-                
-            case AdmitResult.Rejected rejected:
-                if (tickableObj != null) 
+            }
+
+            case AdmitResult.Rejected:
+                if (tickableObj != null)
                     RegisterForTicks(tickableObj);
                 break;
-                
+
             case AdmitResult.Escalate:
                 throw new InvalidOperationException("Escalate should have been handled in escalation loop");
-                
+
             default:
                 throw new InvalidOperationException($"Unexpected AdmitResult type: {admitResult.GetType().Name}");
         }

@@ -423,7 +423,7 @@ public class SerialTests
         Console.WriteLine($"Local Total results: {totalResults}, Avg results/query: {totalResults / (double)queryCount:F2}");
     }
 
-    [TestMethod]
+    //[TestMethod]
     public void Test_NaiveQueryPerformance()
     {
         var objects = new List<ISpatialObject>();

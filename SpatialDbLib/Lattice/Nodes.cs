@@ -2,6 +2,7 @@
 using SpatialDbLib.Synchronize;
 using System.Buffers;
 using System.Numerics;
+using System.Threading;
 ///////////////////////////////
 namespace SpatialDbLib.Lattice;
 
@@ -94,6 +95,33 @@ public abstract class OctetParentNode
     : ParentNode,
       IParentNode
 {
+    // --- TEST/DIAGNOSTIC HOOKS (temporary) ---
+    // Set these from tests to control timing inside migration.
+    // Default null/0/false --> no effect.
+    internal static class DiagnosticHooks
+    {
+        public static ManualResetEventSlim? SignalBeforeBucketAndDispatch;
+        public static ManualResetEventSlim? BlockBeforeBucketAndDispatch;
+
+        public static ManualResetEventSlim? SignalAfterLeafLock;
+        public static ManualResetEventSlim? BlockAfterLeafLock;
+
+        // TEST: thread-id discovery & controlled proceed (temporary)
+        public static int? CurrentSubdividerThreadId;
+        public static ManualResetEventSlim? SignalSubdivideStart;
+        public static ManualResetEventSlim? WaitSubdivideProceed;
+
+        public static int? CurrentTickerThreadId;
+        public static ManualResetEventSlim? SignalTickerStart;
+        public static ManualResetEventSlim? WaitTickerProceed;
+
+        // test-directed delay controls (existing)
+        public static int? SleepThreadId = null;
+        public static int SleepMs = 1;
+        public static bool UseYield = false;
+    }
+    // --- end hooks ---
+
     public OctetParentNode(Region bounds)
         : base(bounds)
     {
@@ -203,8 +231,51 @@ public abstract class OctetParentNode
         return null;
     }
 
+    public void SubdivideAndMigrate(OctetParentNode parent, VenueLeafNode subdividingleaf, byte latticeDepth, int childIndex, bool branchOrSublattice)
+    {
+        // TEST: publish our ManagedThreadId early so test can coordinate/schedule sleeps before locks are taken.
+        try
+        {
+            DiagnosticHooks.CurrentSubdividerThreadId = Thread.CurrentThread.ManagedThreadId;
+            DiagnosticHooks.SignalSubdivideStart?.Set();
+            // allow test to set SleepThreadId or any other control before we acquire locks
+            DiagnosticHooks.WaitSubdivideProceed?.Wait();
+        }
+        catch { /* swallow: hooks are test-only */ }
+
+        using var parentLock = new SlimSyncer(((ISync)parent).Sync, SlimSyncer.LockMode.Write, "SubdivideAndMigrate: Parent");
+        using var leafLock = new SlimSyncer(((ISync)subdividingleaf).Sync, SlimSyncer.LockMode.Write, "SubdivideAndMigrate: Leaf");
+
+        // Test hook: signal that we've acquired the leaf write lock and optionally block here.
+        DiagnosticHooks.SignalAfterLeafLock?.Set();
+
+        // optional deterministic delay at this point
+        if (DiagnosticHooks.SleepThreadId.HasValue && DiagnosticHooks.SleepThreadId.Value == Thread.CurrentThread.ManagedThreadId)
+        {
+            if (DiagnosticHooks.UseYield)
+                Thread.Yield();
+            else
+                Thread.Sleep(System.Math.Max(1, DiagnosticHooks.SleepMs));
+        }
+
+        DiagnosticHooks.BlockAfterLeafLock?.Wait();
+
+        if (subdividingleaf.IsRetired) return;
+        var migrationSnapshot = subdividingleaf.LockAndSnapshotForMigration();
+        var occupantsSnapshot = migrationSnapshot.Objects;
+        IChildNode<OctetParentNode> newBranch = CreateBranchNodeWithLeafs(parent, subdividingleaf, latticeDepth, branchOrSublattice, occupantsSnapshot);
+        parent.Children[childIndex] = newBranch;
+        subdividingleaf.Retire();
+        migrationSnapshot.Dispose();
+    }
+
     protected void BucketAndDispatchMigrants(IList<ISpatialObject> objs)
     {
+        // Test hook: signal and optionally block here so tests can orchestrate concurrent ticks.
+        // This is intentionally minimal and guarded by null checks.
+        DiagnosticHooks.SignalBeforeBucketAndDispatch?.Set();
+        DiagnosticHooks.BlockBeforeBucketAndDispatch?.Wait();
+
         var buckets = new List<ISpatialObject>[8];
 
         foreach (var obj in objs)
@@ -300,19 +371,6 @@ public abstract class OctetParentNode
         => branchOrSublattice
             ? new OctetBranchNode(subdividingleaf.Bounds, parent, occupantsSnapshot)
             : new SubLatticeBranchNode(subdividingleaf.Bounds, parent, (byte)(latticeDepth + 1), occupantsSnapshot);
-
-    public void SubdivideAndMigrate(OctetParentNode parent, VenueLeafNode subdividingleaf, byte latticeDepth, int childIndex, bool branchOrSublattice)
-    {
-        using var parentLock = new SlimSyncer(((ISync)parent).Sync, SlimSyncer.LockMode.Write, "SubdivideAndMigrate: Parent");
-        using var leafLock = new SlimSyncer(((ISync)subdividingleaf).Sync, SlimSyncer.LockMode.Write, "SubdivideAndMigrate: Leaf");
-        if (subdividingleaf.IsRetired) return;
-        var migrationSnapshot = subdividingleaf.LockAndSnapshotForMigration();
-        var occupantsSnapshot = migrationSnapshot.Objects;
-        IChildNode<OctetParentNode> newBranch = CreateBranchNodeWithLeafs(parent, subdividingleaf, latticeDepth, branchOrSublattice, occupantsSnapshot);
-        parent.Children[childIndex] = newBranch;
-        subdividingleaf.Retire();
-        migrationSnapshot.Dispose();
-    }
 
     internal sealed class AdmitWorkFrame
     {
@@ -630,8 +688,16 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
                 : AdmitResult.DelegateRequest(this);
         }
 
+        // Diagnostic: announce admit attempt and chosen proposedPosition
+        if (SlimSyncerDiagnostics.Enabled)
+            Console.WriteLine($"Venue.Admit: leaf.Bounds={Bounds}, proposedPosition={proposedPosition}, IsRetired={IsRetired}, Capacity={Capacity}, Occupants={Occupants.Count}");
+
         var proxy = CreateProxy((SpatialObject)obj, proposedPosition);
         Occupy(proxy);
+
+        if (SlimSyncerDiagnostics.Enabled)
+            Console.WriteLine($"Venue.Admit: created proxy for obj.Guid={((SpatialObject)obj).Guid} -> proxy.TargetLeaf.Bounds={proxy.TargetLeaf?.Bounds}");
+
         return AdmitResult.Create(proxy);
     }
 
