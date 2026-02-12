@@ -1,11 +1,9 @@
-﻿namespace SpatialDbApp;
-using HelixToolkit.Wpf;
+﻿using HelixToolkit.Wpf;
 using SpatialDbLib.Simulation;
-using System.Windows.Forms;
 using System.Windows.Forms.Integration;
 using System.Windows.Media;
 using System.Windows.Media.Media3D;
-
+namespace SpatialDbApp;
 public partial class MainForm : Form
 {
     private HelixViewport3D m_viewport = null!;
@@ -43,7 +41,7 @@ public partial class MainForm : Form
         var sphereModel = HelixUtils.CreateSphereModel(new Point3D(0, 0, 0), 18.0, 60, 30);
         m_modelGroup.Children.Add(sphereModel);
 
-        m_elementHost = HelixUtils.CreateElementHost(m_viewport, rtbLog.Top, rtbLog.Right+3, Height-rtbLog.Top-45, Width-rtbLog.Width-25);
+        m_elementHost = HelixUtils.CreateElementHost(m_viewport, rtbLog.Top, rtbLog.Right + 3, Height - rtbLog.Top - 45, Width - rtbLog.Width - 25);
         Controls.Add(m_elementHost);
         m_elementHost.SendToBack();
     }
@@ -81,11 +79,53 @@ public partial class MainForm : Form
             Invoke(new Action(Cleanup3DView));
             return;
         }
+
+        // Stop using the buffers until a new setup occurs
         m_buffersInitialized = false;
-        
-        m_spheresFront.Clear();
-        m_modelGroupFront?.Children.Clear();
-        m_modelGroupFront = null!;
+
+        // If the visual is currently showing one of the model groups, preserve that displayed group
+        // so the scene remains visible. Clear the opposite/back buffer so it doesn't hold stale references.
+        try
+        {
+            var displayed = m_visual?.Content as Model3DGroup;
+
+            // If displayed is the front group, clear/back the back buffer; otherwise clear front.
+            if (displayed != null && ReferenceEquals(displayed, m_modelGroupFront))
+            {
+                // Preserve front (visible), clear back
+                m_modelGroupBack?.Children.Clear();
+                m_spheresBack.Clear();
+                m_modelGroupBack = null!;
+            }
+            else if (displayed != null && ReferenceEquals(displayed, m_modelGroupBack))
+            {
+                // Preserve back (visible), clear front
+                m_modelGroupFront?.Children.Clear();
+                m_spheresFront.Clear();
+                m_modelGroupFront = null!;
+            }
+            else
+            {
+                // Unknown visual content (or none) — clear both to be safe.
+                m_modelGroupFront?.Children.Clear();
+                m_modelGroupBack?.Children.Clear();
+                m_spheresFront.Clear();
+                m_spheresBack.Clear();
+                m_modelGroupFront = null!;
+                m_modelGroupBack = null!;
+            }
+
+            // Do not leave the viewport pointing at a cleared/empty group; if visual is null or now invalid,
+            // reset to the base model group so UI still shows something until Setup3DView runs.
+            if (m_visual?.Content is not Model3DGroup currentContent || (currentContent.Children.Count == 0 && m_modelGroup != null))
+            {
+                m_visual.Content = m_modelGroup;
+            }
+        }
+        catch
+        {
+            // Best-effort cleanup only — ignore UI race conditions.
+        }
 
         GC.Collect();
         GC.WaitForPendingFinalizers();
@@ -198,6 +238,7 @@ public partial class MainForm : Form
                 spheres[i].Material = new DiffuseMaterial(brush);
             }
         }
-        m_visual.Content = nextGroup;
+        if (nextGroup != null)
+            m_visual.Content = nextGroup;
     }
 }
