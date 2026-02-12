@@ -1,5 +1,6 @@
 ﻿using SpatialDbLib.Lattice;
 using SpatialDbLib.Math;
+using SpatialDbLib.Synchronize;
 //////////////////////////////////
 namespace SpatialDbLib.Simulation;
 
@@ -106,17 +107,20 @@ public class TickableVenueLeafNode(Region bounds, TickableOctetParentNode parent
 
     public void RegisterForTicks(ITickableObject obj)
     {
+        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "register for ticks");
         if (!m_tickableObjects.Contains(obj))
             m_tickableObjects.Add(obj);
     }
 
     public void UnregisterForTicks(ITickableObject obj)
     {
+        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "unregister for ticks");
         m_tickableObjects.Remove(obj);
     }
 
     public void Tick()
     {
+        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.UpgradableRead, "tick");
         foreach (var obj in m_tickableObjects.ToList())
         {
             var result = obj.Tick();
