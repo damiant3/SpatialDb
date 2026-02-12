@@ -48,19 +48,47 @@ public partial class MainForm : Form
 
     private void btnRun_Click(object sender, EventArgs e)
     {
+        btnRun.Enabled = false;
         m_latticeRunner = new LatticeRunner(this, rtbLog);
-        m_renderHandler = (s, e) => m_latticeRunner.Update3DIfNeeded();
+
+#if RenderHandler
+        m_renderHandler = (s, e) => m_latticeRunner?.Update3D();
         CompositionTarget.Rendering += m_renderHandler;
-        // Run the simulation in a background thread to keep the UI responsive
+#endif
+
         Task.Run(() =>
         {
-            m_latticeRunner.RunGrandSimulation(
-                objectCount: (int)nudObjCount.Value,
-                durationMs: (int)(nudTime.Value * 1000));
-            BeginInvoke(new Action(() => CompositionTarget.Rendering -= m_renderHandler));
+            m_latticeRunner?.RunGrandSimulation((int)nudObjCount.Value, (int)(nudTime.Value * 1000));
+
+            BeginInvoke(new Action(() =>
+            {
+#if RenderHandler
+                CompositionTarget.Rendering -= m_renderHandler;
+#endif
+                Cleanup3DView();
+                btnRun.Enabled = true;
+            }));
+            m_latticeRunner = null;
         });
     }
 
+    public void Cleanup3DView()
+    {
+        if (InvokeRequired)
+        {
+            Invoke(new Action(Cleanup3DView));
+            return;
+        }
+        m_buffersInitialized = false;
+        
+        m_spheresFront.Clear();
+        m_modelGroupFront?.Children.Clear();
+        m_modelGroupFront = null!;
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+    }
     public void Setup3DView(List<TickableSpatialObject> objects)
     {
         if (InvokeRequired)
@@ -90,7 +118,7 @@ public partial class MainForm : Form
         m_viewport!.CameraController!.CameraTarget = new Point3D(0, 0, 0);
 
         // Always create and assign the shared mesh for the current radius
-        m_sharedSphereMesh = HelixUtils.CreateSphereMesh(new Point3D(0, 0, 0), sphereRadius, 12, 8);
+        m_sharedSphereMesh = HelixUtils.CreateSphereMesh(new Point3D(0, 0, 0), sphereRadius, 24, 16);
 
         m_modelGroupFront = HelixUtils.CreateModelGroup();
         m_modelGroupBack = HelixUtils.CreateModelGroup();
@@ -139,7 +167,7 @@ public partial class MainForm : Form
         }
         if (!m_buffersInitialized) return;
         var spheres = useFrontBuffer ? m_spheresFront : m_spheresBack;
-        var group = useFrontBuffer ? m_modelGroupFront : m_modelGroupBack;
+        var nextGroup = useFrontBuffer ? m_modelGroupFront : m_modelGroupBack;
 
         for (int i = 0; i < objects.Count && i < spheres.Count; i++)
         {
@@ -155,7 +183,6 @@ public partial class MainForm : Form
                 spheres[i].Transform = new TranslateTransform3D(pos.X, pos.Y, pos.Z);
             }
         }
-        m_visual.Content = group;
-        //m_viewport.InvalidateVisual();
+        m_visual.Content = nextGroup;
     }
 }

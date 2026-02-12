@@ -6,17 +6,18 @@ using System.Collections.Concurrent;
 
 namespace SpatialDbApp;
 
-internal class LatticeRunner
+internal class LatticeRunner(MainForm form, RichTextBox logRtb)
 {
-    readonly RichTextBox m_logRtb;
-    bool m_isRunning = false;
+    readonly RichTextBox m_logRtb = logRtb;
+    readonly MainForm? m_form = form;
 
-    int m_tickCount = 0;
-    int m_monitorChecks = 0;
-    int m_totalMovementDetected = 0;
-    readonly List<TickableSpatialObject> m_failedObjects = new();
+    bool m_isRunning;
+    int m_tickCount;
+    int m_monitorChecks;
+    int m_totalMovementDetected;
+    readonly List<TickableSpatialObject> m_failedObjects = [];
     readonly Stopwatch m_stopwatch = new();
-    bool m_shouldStop = false;
+    bool m_shouldStop;
     TickableSpatialLattice? m_lattice;
     List<TickableSpatialObject>? m_objects;
     ConcurrentDictionary<TickableSpatialObject, LongVector3>? m_initialPositions;
@@ -24,17 +25,10 @@ internal class LatticeRunner
     int m_objectCount;
     int m_spaceRange;
     int m_durationMs;
+    bool m_useFrontBuffer;
 
-    private List<TickableSpatialObject> m_closestObjects = new();
-    private Stopwatch m_renderStopwatch = new();
-    private MainForm? m_form;
-    private bool m_useFrontBuffer = true;
-
-    public LatticeRunner(MainForm form, RichTextBox logRtb)
-    {
-        m_form = form;
-        m_logRtb = logRtb;
-    }
+    List<TickableSpatialObject> m_closestObjects = [];
+    public List<TickableSpatialObject> ClosestObjects => m_closestObjects;
 
     void LogLine(string message)
     {
@@ -69,7 +63,7 @@ internal class LatticeRunner
         m_logRtb.AppendText(message + Environment.NewLine);
     }
 
-    public List<TickableSpatialObject> ClosestObjects => m_closestObjects;
+
 
     public void RunGrandSimulation(int objectCount, int durationMs, int spaceRange = int.MaxValue)
     {
@@ -95,11 +89,9 @@ internal class LatticeRunner
             m_closestObjects = FindClosestObjectsToOrigin(5000, 5000);
             m_form?.Setup3DView(m_closestObjects);
 
-            m_renderStopwatch.Restart();
-
             TickOnceAndTest();
             RunSimulationForDuration();
-            CleanupAndReport();
+            FinalReport();
         }
         catch (Exception ex)
         {
@@ -417,6 +409,9 @@ internal class LatticeRunner
                 SpatialTicker.TickParallel(m_lattice!);
                 Interlocked.Increment(ref m_tickCount);
                 Thread.Yield(); // GC concession
+#if !RenderHandler
+                Update3D();
+#endif
             }
         });
 
@@ -471,7 +466,7 @@ internal class LatticeRunner
         m_stopwatch.Stop();
     }
 
-    void CleanupAndReport()
+    void FinalReport()
     {
         var finalStationaryCount = 0;
         var finalMissingCount = 0;
@@ -567,14 +562,10 @@ internal class LatticeRunner
     }
 
     // Call this from your tick loop (or from CompositionTarget.Rendering)
-    public void Update3DIfNeeded()
+    public void Update3D()
     {
-        if (m_renderStopwatch.ElapsedMilliseconds > 30)
-        {
-            m_form?.Update3DView(m_closestObjects, m_useFrontBuffer);
-            m_useFrontBuffer = !m_useFrontBuffer;
-            m_renderStopwatch.Restart();
-        }
+        m_form?.Update3DView(m_closestObjects, m_useFrontBuffer);
+        m_useFrontBuffer = !m_useFrontBuffer;
     }
 
     public List<TickableSpatialObject> FindClosestObjectsToOrigin(int minCount, int maxCount)
