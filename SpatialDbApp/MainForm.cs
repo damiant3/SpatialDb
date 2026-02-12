@@ -22,6 +22,8 @@ public partial class MainForm : Form
     private EventHandler? m_renderHandler;
     private LatticeRunner? m_latticeRunner;
 
+    private double m_maxComponentAbs = 0;
+
     public MainForm()
     {
         InitializeComponent();
@@ -99,13 +101,15 @@ public partial class MainForm : Form
 
         if (objects.Count == 0) return;
 
-        // Find the farthest object from the origin
+        // Find the farthest object from the origin for use in scaling the sphere radius and camera distance, and also for colors
         double maxDist = 0;
         foreach (var obj in objects)
         {
             var pos = obj.LocalPosition;
             double dist = Math.Sqrt((double)pos.X * pos.X + (double)pos.Y * pos.Y + (double)pos.Z * pos.Z);
             if (dist > maxDist) maxDist = dist;
+            double compAbs = Math.Max(Math.Abs(pos.X), Math.Max(Math.Abs(pos.Y), Math.Abs(pos.Z)));
+            if (compAbs > m_maxComponentAbs) m_maxComponentAbs = compAbs;
         }
 
         // Set sphere radius and camera distance based on maxDist
@@ -128,16 +132,17 @@ public partial class MainForm : Form
         foreach (var obj in objects)
         {
             var pos = obj.LocalPosition;
+            var brush = HelixUtils.GetPositionBrush(obj, m_maxComponentAbs);
             var sphereFront = new GeometryModel3D
             {
                 Geometry = m_sharedSphereMesh,
-                Material = HelixUtils.DefaultMaterial,
+                Material = new DiffuseMaterial(brush),
                 Transform = new TranslateTransform3D(pos.X, pos.Y, pos.Z)
             };
             var sphereBack = new GeometryModel3D
             {
                 Geometry = m_sharedSphereMesh,
-                Material = HelixUtils.DefaultMaterial,
+                Material = new DiffuseMaterial(brush),
                 Transform = new TranslateTransform3D(pos.X, pos.Y, pos.Z)
             };
             m_modelGroupFront.Children.Add(sphereFront);
@@ -172,6 +177,7 @@ public partial class MainForm : Form
         for (int i = 0; i < objects.Count && i < spheres.Count; i++)
         {
             var pos = objects[i].LocalPosition;
+            var brush = HelixUtils.GetPositionBrush(objects[i], m_maxComponentAbs);
             if (spheres[i].Transform is TranslateTransform3D tt)
             {
                 tt.OffsetX = pos.X;
@@ -181,6 +187,15 @@ public partial class MainForm : Form
             else
             {
                 spheres[i].Transform = new TranslateTransform3D(pos.X, pos.Y, pos.Z);
+            }
+            // Update color/material
+            if (spheres[i].Material is DiffuseMaterial mat)
+            {
+                mat.Brush = brush;
+            }
+            else
+            {
+                spheres[i].Material = new DiffuseMaterial(brush);
             }
         }
         m_visual.Content = nextGroup;

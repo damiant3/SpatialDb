@@ -123,4 +123,37 @@ public static class HelixUtils
                 new SpecularMaterial(new SolidColorBrush(Colors.White), 100.0) // shiny
             }
         };
+
+    public static SolidColorBrush GetPositionBrush(SpatialDbLib.Lattice.ISpatialObject obj, double maxComponentAbs)
+    {
+        var pos = obj.LocalPosition;
+        double x = Math.Abs(pos.X);
+        double y = Math.Abs(pos.Y);
+        double z = Math.Abs(pos.Z);
+
+        double max = Math.Max(x, Math.Max(y, z));
+        if (maxComponentAbs <= 0.0) maxComponentAbs = 1.0;
+        double t = Math.Min(max / maxComponentAbs, 1.0); // 0 at origin, 1 at edge
+
+        byte r, g, b;
+        if (max == x)
+        {
+            r = 255;
+            g = (byte)(255 * t);
+            b = (byte)(255 * t);
+        }
+        else if (max == y)
+        {
+            r = (byte)(255 * t);
+            g = 255;
+            b = (byte)(255 * t);
+        }
+        else // z
+        {
+            r = (byte)(255 * t);
+            g = (byte)(255 * t);
+            b = 255;
+        }
+        return new SolidColorBrush(Color.FromRgb(r, g, b));
+    }
 }
