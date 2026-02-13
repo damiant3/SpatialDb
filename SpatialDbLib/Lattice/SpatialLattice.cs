@@ -214,12 +214,17 @@ public class SpatialLattice<TRoot>
         switch (node)
         {
             case VenueLeafNode leaf:
+            {
+                // Acquire a read lock for the node to get a stable view of Bounds/Children/Occupants.
+                // All concrete node types inherit SpatialNode which implements ISync, so cast is safe.
+                using var _ = new SlimSyncer(((ISync)node).Sync, SlimSyncer.LockMode.Read, "QueryWithinDistance: VenueLeafNode");
                 foreach (var obj in leaf.Occupants)
                 {
                     var distSq = (obj.LocalPosition - center).MagnitudeSquaredBig;
                     if (distSq <= (BigInteger)radius * radius) results.Add(obj);
                 }
                 break;
+            }
             case OctetParentNode parent:
                 foreach (var child in parent.Children)
                     if (child.Bounds.IntersectsSphere_SimpleImpl(center, radius))
