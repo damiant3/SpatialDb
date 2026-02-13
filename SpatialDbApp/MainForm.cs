@@ -27,12 +27,80 @@ public partial class MainForm : Form
     private bool m_isAnimating = false;
     private static readonly string[] SupportedExtensions = [".csv", ".bmp", ".png", ".jpg", ".jpeg", ".gif"];
 
+    // controller that centralizes total/display linking logic
+    private DisplayTotalController? m_countController;
+
+    // handlers we attach to the controller when a runner is active (so we can unsubscribe later)
+    private Action<int>? m_totalChangedHandler;
+    private Action<int>? m_displayChangedHandler;
+
     public MainForm()
     {
         InitializeComponent();
         Initialize3DViewport();
         PopulateLoadFiles();
+
+        // Centralize the NUD linking logic into a helper so form is easier to review.
+        try
+        {
+            // nudObjCount and nudDisplayCount are designer controls; create the controller to manage their relationship.
+            m_countController = new DisplayTotalController(nudObjCount, nudDisplayCount);
+        }
+        catch
+        {
+            // best-effort; ensure UI remains usable even if controller construction fails
+            m_countController = null;
+        }
     }
+
+    // Expose the selected initial display count so other code (e.g. when starting the sim)
+    // can read it and pass it to the runner before the run begins.
+    public int InitialDisplayObjectCount => (int)(m_countController?.InitialDisplayCount ?? (nudDisplayCount?.Value ?? 0));
+
+    // Designer wired handler for nudDisplayCount.ValueChanged
+    private void nudDisplayCount_ValueChanged(object? sender, EventArgs e)
+    {
+        try
+        {
+            // Delegate logic to controller (removes label updates and keeps logic in one place)
+            m_countController?.HandleDisplayValueChanged();
+
+            // Propagate to running runner if present (controller will invoke DisplayChanged; we also set directly here as a best-effort)
+            if (m_latticeRunner != null)
+                m_latticeRunner.DisplayObjectCount = (int)nudDisplayCount.Value;
+        }
+        catch
+        {
+            // silent best-effort; don't crash UI for trivial issues
+        }
+    }
+
+    // Designer wired handler for nudObjCount.ValueChanged
+    private void nudObjCount_ValueChanged(object? sender, EventArgs e)
+    {
+        try
+        {
+            m_countController?.HandleTotalValueChanged();
+
+            // Propagate to running runner if present (controller will invoke TotalChanged; set directly as best-effort)
+            if (m_latticeRunner != null)
+            {
+                try { m_latticeRunner.SetTotalObjects((int)nudObjCount.Value); }
+                catch { /* best effort */ }
+                m_latticeRunner.DisplayObjectCount = (int)(nudDisplayCount?.Value ?? 0);
+            }
+        }
+        catch { /* best effort */ }
+    }
+
+    // Example usage: when starting a simulation, make sure MainForm passes InitialDisplayObjectCount
+    // to the runner before RunGrandSimulation. If your start logic constructs/starts the runner,
+    // it should call:
+    //
+    //    runner.SetTotalObjects(totalCount);
+    //    runner.DisplayObjectCount = this.InitialDisplayObjectCount;
+    //
+    // or set up DisplayObjectCount on the runner before invoking RunGrandSimulation.
 
     private void Initialize3DViewport()
     {
@@ -92,6 +160,42 @@ public partial class MainForm : Form
         cmbLoadFile.Enabled = false;
         m_latticeRunner = new LatticeRunner(this, rtbLog);
 
+        // Wire the controller to the runner so UI changes propagate to the active runner,
+        // and immediately apply the current values.
+        if (m_countController != null && m_latticeRunner != null)
+        {
+            // store handlers so we can unsubscribe later
+            m_totalChangedHandler = (count) =>
+            {
+                try { m_latticeRunner?.SetTotalObjects(count); } catch { }
+            };
+            m_displayChangedHandler = (count) =>
+            {
+                try { if (m_latticeRunner != null) m_latticeRunner.DisplayObjectCount = count; } catch { }
+            };
+
+            m_countController.TotalChanged += m_totalChangedHandler;
+            m_countController.DisplayChanged += m_displayChangedHandler;
+
+            // apply current values before starting the run
+            try
+            {
+                m_latticeRunner.SetTotalObjects((int)nudObjCount.Value);
+                m_latticeRunner.DisplayObjectCount = InitialDisplayObjectCount;
+            }
+            catch { /* best effort */ }
+        }
+        else
+        {
+            // Fallback if controller wasn't created
+            try
+            {
+                m_latticeRunner.SetTotalObjects((int)nudObjCount.Value);
+                m_latticeRunner.DisplayObjectCount = (int)(nudDisplayCount?.Value ?? 0);
+            }
+            catch { /* best effort */ }
+        }
+
 #if RenderHandler
         m_renderHandler = (s, e) => m_latticeRunner?.Update3D();
         CompositionTarget.Rendering += m_renderHandler;
@@ -105,6 +209,17 @@ public partial class MainForm : Form
 #if RenderHandler
                 CompositionTarget.Rendering -= m_renderHandler;
 #endif
+                // Unsubscribe controller handlers from runner to avoid leaks
+                try
+                {
+                    if (m_countController != null)
+                    {
+                        if (m_totalChangedHandler != null) m_countController.TotalChanged -= m_totalChangedHandler;
+                        if (m_displayChangedHandler != null) m_countController.DisplayChanged -= m_displayChangedHandler;
+                    }
+                }
+                catch { /* best effort */ }
+
                 Cleanup3DView();
                 PopulateLoadFiles();
                 cmbLoadFile.Enabled = true;

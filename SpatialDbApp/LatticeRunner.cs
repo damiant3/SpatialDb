@@ -1,14 +1,21 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
+using System.Linq;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Threading;
+using System.Windows.Forms;
 using SpatialDbLib.Lattice;
 using SpatialDbLib.Math;
 using SpatialDbLib.Simulation;
-using System.Collections.Concurrent;
+using SpatialDbApp.Logging;
+using SpatialDbApp.Reporting;
 
 namespace SpatialDbApp;
 
 internal class LatticeRunner(MainForm form, RichTextBox logRtb)
 {
-    readonly RichTextBox m_logRtb = logRtb;
+    readonly LatticeLogger m_logger = new(logRtb);
     readonly MainForm? m_form = form;
 
     bool m_isRunning;
@@ -22,7 +29,14 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
     List<TickableSpatialObject>? m_objects;
     ConcurrentDictionary<TickableSpatialObject, LongVector3>? m_initialPositions;
     ConcurrentDictionary<TickableSpatialObject, LongVector3>? m_lastPositions;
+
+    // Total objects and displayed subset logic
     int m_objectCount;
+    int m_displayObjectCount;
+    public event Action<int>? TotalObjectCountChanged;
+    public event Action<int>? DisplayObjectCountChanged;
+
+    // Simulation parameters
     int m_spaceRange;
     int m_durationMs;
     bool m_useFrontBuffer;
@@ -30,40 +44,45 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
     List<TickableSpatialObject> m_closestObjects = [];
     public List<TickableSpatialObject> ClosestObjects => m_closestObjects;
 
-    void LogLine(string message)
+    // ===== Display count management =====
+    // Setter rules:
+    // - If display == total, it tracks total and follows increases.
+    // - If display != total, it remains unchanged when total changes (except clamp down if total < display).
+    public int DisplayObjectCount
     {
-        if (m_logRtb.InvokeRequired)
+        get => m_displayObjectCount;
+        set
         {
-            try{
-                m_logRtb.Invoke(() =>
-                {
-                    m_logRtb.AppendText(message + Environment.NewLine);
-                    m_logRtb.ScrollToCaret();
-                    m_logRtb.Refresh();
-                });
-            } catch { }
-            return;
+            var newVal = Math.Max(0, Math.Min(value, m_objectCount));
+            if (m_displayObjectCount == newVal) return;
+            m_displayObjectCount = newVal;
+            DisplayObjectCountChanged?.Invoke(m_displayObjectCount);
         }
-        m_logRtb.AppendText(message + Environment.NewLine);
-        m_logRtb.ScrollToCaret();
-        m_logRtb.Refresh();
-    }
-    void Log(string message)
-    {
-        if (m_logRtb.InvokeRequired)
-        {
-            try{
-                m_logRtb.Invoke(() =>
-                {
-                    m_logRtb.AppendText(message);
-                });
-            } catch {}
-            return;
-        }
-        m_logRtb.AppendText(message + Environment.NewLine);
     }
 
+    public int TotalObjectCount => m_objectCount;
 
+    public void SetTotalObjects(int newTotal)
+    {
+        if (newTotal < 0) throw new ArgumentOutOfRangeException(nameof(newTotal));
+        var oldTotal = m_objectCount;
+        m_objectCount = newTotal;
+
+        // Determine whether display was "tracking" the total (exact equality)
+        var wasTracking = (m_displayObjectCount == oldTotal);
+
+        if (wasTracking)
+            m_displayObjectCount = newTotal;
+        else if (m_displayObjectCount > newTotal)
+            m_displayObjectCount = newTotal;
+
+        TotalObjectCountChanged?.Invoke(m_objectCount);
+        DisplayObjectCountChanged?.Invoke(m_displayObjectCount);
+    }
+
+    // ===== Logging helpers delegating to LatticeLogger =====
+    void LogLine(string message) => m_logger.LogLine(message);
+    void Log(string message) => m_logger.Log(message);
 
     public void RunGrandSimulation(int objectCount, int durationMs, int spaceRange = int.MaxValue)
     {
@@ -73,7 +92,9 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
             return;
         }
         m_isRunning = true;
-        m_objectCount = objectCount;
+
+        // Use setter logic so display count reacts as requested by UI rules.
+        SetTotalObjects(objectCount);
         m_spaceRange = spaceRange;
         m_durationMs = durationMs;
         try
@@ -85,8 +106,18 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
 
             PerformPreflight();
 
-            // Query for 5000 closest objects after preflight
-            m_closestObjects = FindClosestObjectsToOrigin(5000, 5000);
+            // Determine how many objects to request from the lattice for rendering.
+            // Use the UI-requested DisplayObjectCount when > 0; otherwise fall back to a sane default
+            // (min(5000, total)). Always clamp to the total object count.
+            var requested = (DisplayObjectCount > 0) ? DisplayObjectCount : Math.Min(5000, m_objectCount);
+            var toRender = Math.Max(0, Math.Min(requested, m_objectCount));
+
+            // Query the lattice for the closest `toRender` objects (min and max both set to toRender).
+            // If toRender is zero (e.g. objectCount==0), FindClosestObjectsToOrigin will return an empty list.
+            m_closestObjects = FindClosestObjectsToOrigin(toRender, toRender);
+
+            m_form?.Setup3DView(m_closestObjects);
+
             m_form?.Setup3DView(m_closestObjects);
 
             TickOnceAndTest();
@@ -98,11 +129,7 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
             LogLine($"\nEXCEPTION during grand simulation: {ex}");
             throw new InvalidOperationException($"Grand simulation threw an exception: {ex}", ex);
         }
-        m_logRtb.Invoke(() =>
-        {
-            m_logRtb.ScrollToCaret();
-            m_logRtb.Refresh();
-        });
+        m_logger.ScrollToEnd();
         m_isRunning = false;
     }
 
@@ -135,7 +162,8 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
         m_lattice!.Insert(m_objects!.Cast<ISpatialObject>().ToList());
         insertSw.Stop();
         LogLine($"Inserted {m_objectCount} objects in {insertSw.ElapsedMilliseconds}ms");
-        LogLine("\n=== Exhaustive Post-Insert Validation ===");
+
+        // Post-insert validation (collect data and delegate summary formatting)
         var postInsertIssues = new List<string>();
         var objectInOccupantsCount = 0;
         var proxyInOccupantsCount = 0;
@@ -159,8 +187,7 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
                 postInsertIssues.Add($"Occupants is null for leaf. {obj.Guid}");
                 continue;
             }
-            var originalInOccupants = occupants.Contains(obj);
-            if (originalInOccupants) objectInOccupantsCount++;
+            if (occupants.Contains(obj)) objectInOccupantsCount++;
             var proxyInOccupants = occupants.FirstOrDefault(o => o is ISpatialObjectProxy proxy && proxy.OriginalObject == obj);
             if (proxyInOccupants != null)
             {
@@ -174,8 +201,7 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
                 return;
             }
 
-            var isRegistered = tickables.Contains(obj);
-            if (!isRegistered)
+            if (!tickables.Contains(obj))
             {
                 tickableNotRegisteredCount++;
                 postInsertIssues.Add($"Object {obj.Guid}: In Occupants but NOT in m_tickable_objects!");
@@ -185,19 +211,18 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
             if (proxyRegistered != null)
                 postInsertIssues.Add($"Object {obj.Guid}: PROXY registered in m_tickable_objects instead of original!");
         }
-        LogLine($"Post-insert check complete:");
-        LogLine($"  Original objects in Occupants: {objectInOccupantsCount}");
-        LogLine($"  Proxies still in Occupants: {proxyInOccupantsCount}");
-        LogLine($"  Objects NOT in m_tickable_objects: {tickableNotRegisteredCount}");
+
+        // Use ReportBuilder to create a concise summary string
+        LogLine(ReportBuilder.BuildPostInsertSummary(
+            objectInOccupantsCount,
+            proxyInOccupantsCount,
+            tickableNotRegisteredCount,
+            postInsertIssues,
+            m_objectCount));
 
         if (postInsertIssues.Count > 0)
-        {
-            LogLine($"\n⚠ POST-INSERT ISSUES ({postInsertIssues.Count} total, showing first 20):");
-            foreach (var issue in postInsertIssues.Take(20))
-                LogLine($"  {issue}");
             throw new InvalidOperationException($"Post-insert validation failed! {postInsertIssues.Count} issues detected BEFORE RegisterForTicks() was even called!");
-        }
-        LogLine("✓ Post-insert validation PASSED - all proxies committed, all objects in m_tickable_objects");
+
         LogLine("\nCalling RegisterForTicks() on all objects...");
         var registrationFailures = new List<(TickableSpatialObject obj, string reason)>();
 
@@ -230,8 +255,7 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
         }
         LogLine($"✓ All {m_objectCount} objects successfully registered for ticks");
 
-        LogLine("Running pre-flight validation...");
-
+        // Pre-flight validation summary
         var preFlightIssues = new List<string>();
         var unregisteredCount = 0;
         var missingLeafCount = 0;
@@ -261,19 +285,10 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
             }
         }
 
-        LogLine($"Pre-flight check complete:");
-        LogLine($"  Objects missing leaf: {missingLeafCount}");
-        LogLine($"  Objects not registered in leaf: {unregisteredCount}");
-        LogLine($"  Objects with wrong position: {wrongPositionCount}");
+        LogLine(ReportBuilder.BuildPreFlightSummary(missingLeafCount, unregisteredCount, wrongPositionCount, preFlightIssues));
 
         if (preFlightIssues.Count > 0)
-        {
-            LogLine($"\n⚠ PRE-FLIGHT FAILURES ({preFlightIssues.Count} issues, showing first 20):");
-            foreach (var issue in preFlightIssues.Take(20))
-                LogLine($"  {issue}");
             throw new InvalidOperationException($"Pre-flight validation failed with {preFlightIssues.Count} issues. Objects not properly registered before simulation start!");
-        }
-        LogLine("✓ Pre-flight validation PASSED - all objects properly registered");
     }
 
     void TickOnceAndTest()
@@ -345,14 +360,15 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
             if (firstUnmovedUnregistered != null)
                 LogLine($"\n🔍 REGISTRATION HISTORY FOR UNMOVED OBJECT {firstUnmovedUnregistered.Guid}:");
         }
-        LogLine($"Post-tick check complete:");
-        LogLine($"  Objects that moved: {movedCount}/{m_objectCount}");
-        LogLine($"  Objects unchanged: {unchangedCount}/{m_objectCount}");
-        LogLine($"  Objects that crossed leaf boundaries: {leafChangedCount}");
-        LogLine($"  Objects missing from leaf: {missingFromLeafCount}");
-        LogLine($"  Objects NOT in m_tickable_objects: {notInTickablesCount}");
-        LogLine($"    - Moved but not in tickables: {movedButNotInTickables}");
-        LogLine($"    - Unmoved and not in tickables: {unchangedButNotInTickables}");
+        ReportBuilder.PostTickReport(
+            movedCount,
+            unchangedCount,
+            missingFromLeafCount,
+            notInTickablesCount,
+            leafChangedCount,
+            movedButNotInTickables,
+            unchangedButNotInTickables,
+            m_objectCount);
 
         if (postTickIssues.Count > 0)
         {
@@ -374,19 +390,11 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
                 if (failedMovedObj != null)
                 {
                     var failedLeaf = m_lattice.ResolveOccupyingLeaf(failedMovedObj) as TickableVenueLeafNode;
-                    LogLine($"\n=== Detailed diagnosis of first moved-but-unregistered object ===");
-                    LogLine($"  GUID: {failedMovedObj.Guid}");
-                    LogLine($"  Initial pos: {m_initialPositions![failedMovedObj]}");
-                    LogLine($"  Current pos: {failedMovedObj.LocalPosition}");
-                    LogLine($"  Velocity: {failedMovedObj.Velocity}");
-                    LogLine($"  IsStationary: {failedMovedObj.IsStationary}");
-                    LogLine($"  Leaf bounds: {failedLeaf?.Bounds}");
-                    LogLine($"  Leaf IsRetired: {failedLeaf?.IsRetired}");
-                    LogLine($"  In leaf.Occupants: {failedLeaf?.Occupants?.Contains(failedMovedObj)}");
-                    LogLine($"  Leaf tickables count: {failedLeaf?.m_tickableObjects?.Count}");
+                    ReportBuilder.ReportMovedButUnregistered(failedMovedObj, failedLeaf, m_initialPositions);
                 }
             }
             throw new InvalidOperationException($"Post-tick validation failed! {postTickIssues.Count} issues detected after first tick ({movedButNotInTickables} moved but lost registration)!");
+
         }
 
         if (movedCount == 0)
@@ -394,6 +402,8 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
         else
             LogLine($"✓ Post-tick validation PASSED - {movedCount} objects moved successfully");
     }
+
+
 
     void RunSimulationForDuration()
     {
