@@ -5,9 +5,9 @@ using System.Windows.Media;
 using System.Windows.Media.Media3D;
 using System.IO;
 using SpatialDbApp.Loader;
-using System.Diagnostics;
-
+///////////////////////
 namespace SpatialDbApp;
+
 public partial class MainForm : Form
 {
     private HelixViewport3D m_viewport = null!;
@@ -30,6 +30,9 @@ public partial class MainForm : Form
     private CancellationTokenSource? m_animationCts;
     private bool m_isAnimating = false;
 
+    // Supported file extensions for the combo
+    private static readonly string[] SupportedExtensions = new[] { ".csv", ".bmp", ".png", ".jpg", ".jpeg", ".gif" };
+
     public MainForm()
     {
         InitializeComponent();
@@ -51,7 +54,7 @@ public partial class MainForm : Form
         m_elementHost.SendToBack();
     }
 
-    // Populate the cmbLoadFile with CSV files found in the appbin/Data directory.
+    // Populate the cmbLoadFile with supported files in Data directory.
     private void PopulateLoadFiles()
     {
         try
@@ -64,23 +67,28 @@ public partial class MainForm : Form
                 return;
             }
 
-            var files = Directory.GetFiles(dataDir, "*.csv")
+            var files = Directory.GetFiles(dataDir)
+                .Where(f => SupportedExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
                 .Select(Path.GetFileName)
                 .OrderBy(n => n)
                 .ToArray();
 
             cmbLoadFile.Items.Clear();
-            foreach (var f in files) cmbLoadFile.Items.Add(f!);
+            foreach (var f in files) cmb_loadfile_additem(f!);
 
             cmbLoadFile.SelectedIndex = -1;
-            cmbLoadFile.Enabled = files.Length == 0 || !m_latticeRunner?.Equals(null) != true || !m_latticeRunner!.Equals(null);
-            // If a grand simulation is running, the runner will call Cleanup3DView which will keep UI consistent.
+            cmbLoadFile.Enabled = files.Length > 0 && !m_latticeRunner?.Equals(null) == true ? !m_latticeRunner!.Equals(null) : true;
         }
         catch
         {
             // best-effort
             cmbLoadFile.Items.Clear();
             cmbLoadFile.Enabled = false;
+        }
+
+        void cmb_loadfile_additem(string f)
+        {
+            cmbLoadFile.Items.Add(f);
         }
     }
 
@@ -89,12 +97,7 @@ public partial class MainForm : Form
         // If an animation is running, this button acts as "Stop Animation"
         if (m_isAnimating && m_animationCts != null)
         {
-            try
-            {
-                m_animationCts.Cancel();
-            }
-            catch { }
-            // UI will be restored when the animation task observes cancellation and exits.
+            try { m_animationCts.Cancel(); } catch { }
             return;
         }
 
@@ -140,30 +143,24 @@ public partial class MainForm : Form
         // Stop using the buffers until a new setup occurs
         m_buffersInitialized = false;
 
-        // If the visual is currently showing one of the model groups, preserve that displayed group
-        // so the scene remains visible. Clear the opposite/back buffer so it doesn't hold stale references.
         try
         {
             var displayed = m_visual?.Content as Model3DGroup;
 
-            // If displayed is the front group, clear/back the back buffer; otherwise clear front.
             if (displayed != null && ReferenceEquals(displayed, m_modelGroupFront))
             {
-                // Preserve front (visible), clear back
                 m_modelGroupBack?.Children.Clear();
                 m_spheresBack.Clear();
                 m_modelGroupBack = null!;
             }
             else if (displayed != null && ReferenceEquals(displayed, m_modelGroupBack))
             {
-                // Preserve back (visible), clear front
                 m_modelGroupFront?.Children.Clear();
                 m_spheresFront.Clear();
                 m_modelGroupFront = null!;
             }
             else
             {
-                // Unknown visual content (or none) — clear both to be safe.
                 m_modelGroupFront?.Children.Clear();
                 m_modelGroupBack?.Children.Clear();
                 m_spheresFront.Clear();
@@ -172,8 +169,6 @@ public partial class MainForm : Form
                 m_modelGroupBack = null!;
             }
 
-            // Do not leave the viewport pointing at a cleared/empty group; if visual is null or now invalid,
-            // reset to the base model group so UI still shows something until Setup3DView runs.
             if (m_visual?.Content is not Model3DGroup currentContent || (currentContent.Children.Count == 0 && m_modelGroup != null))
             {
                 m_visual!.Content = m_modelGroup;
@@ -188,6 +183,7 @@ public partial class MainForm : Form
         GC.WaitForPendingFinalizers();
         GC.Collect();
     }
+
     public void Setup3DView(List<TickableSpatialObject> objects)
     {
         if (InvokeRequired)
@@ -198,7 +194,6 @@ public partial class MainForm : Form
 
         if (objects.Count == 0) return;
 
-        // Find the farthest object from the origin for use in scaling the sphere radius and camera distance, and also for colors
         double maxDist = 0;
         foreach (var obj in objects)
         {
@@ -209,16 +204,13 @@ public partial class MainForm : Form
             if (compAbs > m_maxComponentAbs) m_maxComponentAbs = compAbs;
         }
 
-        // Set sphere radius and camera distance based on maxDist
         double sphereRadius = maxDist / 500.0;
         if (sphereRadius < 1.0) sphereRadius = 1.0;
         double cameraDist = maxDist * 4.0;
 
-        // Set camera position
         m_viewport!.Camera!.Position = new Point3D(0, 0, cameraDist);
         m_viewport!.CameraController!.CameraTarget = new Point3D(0, 0, 0);
 
-        // Always create and assign the shared mesh for the current radius
         m_sharedSphereMesh = HelixUtils.CreateSphereMesh(new Point3D(0, 0, 0), sphereRadius, 24, 16);
 
         m_modelGroupFront = HelixUtils.CreateModelGroup();
@@ -260,7 +252,6 @@ public partial class MainForm : Form
         m_buffersInitialized = true;
     }
 
-    // New overload: accept PointData with optional color and size tokens.
     public void Setup3DViewFromPoints(List<PointData> points)
     {
         if (InvokeRequired)
@@ -271,7 +262,6 @@ public partial class MainForm : Form
 
         if (points == null || points.Count == 0) return;
 
-        // Compute bounding box for camera placement
         long minX = long.MaxValue, minY = long.MaxValue, minZ = long.MaxValue;
         long maxX = long.MinValue, maxY = long.MinValue, maxZ = long.MinValue;
         foreach (var p in points)
@@ -285,7 +275,6 @@ public partial class MainForm : Form
             if (pos.Z > maxZ) maxZ = pos.Z;
         }
 
-        // Compute a scale metric (max dimension)
         var sizeX = Math.Max(1, maxX - minX);
         var sizeY = Math.Max(1, maxY - minY);
         var sizeZ = Math.Max(1, maxZ - minZ);
@@ -294,12 +283,10 @@ public partial class MainForm : Form
         var centerY = (minY + maxY) / 2.0;
         var centerZ = (minZ + maxZ) / 2.0;
 
-        // Choose camera distance proportional to extent
         double cameraDist = Math.Max(100.0, maxExtent * 2.5);
         m_viewport.Camera!.Position = new Point3D(centerX, centerY, centerZ + cameraDist);
         m_viewport.CameraController!.CameraTarget = new Point3D(centerX, centerY, centerZ);
 
-        // Decide uniform sphere radius. If any point supplies SizeToken, map min->max token to a radius range.
         int minToken = int.MaxValue, maxToken = int.MinValue;
         foreach (var p in points)
         {
@@ -310,18 +297,9 @@ public partial class MainForm : Form
             }
         }
         double baseRadius;
-        if (minToken == int.MaxValue)
-        {
-            // no size tokens: choose radius relative to extent
-            baseRadius = Math.Max(1.0, maxExtent / 200.0);
-        }
-        else
-        {
-            // map token -> radius in [maxExtent/400, maxExtent/40]
-            baseRadius = Math.Max(1.0, maxExtent / 200.0);
-        }
+        if (minToken == int.MaxValue) baseRadius = Math.Max(1.0, maxExtent / 200.0);
+        else baseRadius = Math.Max(1.0, maxExtent / 200.0);
 
-        // Shared mesh for uniform appearance
         m_sharedSphereMesh = HelixUtils.CreateSphereMesh(new Point3D(0, 0, 0), baseRadius, 24, 16);
 
         m_modelGroupFront = HelixUtils.CreateModelGroup();
@@ -341,16 +319,12 @@ public partial class MainForm : Form
                 b = Math.Clamp(b, 0, 255);
                 wcolor = System.Windows.Media.Color.FromRgb((byte)r, (byte)g, (byte)b);
             }
-            // Log the exact parsed color (ARGB hex) for debugging
             var hex = $"#{(byte)255:X2}{wcolor.R:X2}{wcolor.G:X2}{wcolor.B:X2}";
-            Debug.WriteLine($"Setup3DViewFromPoints: point={pos.X},{pos.Y},{pos.Z} color={wcolor.R},{wcolor.G},{wcolor.B} hex={hex} size={pd.SizeToken}");
-
-            // Use the parsed color (no hard-coded override). Keep Emissive+Diffuse so small values remain visible.
             var brush = new SolidColorBrush(wcolor);
             brush.Freeze();
             var matGroup = new MaterialGroup();
-            matGroup.Children.Add(new EmissiveMaterial(brush)); // shows raw color independent of lighting
-            matGroup.Children.Add(new DiffuseMaterial(brush));  // still responds to scene lighting
+            matGroup.Children.Add(new EmissiveMaterial(brush));
+            matGroup.Children.Add(new DiffuseMaterial(brush));
 
             var sphereFront = new GeometryModel3D
             {
@@ -407,7 +381,6 @@ public partial class MainForm : Form
             {
                 spheres[i].Transform = new TranslateTransform3D(pos.X, pos.Y, pos.Z);
             }
-            // Update color/material
             if (spheres[i].Material is DiffuseMaterial mat)
             {
                 mat.Brush = brush;
@@ -421,74 +394,85 @@ public partial class MainForm : Form
             m_visual.Content = nextGroup;
     }
 
-    // Handler for the combo selection — loads a static or frame-based CSV from Data directory.
     private async void cmbLoadFile_SelectedIndexChanged(object? sender, EventArgs e)
     {
         if (cmbLoadFile.SelectedItem == null) return;
         var fileName = cmbLoadFile.SelectedItem.ToString() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(fileName)) return;
-
-        // Disable UI while loading/playing
         cmbLoadFile.Enabled = false;
-        // keep btnRun enabled so user can stop animation; change label to indicate stop action
         btnRun.Text = "Stop Animation";
         btnRun.Enabled = true;
-
         m_animationCts?.Cancel();
         m_animationCts = new CancellationTokenSource();
         m_isAnimating = true;
         var token = m_animationCts.Token;
 
         var dataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", fileName);
+        var ext = Path.GetExtension(dataPath).ToLowerInvariant();
 
         try
         {
-            // Try frames (frame-based file) first; fall back to static points.
-            var frames = LatticeDataLoader.ParseFrames(dataPath)
-                .OrderBy(kvp => kvp.Key)
-                .ToList();
-
-            if (frames.Count > 1)
+            if (ext == ".csv")
             {
-                // Play frames as animation on the UI by projecting PointData -> TickableSpatialObject per frame
-                Debug.WriteLine($"cmbLoadFile: parsed {frames.Count} frames.");
-                var orderedFrames = frames.OrderBy(kvp => kvp.Key).ToList();
-                if (orderedFrames.Count == 0)
+                var frames = LatticeDataLoader.ParseFrames(dataPath)
+                    .OrderBy(kvp => kvp.Key)
+                    .ToList();
+
+                if (frames.Count > 1)
                 {
-                    MessageBox.Show(this, "No frame points were parsed from the file.", "No Data", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    var orderedFrames = frames.OrderBy(kvp => kvp.Key).ToList();
+                    if (orderedFrames.Count == 0)
+                    {
+                        MessageBox.Show(this, "No frame points were parsed from the file.", "No Data", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    else
+                    {
+                        while (!token.IsCancellationRequested)
+                        {
+                            foreach (var kvp in orderedFrames)
+                            {
+                                if (token.IsCancellationRequested) break;
+                                var pts = kvp.Value;
+                                if (pts == null || pts.Count == 0) continue;
+                                var objs = pts.Select(p => new TickableSpatialObject(p.Position)).ToList();
+                                Setup3DView(objs);
+                                await Task.Delay(250, token).ContinueWith(_ => { }, TaskScheduler.Default);
+                            }
+                        }
+                    }
                 }
                 else
                 {
-                    // Loop the animation until cancelled so user can observe it.
-                    while (!token.IsCancellationRequested)
+                    var points = LatticeDataLoader.ParsePoints(dataPath);
+                    if (points == null || points.Count == 0)
                     {
-                        foreach (var kvp in orderedFrames)
-                        {
-                            if (token.IsCancellationRequested) break;
-                            var pts = kvp.Value;
-                            if (pts == null || pts.Count == 0) continue;
-                            var objs = pts.Select(p => new TickableSpatialObject(p.Position)).ToList();
-                            Setup3DView(objs);
-                            await Task.Delay(250, token).ContinueWith(_ => { }, TaskScheduler.Default);
-                        }
+                        MessageBox.Show(this, "No points were parsed from the file. Lines that do not begin with a digit or '-' are skipped.", "No Data", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
+                    else
+                    {
+                        Setup3DViewFromPoints(points);
+                    }
+                }
+            }
+            else if (SupportedExtensions.Contains(ext))
+            {
+                // Image path -> convert to points and display
+                // sample step reduces point count for large images; adjust as desired
+                int sample = 2;
+                double spacing = 1.0;
+                var pts = ImageDataLoader.LoadBitmapAsPoints(dataPath, sample, spacing, ignoreTransparent: true);
+                if (pts == null || pts.Count == 0)
+                {
+                    MessageBox.Show(this, "No points parsed from image (maybe fully transparent).", "No Data", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    Setup3DViewFromPoints(pts);
                 }
             }
             else
             {
-                // Static points (supports header-aware PointData)
-                var points = LatticeDataLoader.ParsePoints(dataPath);
-                Debug.WriteLine($"cmbLoadFile: parsed {points?.Count ?? 0} static points from {fileName}");
-                if (points == null || points.Count == 0)
-                {
-                    // No points parsed — give the user feedback instead of silently doing nothing.
-                    MessageBox.Show(this, "No points were parsed from the file. Lines that do not begin with a digit or '-' are skipped.", "No Data", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-                else
-                {
-                    // Convert PointData -> UI helper that respects color/size tokens
-                    Setup3DViewFromPoints(points);
-                }
+                MessageBox.Show(this, $"Unsupported file type: {ext}", "Unsupported", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
         catch (OperationCanceledException)
@@ -503,10 +487,8 @@ public partial class MainForm : Form
         {
             m_animationCts = null;
             m_isAnimating = false;
-            // restore UI state
             btnRun.Text = "Run Grand Sim";
             btnRun.Enabled = true;
-            // Keep combo enabled unless a grand sim is running (btnRun disabled by grand sim)
             cmbLoadFile.Enabled = true;
         }
     }
