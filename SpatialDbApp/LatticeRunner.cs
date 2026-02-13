@@ -36,6 +36,9 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
     public event Action<int>? TotalObjectCountChanged;
     public event Action<int>? DisplayObjectCountChanged;
 
+    // Signal to UI that the lattice + initial view are ready and the render handler may be attached.
+    public event Action? RenderingReady;
+
     // Simulation parameters
     int m_spaceRange;
     int m_durationMs;
@@ -59,8 +62,6 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
             DisplayObjectCountChanged?.Invoke(m_displayObjectCount);
         }
     }
-
-    public int TotalObjectCount => m_objectCount;
 
     public void SetTotalObjects(int newTotal)
     {
@@ -112,13 +113,12 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
             var requested = (DisplayObjectCount > 0) ? DisplayObjectCount : Math.Min(5000, m_objectCount);
             var toRender = Math.Max(0, Math.Min(requested, m_objectCount));
 
-            // Query the lattice for the closest `toRender` objects (min and max both set to toRender).
-            // If toRender is zero (e.g. objectCount==0), FindClosestObjectsToOrigin will return an empty list.
+            // Initial query and initial view setup.
             m_closestObjects = FindClosestObjectsToOrigin(toRender, toRender);
-
             m_form?.Setup3DView(m_closestObjects);
 
-            m_form?.Setup3DView(m_closestObjects);
+            // Signal UI that the lattice and initial view are ready -> UI may attach CompositionTarget.Rendering now.
+            try { RenderingReady?.Invoke(); } catch { /* best effort: swallow to avoid impacting test flow */ }
 
             TickOnceAndTest();
             RunSimulationForDuration();
@@ -394,7 +394,6 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
                 }
             }
             throw new InvalidOperationException($"Post-tick validation failed! {postTickIssues.Count} issues detected after first tick ({movedButNotInTickables} moved but lost registration)!");
-
         }
 
         if (movedCount == 0)
@@ -585,14 +584,14 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
         var collected = new HashSet<TickableSpatialObject>();
 
         // Expand radius until we have at least minCount objects or hit a large enough radius
-        while (collected.Count < minCount && radius < (ulong)long.MaxValue / 2)
-        {
+                while (collected.Count < minCount && radius < (ulong)long.MaxValue / 2)
+                {
             var query = m_lattice!.QueryWithinDistance(center, radius);
-            foreach (var obj in query)
-            {
-                if (obj is TickableSpatialObject tickable)
-                    collected.Add(tickable);
-            }
+                    foreach (var obj in query)
+                    {
+                        if (obj is TickableSpatialObject tickable)
+                            collected.Add(tickable);
+                    }
             radius *= 2; // double the radius
         }
 

@@ -34,6 +34,9 @@ public partial class MainForm : Form
     private Action<int>? m_totalChangedHandler;
     private Action<int>? m_displayChangedHandler;
 
+    // Render-ready handler delegate reference so we can unsubscribe later
+    private Action? m_renderingReadyHandler;
+
     public MainForm()
     {
         InitializeComponent();
@@ -160,6 +163,23 @@ public partial class MainForm : Form
         cmbLoadFile.Enabled = false;
         m_latticeRunner = new LatticeRunner(this, rtbLog);
 
+        // Prepare render-ready handler: wait until runner signals it's ready before attaching CompositionTarget.Rendering.
+        m_renderingReadyHandler = () =>
+        {
+            try
+            {
+#if RenderHandler
+                // Attach on UI thread
+                BeginInvoke(new Action(() =>
+                {
+                    m_renderHandler = (s, evt) => m_latticeRunner?.Update3D();
+                    CompositionTarget.Rendering += m_renderHandler;
+                }));
+#endif
+            }
+            catch { /* best effort */ }
+        };
+
         // Wire the controller to the runner so UI changes propagate to the active runner,
         // and immediately apply the current values.
         if (m_countController != null && m_latticeRunner != null)
@@ -177,6 +197,10 @@ public partial class MainForm : Form
             m_countController.TotalChanged += m_totalChangedHandler;
             m_countController.DisplayChanged += m_displayChangedHandler;
 
+            // subscribe to runner RenderingReady so UI attaches render handler only after runner is ready
+            if (m_renderingReadyHandler != null)
+                m_latticeRunner.RenderingReady += m_renderingReadyHandler;
+
             // apply current values before starting the run
             try
             {
@@ -190,15 +214,18 @@ public partial class MainForm : Form
             // Fallback if controller wasn't created
             try
             {
-                m_latticeRunner.SetTotalObjects((int)nudObjCount.Value);
+                m_latticeRunner!.SetTotalObjects((int)nudObjCount.Value);
                 m_latticeRunner.DisplayObjectCount = (int)(nudDisplayCount?.Value ?? 0);
+
+                // still subscribe to RenderingReady if present
+                if (m_latticeRunner != null && m_renderingReadyHandler != null)
+                    m_latticeRunner.RenderingReady += m_renderingReadyHandler;
             }
             catch { /* best effort */ }
         }
 
 #if RenderHandler
-        m_renderHandler = (s, e) => m_latticeRunner?.Update3D();
-        CompositionTarget.Rendering += m_renderHandler;
+        // Note: actual CompositionTarget.Rendering attachment is performed when runner raises RenderingReady.
 #endif
 
         Task.Run(() =>
@@ -207,7 +234,8 @@ public partial class MainForm : Form
             BeginInvoke(new Action(() =>
             {
 #if RenderHandler
-                CompositionTarget.Rendering -= m_renderHandler;
+                // Remove actual render handler if attached
+                try { if (m_renderHandler != null) CompositionTarget.Rendering -= m_renderHandler; } catch { }
 #endif
                 // Unsubscribe controller handlers from runner to avoid leaks
                 try
@@ -216,6 +244,13 @@ public partial class MainForm : Form
                     {
                         if (m_totalChangedHandler != null) m_countController.TotalChanged -= m_totalChangedHandler;
                         if (m_displayChangedHandler != null) m_countController.DisplayChanged -= m_displayChangedHandler;
+                    }
+
+                    // Unsubscribe the RenderingReady subscription to avoid leaks
+                    if (m_latticeRunner != null && m_renderingReadyHandler != null)
+                    {
+                        try { m_latticeRunner.RenderingReady -= m_renderingReadyHandler; } catch { }
+                        m_renderingReadyHandler = null;
                     }
                 }
                 catch { /* best effort */ }
