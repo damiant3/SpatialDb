@@ -1,5 +1,4 @@
 ﻿#if DIAGNOSTIC
-using System.Threading;
 using SpatialDbLib.Lattice;
 using SpatialDbLib.Synchronize;
 //////////////////////////////////

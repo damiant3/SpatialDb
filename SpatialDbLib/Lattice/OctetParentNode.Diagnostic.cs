@@ -1,5 +1,5 @@
 ﻿#if DIAGNOSTIC
-using System.Threading;
+using SpatialDbLib.Synchronize;
 ///////////////////////////////
 namespace SpatialDbLib.Lattice;
 public abstract partial class OctetParentNode

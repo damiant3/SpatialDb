@@ -7,11 +7,15 @@
     <UseWindowsForms>true</UseWindowsForms>
     <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
+    <Configurations>Debug;Release;Diagnostic</Configurations>
   </PropertyGroup>
   <PropertyGroup>
     <ServerGarbageCollection>true</ServerGarbageCollection>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DefineConstants>$(DefineConstants);RenderHandler</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Diagnostic|AnyCPU'">
     <DefineConstants>$(DefineConstants);RenderHandler</DefineConstants>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">

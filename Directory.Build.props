@@ -1,0 +1,7 @@
+<Project>
+  <!-- Add DIAGNOSTIC when building the Diagnostic configuration.
+       This applies to all projects in the repo without editing each .csproj. -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Diagnostic'">
+    <DefineConstants>$(DefineConstants);DIAGNOSTIC</DefineConstants>
+  </PropertyGroup>
+</Project>

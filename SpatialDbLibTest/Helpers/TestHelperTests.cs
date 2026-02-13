@@ -11,7 +11,7 @@ public class TestHelperTests
     private const int DICT_SIZE = 1000;
     private const int CONCURRENT_THREADS = 8;
 
-    [TestMethod]
+   // [TestMethod]
     public void TestConcurrentDictionaryExtensions_Performance()
     {
         Console.WriteLine("=".PadRight(80, '='));

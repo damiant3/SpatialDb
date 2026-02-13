@@ -29,9 +29,9 @@ public class ProxyCommitCoordinator<TOriginal, TProxy>(TOriginal originalObject,
 
         while (true)
         {
-            var leaf = TargetLeaf;
+            var leaf = TargetLeaf ?? throw new InvalidOperationException("TargetLeaf is null in ProxyCommitCoordinator.Commit.");
             if (SlimSyncerDiagnostics.Enabled)
-                Console.WriteLine($"ProxyCommitCoordinator.Commit: attempting leaf lock for leaf.Bounds={leaf?.Bounds}, leaf.IsRetired={leaf?.IsRetired}");
+                Console.WriteLine($"ProxyCommitCoordinator.Commit: attempting leaf lock for leaf.Bounds={leaf.Bounds}, leaf.IsRetired={leaf.IsRetired}");
 
             using var leafLock = new SlimSyncer(((ISync)leaf).Sync, SlimSyncer.LockMode.Write, "ProxyCommitCoordinator.Commit: Leaf");
 
