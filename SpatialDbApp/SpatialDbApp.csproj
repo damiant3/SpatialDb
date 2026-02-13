@@ -18,6 +18,18 @@
     <DefineConstants>$(DefineConstants);RenderHandler</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
+    <None Remove="Data\simple_sweep.csv" />
+    <None Remove="Data\smiley_face.csv" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Data\simple_sweep.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Data\smiley_face.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="HelixToolkit.Wpf" Version="3.1.2" />
   </ItemGroup>
   <ItemGroup>

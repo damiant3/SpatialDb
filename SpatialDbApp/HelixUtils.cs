@@ -36,7 +36,7 @@ public static class HelixUtils
         var group = new Model3DGroup();
         group.Children.Add(new AmbientLight(Colors.Gray));
         group.Children.Add(new DirectionalLight(Colors.White, new Vector3D(-0.5, -1, -0.75)));
-        group.Children.Add(new PointLight(Color.FromRgb(0, 200, 0), new Point3D(60, 60, 120)));
+        group.Children.Add(new PointLight(Color.FromRgb(255, 255, 255), new Point3D(60, 60, 120)));
         return group;
     }
 

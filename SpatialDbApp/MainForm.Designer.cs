@@ -34,6 +34,8 @@
             nudTime = new NumericUpDown();
             label1 = new Label();
             label2 = new Label();
+            cmbLoadFile = new ComboBox();
+            label3 = new Label();
             ((System.ComponentModel.ISupportInitialize)nudObjCount).BeginInit();
             ((System.ComponentModel.ISupportInitialize)nudTime).BeginInit();
             SuspendLayout();
@@ -96,11 +98,32 @@
             label2.TabIndex = 5;
             label2.Text = "Seconds";
             // 
+            // cmbLoadFile
+            // 
+            cmbLoadFile.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbLoadFile.FormattingEnabled = true;
+            cmbLoadFile.Location = new Point(616, 11);
+            cmbLoadFile.Name = "cmbLoadFile";
+            cmbLoadFile.Size = new Size(172, 23);
+            cmbLoadFile.TabIndex = 6;
+            cmbLoadFile.SelectedIndexChanged += cmbLoadFile_SelectedIndexChanged;
+            // 
+            // label3
+            // 
+            label3.AutoSize = true;
+            label3.Location = new Point(565, 14);
+            label3.Name = "label3";
+            label3.Size = new Size(36, 15);
+            label3.TabIndex = 7;
+            label3.Text = "Load:";
+            // 
             // MainForm
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(800, 450);
+            Controls.Add(label3);
+            Controls.Add(cmbLoadFile);
             Controls.Add(label2);
             Controls.Add(label1);
             Controls.Add(nudTime);
@@ -123,5 +146,7 @@
         private NumericUpDown nudTime;
         private Label label1;
         private Label label2;
+        private ComboBox cmbLoadFile;
+        private Label label3;
     }
 }
