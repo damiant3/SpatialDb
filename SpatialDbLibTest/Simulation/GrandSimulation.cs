@@ -461,25 +461,26 @@ public class GrandSimulation
     // === GRAND SIMULATION TEST ===
 
     [TestMethod]
-    public void Test_GrandSimulation_10K_5Seconds()
+    public void GrandSimulation_10K_5Seconds()
     {
         RunGrandSimulation(objectCount: 10000, durationMs: 5000);
     }
 
     [TestMethod]
-    public void Test_GrandSimulation_1K_2Seconds()
+    public void GrandSimulation_1K_2Seconds()
     {
         RunGrandSimulation(objectCount: 1000, durationMs: 2000);
     }
 
     [TestMethod]
-    public void Test_GrandSimulation_50K_10Seconds()
+    public void GrandSimulation_50K_10Seconds()
     {
         RunGrandSimulation(objectCount: 50000, durationMs: 10000);
     }
 
     [TestMethod]
-    public void Test_GrandSimulation_100K_10Seconds()
+    [DoNotParallelize]
+    public void GrandSimulation_100K_10Seconds()
     {
         RunGrandSimulation(objectCount: 100000, durationMs: 10000);
     }

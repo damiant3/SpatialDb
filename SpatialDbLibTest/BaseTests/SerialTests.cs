@@ -350,7 +350,7 @@ public class SerialTests
     // === PERFORMANCE BENCHMARK ===
 
     [TestMethod]
-    public void Test_QueryPerformance()
+    public void QueryPerformance()
     {
         var lattice = new SpatialLattice();
         var objects = new List<ISpatialObject>();
@@ -389,7 +389,7 @@ public class SerialTests
     }
 
     [TestMethod]
-    public void Test_LocalQueryPerformance()
+    public void LocalQueryPerformance()
     {
         var lattice = new SpatialLattice();
         var objects = new List<ISpatialObject>();

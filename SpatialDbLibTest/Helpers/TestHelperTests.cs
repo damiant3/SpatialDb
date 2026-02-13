@@ -86,7 +86,7 @@ public class TestHelperTests
     }
 
     [TestMethod]
-    public void TestConcurrentDictionaryExtensions_Correctness()
+    public void ConcurrentDictionaryExtensions_Correctness()
     {
         Console.WriteLine("\n--- Correctness Tests ---");
 

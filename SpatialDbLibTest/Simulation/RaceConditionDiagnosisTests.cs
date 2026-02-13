@@ -3,15 +3,19 @@ using SpatialDbLib.Lattice;
 using SpatialDbLib.Math;
 using SpatialDbLib.Simulation;
 using SpatialDbLib.Synchronize;
+using SpatialDbLibTest.Helpers;
 
 namespace SpatialDbLibTest.Simulation
 {
     [TestClass]
+    [DoNotParallelize]
     public class RaceConditionDiagnosisTests
     {
         [TestMethod]
         public void Deterministic_MigrantHasNoHome_Diagnostic()
         {
+            using var hooks = new DiagnosticHookScope();
+
             // Enable diagnostic lock tracking
             SlimSyncerDiagnostics.Enabled = true;
             SpatialLatticeOptions.TrackLocks = true;

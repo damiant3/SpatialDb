@@ -11,6 +11,7 @@ public class SimulationTests
 {
     // === BASIC FUNCTIONALITY ===
     [TestMethod]
+    [DoNotParallelize]
     public void SimulationTests_Omnibus()
     {
         Console.WriteLine("=".PadRight(70, '='));
@@ -357,6 +358,7 @@ public class SimulationTests
     // === PERFORMANCE BENCHMARK ===
 
     [TestMethod]
+    [DoNotParallelize]
     public void Benchmark_ParallelTickPerformance()
     {
         // === PARALLEL VS SERIAL TICK PERFORMANCE ===
@@ -429,7 +431,8 @@ public class SimulationTests
             }
         }
     }
-    //[TestMethod]
+    [TestMethod]
+    [DoNotParallelize]
     public void Benchmark_TickPerformance()
     {
         var counts = new[] { 50000, 250000, 1000000 };

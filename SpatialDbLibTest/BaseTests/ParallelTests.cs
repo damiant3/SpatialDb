@@ -51,6 +51,7 @@ public class ParallelTests
     }
 
     [TestMethod]
+    [DoNotParallelize]
     public void InsertStress_Bulk()
     {
         Console.WriteLine("=== Bimodal Distribution ===");
