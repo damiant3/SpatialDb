@@ -115,12 +115,6 @@ public class SpatialObjectProxy : SpatialObject, ISpatialObjectProxy
     public SpatialObjectProxy(SpatialObject originalObj, VenueLeafNode targetLeaf, LongVector3 proposedPosition)
         : base([.. originalObj.GetPositionStack()])
     {
-#if DEBUG
-        if (originalObj.PositionStackDepth == 0)
-            throw new InvalidOperationException("Original object has no position.");
-        if (targetLeaf.IsRetired)
-            throw new InvalidOperationException("Target leaf is retired.");
-#endif
         m_coordinator = new ProxyCommitCoordinator<SpatialObject, SpatialObjectProxy>(originalObj, targetLeaf);
         SetLocalPosition(proposedPosition);
     }

@@ -72,13 +72,7 @@ public class RootNode<TParent, TBranch, TVenue, TSelf>(Region bounds, byte latti
         => BucketAndDispatchMigrants(objs);
 
     public VenueLeafNode? ResolveLeafFromOuterLattice(ISpatialObject obj)
-    {
-#if DEBUG
-        if (obj.PositionStackDepth <= LatticeDepth)
-            throw new InvalidOperationException("Object position stack depth is less than or equal to lattice depth during outer lattice leaf resolution.");
-#endif
-        return ResolveLeaf(obj);
-    }
+        => ResolveLeaf(obj);
 }
 
 public abstract class ParentNode(Region bounds)
@@ -242,7 +236,7 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
     }
     private static void QueryNeighborsRecursive(ISpatialNode node, LongVector3 center, ulong radius, List<ISpatialObject> results)
     {
-        if (!node.Bounds.IntersectsSphere(center, radius)) return;
+        if (!node.Bounds.IntersectsSphere_SimpleImpl(center, radius)) return;
         switch (node)
         {
             case VenueLeafNode leaf:
@@ -254,7 +248,7 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
                 break;
             case OctetParentNode parent:
                 foreach (var child in parent.Children)
-                    if (child.Bounds.IntersectsSphere(center, radius))
+                    if (child.Bounds.IntersectsSphere_SimpleImpl(center, radius))
                         QueryNeighborsRecursive(child, center, radius, results);
                 break;
             case SubLatticeBranchNode sub:
@@ -301,17 +295,7 @@ public abstract class SubLatticeBranchNode<TLattice>(Region bounds, OctetParentN
     public VenueLeafNode? ResolveLeafFromOuterLattice(ISpatialObject obj)
         => Sublattice.ResolveLeafFromOuterLattice(obj);
     public override AdmitResult Admit(Span<ISpatialObject> buffer)
-    {
-#if DEBUG
-        foreach (var obj in buffer)
-        {
-            var proposedPosition = obj.GetPositionAtDepth(Sublattice.LatticeDepth - 1);
-            if (!Bounds.Contains(proposedPosition))
-                throw new InvalidOperationException($"Object outside SublatticeBranch bounds: {proposedPosition}");
-        }
-#endif
-        return Sublattice.AdmitForInsert(buffer);
-    }
+        => Sublattice.AdmitForInsert(buffer);
 }
 public class SubLatticeBranchNode
     : SubLatticeBranchNode<ISpatialLattice>
@@ -320,12 +304,6 @@ public class SubLatticeBranchNode
         : base(bounds, parent)
     {
         Sublattice = new SpatialLattice(bounds, latticeDepth);
-#if DEBUG
-        if (migrants.Any(a => a.PositionStackDepth > latticeDepth + 1))
-        {
-            throw new InvalidOperationException($"Occupant has depth > lattice");
-        }
-#endif
         Sublattice.AdmitMigrants(migrants);
     }
 }

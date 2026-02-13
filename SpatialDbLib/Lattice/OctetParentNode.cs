@@ -37,10 +37,8 @@ public abstract partial class OctetParentNode
             Children[i] = CreateNewVenueNode(i, childMin, childMax);
         }
     }
-
     public virtual VenueLeafNode CreateNewVenueNode(int i, LongVector3 childMin, LongVector3 childMax)
         => new LargeLeafNode(new(childMin, childMax), this);
-
     public SelectChildResult? SelectChild(LongVector3 pos)
     {
         if (!Bounds.Contains(pos)) return null;
@@ -93,7 +91,6 @@ public abstract partial class OctetParentNode
         => BucketAndDispatchMigrants(objs);
     public void BucketAndDispatchMigrants(IList<ISpatialObject> objs)
         => BucketAndDispatchMigrants_Impl(objs);
-
     public struct AdmitFrame(OctetParentNode parent, IChildNode<OctetParentNode> childNode, byte childIndex)
     {
         public OctetParentNode Parent = parent;
@@ -133,15 +130,14 @@ public abstract partial class OctetParentNode
                 case AdmitResult.Subdivide:
                 case AdmitResult.Delegate:
                 {
-                    var subdividingleaf = frame.ChildNode as VenueLeafNode;
-#if DEBUG
-                    if (subdividingleaf == null)
-                        throw new InvalidOperationException("Subdivision requested by non-venueleaf");
-                    if (frame.Parent == null)
-                        throw new InvalidOperationException("Subdivision requested at root node");
-#endif
-                    if (!subdividingleaf.IsRetired)
-                        SubdivideAndMigrate(frame.Parent, subdividingleaf, SpatialLattice.CurrentThreadLatticeDepth, frame.ChildIndex, admitResult is AdmitResult.Subdivide);
+                    if (frame.ChildNode is not VenueLeafNode subdividingLeaf) throw new InvalidOperationException("Subdivide/Delgate request from non-venue leaf.");
+                    if (!subdividingLeaf.IsRetired)
+                        SubdivideAndMigrate(
+                            frame.Parent,
+                            subdividingLeaf,
+                            SpatialLattice.CurrentThreadLatticeDepth,
+                            frame.ChildIndex,
+                            admitResult is AdmitResult.Subdivide);
                     current = frame.Parent;
                     continue;
                 }

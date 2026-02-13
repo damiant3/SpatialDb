@@ -209,7 +209,7 @@ public class SpatialLattice<TRoot>
 
     private void QueryWithinDistanceRecursive(ISpatialNode node, LongVector3 center, ulong radius, List<ISpatialObject> results)
     {
-        if (!node.Bounds.IntersectsSphere(center, radius)) return;
+        if (!node.Bounds.IntersectsSphere_SimpleImpl(center, radius)) return;
 
         switch (node)
         {
@@ -222,7 +222,7 @@ public class SpatialLattice<TRoot>
                 break;
             case OctetParentNode parent:
                 foreach (var child in parent.Children)
-                    if (child.Bounds.IntersectsSphere(center, radius))
+                    if (child.Bounds.IntersectsSphere_SimpleImpl(center, radius))
                         QueryWithinDistanceRecursive(child, center, radius, results);
                 break;
             case SubLatticeBranchNode sub:

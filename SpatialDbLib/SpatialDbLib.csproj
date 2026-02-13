@@ -7,13 +7,9 @@
     <Configurations>Debug;Release;Diagnostic</Configurations>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <DefineConstants>$(DefineConstants);DIAGNOSTIC</DefineConstants>
-  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'" />
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Diagnostic|AnyCPU'">
-    <DefineConstants>$(DefineConstants);DIAGNOSTIC</DefineConstants>
-  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Diagnostic|AnyCPU'" />
 
   <ItemGroup>
     <Compile Remove="Distance\**" />
