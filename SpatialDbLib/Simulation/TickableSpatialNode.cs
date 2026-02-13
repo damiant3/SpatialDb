@@ -37,7 +37,7 @@ public class TickableOctetParentNode(Region bounds)
     protected ITickableChildNode GetTickableChild(int index)
         => (ITickableChildNode)base.Children[index];
 
-    public virtual void Tick()
+public virtual void Tick()
     {
         for (int i = 0; i < 8; i++)
             GetTickableChild(i).Tick();
@@ -64,11 +64,12 @@ public class TickableOctetBranchNode
     OctetParentNode IChildNode<OctetParentNode>.Parent => Parent;
 }
 
-public class TickableVenueLeafNode(Region bounds, TickableOctetParentNode parent)
+public partial class TickableVenueLeafNode(Region bounds, TickableOctetParentNode parent)
     : VenueLeafNode(bounds, parent),
       ITickableSpatialNode,
       ITickableChildNode
 {
+    public partial void Tick();
     public override int Capacity => 64;
     internal List<ITickableObject> m_tickableObjects = [];
     protected override ISpatialObjectProxy CreateProxy<T>(T obj, LongVector3 proposedPosition)
@@ -116,38 +117,7 @@ public class TickableVenueLeafNode(Region bounds, TickableOctetParentNode parent
     {
         using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "unregister for ticks");
         m_tickableObjects.Remove(obj);
-    }
-
-    public void Tick()
-    {
-        // Publish ticker thread id so a test can learn it before the tick acquires the leaf lock.
-        try
-        {
-            OctetParentNode.DiagnosticHooks.CurrentTickerThreadId = Thread.CurrentThread.ManagedThreadId;
-            OctetParentNode.DiagnosticHooks.SignalTickerStart?.Set();
-            // allow the test to set SleepThreadId or other controls before we proceed
-            OctetParentNode.DiagnosticHooks.WaitTickerProceed?.Wait();
-        }
-        catch { /* test-only */ }
-
-        // TEST-CHEAT: optional deterministic delay for this thread before taking the venue lock.
-        if (OctetParentNode.DiagnosticHooks.SleepThreadId.HasValue && OctetParentNode.DiagnosticHooks.SleepThreadId.Value == Thread.CurrentThread.ManagedThreadId)
-        {
-            if (OctetParentNode.DiagnosticHooks.UseYield)
-                Thread.Yield();
-            else
-                Thread.Sleep(System.Math.Max(1, OctetParentNode.DiagnosticHooks.SleepMs));
-        }
-
-        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.UpgradableRead, "tick");
-        foreach (var obj in m_tickableObjects.ToList())
-        {
-            var result = obj.Tick();
-            if (result.HasValue)
-                HandleTickResult(result.Value);
-        }
-    }
-
+    }    
     private void HandleTickResult(TickResult result)
     {
         switch (result.Action)
@@ -168,9 +138,7 @@ public class TickableVenueLeafNode(Region bounds, TickableOctetParentNode parent
     {
         var tickableObj = obj as TickableSpatialObjectBase;
         if (tickableObj != null)
-        {
             UnregisterForTicks(tickableObj);
-        }
 
         var currentParent = Parent;
         AdmitResult admitResult;
@@ -362,6 +330,5 @@ public class TickableSubLatticeBranchNode
         Sublattice = new TickableSpatialLattice(bounds, (byte)(latticeDepth + 1));
         Sublattice.AdmitMigrants(migrants);
     }
-
     public void Tick() => Sublattice.Tick();
 }

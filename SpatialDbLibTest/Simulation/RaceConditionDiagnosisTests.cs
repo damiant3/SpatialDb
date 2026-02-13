@@ -1,3 +1,4 @@
+#if DIAGNOSTIC
 using SpatialDbLib.Lattice;
 using SpatialDbLib.Math;
 using SpatialDbLib.Simulation;
@@ -57,7 +58,7 @@ namespace SpatialDbLibTest.Simulation
                     (delaySubdivider: true,  delayMigration: true)
                 };
 
-                foreach (var perm in permutations)
+                foreach (var (delaySubdivider, delayMigration) in permutations)
                 {
                     // Reset any stateful hooks before each run
                     OctetParentNode.DiagnosticHooks.SleepThreadId = null;
@@ -118,7 +119,7 @@ namespace SpatialDbLibTest.Simulation
 
                     // migration coordination primitive (test-side)
                     var migrationDelay = new ManualResetEventSlim(true); // set = proceed; reset = wait
-                    if (perm.delayMigration)
+                    if (delayMigration)
                         migrationDelay.Reset();
 
                     // Start subdivider task (it will set CurrentSubdividerThreadId and wait on WaitSubdivideProceed)
@@ -177,13 +178,13 @@ namespace SpatialDbLibTest.Simulation
                         ?? Thread.CurrentThread.ManagedThreadId; // fallback
 
                     // Choose delay target based on permutation
-                    if (perm.delaySubdivider)
+                    if (delaySubdivider)
                     {
                         OctetParentNode.DiagnosticHooks.SleepThreadId = subdividerTid;
                         OctetParentNode.DiagnosticHooks.SleepMs = 10;
                         OctetParentNode.DiagnosticHooks.UseYield = false;
                     }
-                    else if (perm.delayMigration)
+                    else if (delayMigration)
                     {
                         // We'll simulate delay on migration by keeping migrationDelay reset until we want it to run.
                         OctetParentNode.DiagnosticHooks.SleepThreadId = null;
@@ -201,7 +202,7 @@ namespace SpatialDbLibTest.Simulation
                         DumpDiagnosticsAndFail("Timed out waiting for subdivider to acquire leaf lock (SignalAfterLeafLock).");
 
                     // If migration is delayed by permutation, allow migration to proceed now (so it runs while subdivider is paused at BlockAfterLeafLock)
-                    if (perm.delayMigration)
+                    if (delayMigration)
                         migrationDelay.Set(); // allow migration to perform forced move now
 
                     // Release subdivider from its post-leaf-lock block so it will continue to bucket & dispatch while migration may run concurrently.
@@ -260,3 +261,4 @@ namespace SpatialDbLibTest.Simulation
         }
     }
 }
+#endif

@@ -20,18 +20,12 @@ public partial class MainForm : Form
     private Model3DGroup m_modelGroupBack = null!;
     private ModelVisual3D m_visual = null!;
     private bool m_buffersInitialized = false;
-
     private EventHandler? m_renderHandler;
     private LatticeRunner? m_latticeRunner;
-
     private double m_maxComponentAbs = 0;
-
-    // Data loader/animation state
     private CancellationTokenSource? m_animationCts;
     private bool m_isAnimating = false;
-
-    // Supported file extensions for the combo
-    private static readonly string[] SupportedExtensions = new[] { ".csv", ".bmp", ".png", ".jpg", ".jpeg", ".gif" };
+    private static readonly string[] SupportedExtensions = [".csv", ".bmp", ".png", ".jpg", ".jpeg", ".gif"];
 
     public MainForm()
     {
@@ -43,18 +37,19 @@ public partial class MainForm : Form
     private void Initialize3DViewport()
     {
         m_viewport = HelixUtils.CreateViewport();
-
-        // Camera centered along +Z looking to origin
-        m_viewport.Camera = HelixUtils.CreateCamera(new Point3D(0, 0, 200));
-
+        m_viewport.Camera = HelixUtils.CreateCamera(new Point3D(0, 0, 200)); // centered along +Z looking to origin
         m_modelGroup = HelixUtils.CreateModelGroup();
         m_viewport.Children.Add(new ModelVisual3D { Content = m_modelGroup });
-        m_elementHost = HelixUtils.CreateElementHost(m_viewport, rtbLog.Top, rtbLog.Right + 3, Height - rtbLog.Top - 45, Width - rtbLog.Width - 25);
+        m_elementHost = HelixUtils.CreateElementHost(
+            m_viewport,
+            rtbLog.Top,
+            rtbLog.Right + 3,
+            Height - rtbLog.Top - 45,
+            Width - rtbLog.Width - 25);
         Controls.Add(m_elementHost);
         m_elementHost.SendToBack();
     }
 
-    // Populate the cmbLoadFile with supported files in Data directory.
     private void PopulateLoadFiles()
     {
         try
@@ -66,46 +61,35 @@ public partial class MainForm : Form
                 cmbLoadFile.Enabled = false;
                 return;
             }
-
             var files = Directory.GetFiles(dataDir)
                 .Where(f => SupportedExtensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
                 .Select(Path.GetFileName)
                 .OrderBy(n => n)
                 .ToArray();
-
             cmbLoadFile.Items.Clear();
             foreach (var f in files) cmb_loadfile_additem(f!);
-
             cmbLoadFile.SelectedIndex = -1;
-            cmbLoadFile.Enabled = files.Length > 0 && !m_latticeRunner?.Equals(null) == true ? !m_latticeRunner!.Equals(null) : true;
+            cmbLoadFile.Enabled = files.Length > 0;
         }
         catch
         {
-            // best-effort
             cmbLoadFile.Items.Clear();
             cmbLoadFile.Enabled = false;
         }
 
         void cmb_loadfile_additem(string f)
-        {
-            cmbLoadFile.Items.Add(f);
-        }
+            => cmbLoadFile.Items.Add(f);
     }
 
     private void btnRun_Click(object sender, EventArgs e)
     {
-        // If an animation is running, this button acts as "Stop Animation"
         if (m_isAnimating && m_animationCts != null)
         {
             try { m_animationCts.Cancel(); } catch { }
             return;
         }
-
-        // Otherwise start Grand Simulation
         btnRun.Enabled = false;
-        // Disable file loading while grand sim runs
         cmbLoadFile.Enabled = false;
-
         m_latticeRunner = new LatticeRunner(this, rtbLog);
 
 #if RenderHandler
@@ -116,14 +100,12 @@ public partial class MainForm : Form
         Task.Run(() =>
         {
             m_latticeRunner?.RunGrandSimulation((int)nudObjCount.Value, (int)(nudTime.Value * 1000));
-
             BeginInvoke(new Action(() =>
             {
 #if RenderHandler
                 CompositionTarget.Rendering -= m_renderHandler;
 #endif
                 Cleanup3DView();
-                // Re-populate files and re-enable combo after run finishes
                 PopulateLoadFiles();
                 cmbLoadFile.Enabled = true;
                 btnRun.Enabled = true;
@@ -139,14 +121,10 @@ public partial class MainForm : Form
             Invoke(new Action(Cleanup3DView));
             return;
         }
-
-        // Stop using the buffers until a new setup occurs
         m_buffersInitialized = false;
-
         try
         {
             var displayed = m_visual?.Content as Model3DGroup;
-
             if (displayed != null && ReferenceEquals(displayed, m_modelGroupFront))
             {
                 m_modelGroupBack?.Children.Clear();
@@ -170,15 +148,9 @@ public partial class MainForm : Form
             }
 
             if (m_visual?.Content is not Model3DGroup currentContent || (currentContent.Children.Count == 0 && m_modelGroup != null))
-            {
                 m_visual!.Content = m_modelGroup;
-            }
         }
-        catch
-        {
-            // Best-effort cleanup only — ignore UI race conditions.
-        }
-
+        catch { }
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
@@ -191,9 +163,7 @@ public partial class MainForm : Form
             Invoke(new Action(() => Setup3DView(objects)));
             return;
         }
-
         if (objects.Count == 0) return;
-
         double maxDist = 0;
         foreach (var obj in objects)
         {
@@ -203,16 +173,12 @@ public partial class MainForm : Form
             double compAbs = Math.Max(Math.Abs(pos.X), Math.Max(Math.Abs(pos.Y), Math.Abs(pos.Z)));
             if (compAbs > m_maxComponentAbs) m_maxComponentAbs = compAbs;
         }
-
         double sphereRadius = maxDist / 500.0;
         if (sphereRadius < 1.0) sphereRadius = 1.0;
         double cameraDist = maxDist * 4.0;
-
         m_viewport!.Camera!.Position = new Point3D(0, 0, cameraDist);
         m_viewport!.CameraController!.CameraTarget = new Point3D(0, 0, 0);
-
         m_sharedSphereMesh = HelixUtils.CreateSphereMesh(new Point3D(0, 0, 0), sphereRadius, 24, 16);
-
         m_modelGroupFront = HelixUtils.CreateModelGroup();
         m_modelGroupBack = HelixUtils.CreateModelGroup();
         m_spheresFront.Clear();
@@ -239,16 +205,12 @@ public partial class MainForm : Form
             m_spheresFront.Add(sphereFront);
             m_spheresBack.Add(sphereBack);
         }
-
         if (m_visual == null)
         {
             m_visual = new ModelVisual3D { Content = m_modelGroupFront };
             m_viewport.Children.Add(m_visual);
         }
-        else
-        {
-            m_visual.Content = m_modelGroupFront;
-        }
+        else m_visual.Content = m_modelGroupFront;
         m_buffersInitialized = true;
     }
 
@@ -259,9 +221,7 @@ public partial class MainForm : Form
             Invoke(new Action(() => Setup3DViewFromPoints(points)));
             return;
         }
-
         if (points == null || points.Count == 0) return;
-
         long minX = long.MaxValue, minY = long.MaxValue, minZ = long.MaxValue;
         long maxX = long.MinValue, maxY = long.MinValue, maxZ = long.MinValue;
         foreach (var p in points)
@@ -282,31 +242,25 @@ public partial class MainForm : Form
         var centerX = (minX + maxX) / 2.0;
         var centerY = (minY + maxY) / 2.0;
         var centerZ = (minZ + maxZ) / 2.0;
-
         double cameraDist = Math.Max(100.0, maxExtent * 2.5);
         m_viewport.Camera!.Position = new Point3D(centerX, centerY, centerZ + cameraDist);
         m_viewport.CameraController!.CameraTarget = new Point3D(centerX, centerY, centerZ);
 
         int minToken = int.MaxValue, maxToken = int.MinValue;
         foreach (var p in points)
-        {
             if (p.SizeToken.HasValue)
             {
                 minToken = Math.Min(minToken, p.SizeToken.Value);
                 maxToken = Math.Max(maxToken, p.SizeToken.Value);
             }
-        }
         double baseRadius;
         if (minToken == int.MaxValue) baseRadius = Math.Max(1.0, maxExtent / 200.0);
         else baseRadius = Math.Max(1.0, maxExtent / 200.0);
-
         m_sharedSphereMesh = HelixUtils.CreateSphereMesh(new Point3D(0, 0, 0), baseRadius, 24, 16);
-
         m_modelGroupFront = HelixUtils.CreateModelGroup();
         m_modelGroupBack = HelixUtils.CreateModelGroup();
         m_spheresFront.Clear();
         m_spheresBack.Clear();
-
         foreach (var pd in points)
         {
             var pos = pd.Position;
@@ -325,7 +279,6 @@ public partial class MainForm : Form
             var matGroup = new MaterialGroup();
             matGroup.Children.Add(new EmissiveMaterial(brush));
             matGroup.Children.Add(new DiffuseMaterial(brush));
-
             var sphereFront = new GeometryModel3D
             {
                 Geometry = m_sharedSphereMesh,
@@ -343,16 +296,12 @@ public partial class MainForm : Form
             m_spheresFront.Add(sphereFront);
             m_spheresBack.Add(sphereBack);
         }
-
         if (m_visual == null)
         {
             m_visual = new ModelVisual3D { Content = m_modelGroupFront };
             m_viewport.Children.Add(m_visual);
         }
-        else
-        {
-            m_visual.Content = m_modelGroupFront;
-        }
+        else m_visual.Content = m_modelGroupFront;
         m_buffersInitialized = true;
     }
 
@@ -377,18 +326,10 @@ public partial class MainForm : Form
                 tt.OffsetY = pos.Y;
                 tt.OffsetZ = pos.Z;
             }
-            else
-            {
-                spheres[i].Transform = new TranslateTransform3D(pos.X, pos.Y, pos.Z);
-            }
+            else spheres[i].Transform = new TranslateTransform3D(pos.X, pos.Y, pos.Z);
             if (spheres[i].Material is DiffuseMaterial mat)
-            {
                 mat.Brush = brush;
-            }
-            else
-            {
-                spheres[i].Material = new DiffuseMaterial(brush);
-            }
+            else spheres[i].Material = new DiffuseMaterial(brush);
         }
         if (nextGroup != null)
             m_visual.Content = nextGroup;
@@ -406,29 +347,20 @@ public partial class MainForm : Form
         m_animationCts = new CancellationTokenSource();
         m_isAnimating = true;
         var token = m_animationCts.Token;
-
         var dataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", fileName);
         var ext = Path.GetExtension(dataPath).ToLowerInvariant();
-
         try
         {
             if (ext == ".csv")
             {
-                var frames = LatticeDataLoader.ParseFrames(dataPath)
-                    .OrderBy(kvp => kvp.Key)
-                    .ToList();
-
+                var frames = LatticeDataLoader.ParseFrames(dataPath).OrderBy(kvp => kvp.Key).ToList();
                 if (frames.Count > 1)
                 {
                     var orderedFrames = frames.OrderBy(kvp => kvp.Key).ToList();
                     if (orderedFrames.Count == 0)
-                    {
                         MessageBox.Show(this, "No frame points were parsed from the file.", "No Data", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    }
                     else
-                    {
                         while (!token.IsCancellationRequested)
-                        {
                             foreach (var kvp in orderedFrames)
                             {
                                 if (token.IsCancellationRequested) break;
@@ -438,47 +370,27 @@ public partial class MainForm : Form
                                 Setup3DView(objs);
                                 await Task.Delay(250, token).ContinueWith(_ => { }, TaskScheduler.Default);
                             }
-                        }
-                    }
                 }
                 else
                 {
                     var points = LatticeDataLoader.ParsePoints(dataPath);
                     if (points == null || points.Count == 0)
-                    {
                         MessageBox.Show(this, "No points were parsed from the file. Lines that do not begin with a digit or '-' are skipped.", "No Data", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    }
-                    else
-                    {
-                        Setup3DViewFromPoints(points);
-                    }
+                    else Setup3DViewFromPoints(points);
                 }
             }
             else if (SupportedExtensions.Contains(ext))
             {
-                // Image path -> convert to points and display
-                // sample step reduces point count for large images; adjust as desired
                 int sample = 2;
                 double spacing = 1.0;
                 var pts = ImageDataLoader.LoadBitmapAsPoints(dataPath, sample, spacing, ignoreTransparent: true);
                 if (pts == null || pts.Count == 0)
-                {
                     MessageBox.Show(this, "No points parsed from image (maybe fully transparent).", "No Data", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-                else
-                {
-                    Setup3DViewFromPoints(pts);
-                }
+                else Setup3DViewFromPoints(pts);
             }
-            else
-            {
-                MessageBox.Show(this, $"Unsupported file type: {ext}", "Unsupported", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
+            else MessageBox.Show(this, $"Unsupported file type: {ext}", "Unsupported", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
-        catch (OperationCanceledException)
-        {
-            // cancelled — ignore
-        }
+        catch (OperationCanceledException) { }
         catch (Exception ex)
         {
             MessageBox.Show(this, $"Failed to load/animate file: {ex.Message}", "Load Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
