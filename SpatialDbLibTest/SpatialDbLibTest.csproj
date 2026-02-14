@@ -9,10 +9,18 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Diagnostic\VariantEntry.Template.cs" />
+    <Compile Remove="Diagnostic\Variants\VariantImpl.LockOrderWrong.cs" />
     <Compile Remove="DistanceTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="Diagnostic\VariantEntry.Template.cs" />
+    <None Include="Diagnostic\Variants\VariantImpl.LockOrderWrong.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ICSharpCode.Decompiler" Version="9.1.0.7988" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
     <PackageReference Include="MSTest" Version="4.1.0" />

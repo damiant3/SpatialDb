@@ -119,7 +119,7 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
         => Occupants.Remove(obj);
     protected void Occupy(ISpatialObject obj)
         => Occupants.Add(obj); // private, assumes write lock held and is not retired
-    internal void Retire()
+    public void Retire()
     {
         Occupants.Clear();
         m_isRetired = true;

@@ -37,6 +37,29 @@ public abstract partial class OctetParentNode
         DisposeBeforeRetire
     }
     public static SubdivideVariant SelectedSubdivideVariant { get; set; } = SubdivideVariant.Correct;
+
+    // Runtime-injectable delegate and registry (no extra using directives).
+    public delegate void SubdivideImplDelegate(OctetParentNode parent, VenueLeafNode subdividingleaf, byte latticeDepth, int childIndex, bool branchOrSublattice);
+    private static readonly Dictionary<SubdivideVariant, SubdivideImplDelegate> s_subdivideImplRegistry = [];
+    private static readonly object s_subdivideRegistryLock = new();
+
+    public static void RegisterSubdivideImpl(SubdivideVariant variant, SubdivideImplDelegate impl)
+    {
+        if (impl == null) throw new ArgumentNullException(nameof(impl));
+        lock (s_subdivideRegistryLock)
+        {
+            s_subdivideImplRegistry[variant] = impl;
+        }
+    }
+
+    public static void UnregisterSubdivideImpl(SubdivideVariant variant)
+    {
+        lock (s_subdivideRegistryLock)
+        {
+            s_subdivideImplRegistry.Remove(variant);
+        }
+    }
+
     partial void SubdivideAndMigrate_Impl(OctetParentNode parent, VenueLeafNode subdividingleaf, byte latticeDepth, int childIndex, bool branchOrSublattice)
     {
         switch (SelectedSubdivideVariant)
