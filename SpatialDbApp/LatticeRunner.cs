@@ -138,17 +138,51 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
         LogLine($"Creating and inserting {m_objectCount} objects with random positions and velocities...");
         for (int i = 0; i < m_objectCount; i++)
         {
-            var velspan = 15000;
             var pos = new LongVector3(
                 FastRandom.NextInt(-m_spaceRange, m_spaceRange),
                 FastRandom.NextInt(-m_spaceRange, m_spaceRange),
                 FastRandom.NextInt(-m_spaceRange, m_spaceRange));
+
+            // Set velocity directed toward origin at ~25000 units (clicks) magnitude
+            const double targetSpeed = 45000.0;
+            // direction from position to origin is (-pos)
+            double dx = -pos.X;
+            double dy = -pos.Y;
+            double dz = -pos.Z;
+            double dist = Math.Sqrt(dx * dx + dy * dy + dz * dz);
+
+            IntVector3 velocity;
+            if (dist <= double.Epsilon)
+            {
+                // If already at origin, give a small random nudge to avoid zero-velocity
+                velocity = new IntVector3(
+                    FastRandom.NextInt(-2500, 2500),
+                    FastRandom.NextInt(-2500, 2500),
+                    FastRandom.NextInt(-2500, 2500));
+            }
+            else
+            {
+                double scale = targetSpeed / dist;
+                // compute scaled components in 64-bit then clamp to int range
+                long vxL = (long)Math.Round(dx * scale);
+                long vyL = (long)Math.Round(dy * scale);
+                long vzL = (long)Math.Round(dz * scale);
+                int vx = (int)Math.Clamp(vxL, int.MinValue, int.MaxValue);
+                int vy = (int)Math.Clamp(vyL, int.MinValue, int.MaxValue);
+                int vz = (int)Math.Clamp(vzL, int.MinValue, int.MaxValue);
+                velocity = new IntVector3(vx, vy, vz);
+            }
+
             var obj = new TickableSpatialObject(pos)
             {
-                Velocity = new IntVector3(
-                    FastRandom.NextInt(-velspan, velspan),
-                    FastRandom.NextInt(-velspan, velspan),
-                    FastRandom.NextInt(-velspan, velspan))
+                Velocity = velocity
+
+
+
+                //new IntVector3(
+                //    FastRandom.NextInt(-velspan, velspan),
+                //    FastRandom.NextInt(-velspan, velspan),
+                //    FastRandom.NextInt(-velspan, velspan))
             };
             if (!SimulationPolicy.MeetsMovementThreshold(obj.Velocity))
                 throw new InvalidOperationException($"Object velocity {obj.Velocity} should meet movement threshold");
@@ -453,6 +487,8 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
                 }
 
                 Interlocked.Add(ref m_totalMovementDetected, movedThisCheck);
+                m_closestObjects = FindClosestObjectsToOrigin(m_displayObjectCount, m_displayObjectCount);
+
                 Interlocked.Increment(ref m_monitorChecks);
 
                 lock (m_failedObjects)

@@ -108,14 +108,14 @@ public partial class TickableVenueLeafNode(Region bounds, TickableOctetParentNod
 
     public void RegisterForTicks(ITickableObject obj)
     {
-        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "register for ticks");
+        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "TickableSpatialNode: RegisterForTicks");
         if (!m_tickableObjects.Contains(obj))
             m_tickableObjects.Add(obj);
     }
 
     public void UnregisterForTicks(ITickableObject obj)
     {
-        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "unregister for ticks");
+        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "TickableSpatialNode: UnregisterForTicks");
         m_tickableObjects.Remove(obj);
     }    
     private void HandleTickResult(TickResult result)

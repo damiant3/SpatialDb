@@ -29,9 +29,9 @@ public class GrandSimulation
                 var obj = new TickableSpatialObject(pos)
                 {
                     Velocity = new IntVector3(
-                        Random.Shared.Next(50, 500),
-                        Random.Shared.Next(50, 500),
-                        Random.Shared.Next(50, 500))
+                        Random.Shared.Next(-75000, 75000),
+                        Random.Shared.Next(-75000, 75000),
+                        Random.Shared.Next(-75000, 75000))
                 };
                 Assert.IsTrue(SimulationPolicy.MeetsMovementThreshold(obj.Velocity), $"Object velocity {obj.Velocity} should meet movement threshold");
                 Assert.IsFalse(obj.IsStationary, "Object should not be stationary");

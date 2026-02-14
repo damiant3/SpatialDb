@@ -97,13 +97,21 @@ public abstract class TickableSpatialObjectBase(IList<LongVector3> position)
 
     public virtual TickResult? Tick()
     {
-        if (LocalVelocity.IsZero) return null; 
+        // Avoid int overflow by performing scaling in 64-bit and producing a LongVector3 target.
+        if (LocalVelocity.IsZero) return null;
         var currentMs = MillisecondTicks32;
         var deltaMs = currentMs - m_lastMsTick;
-        if (deltaMs == 0) return null;
+        // Guard against zero or negative deltas (including wrap) — treat as no-op
+        if (deltaMs <= 0) return null;
         m_lastMsTick = currentMs;
-        var scaledVelocity = LocalVelocity * deltaMs;
-        LongVector3 target = LocalPosition + scaledVelocity;
+
+        // Scale using 64-bit arithmetic to avoid overflow when velocity * deltaMs exceeds Int32 range
+        long dx = (long)LocalVelocity.X * (long)deltaMs;
+        long dy = (long)LocalVelocity.Y * (long)deltaMs;
+        long dz = (long)LocalVelocity.Z * (long)deltaMs;
+
+        var pos = LocalPosition;
+        var target = new LongVector3(pos.X + dx, pos.Y + dy, pos.Z + dz);
         return TickResult.Move(this, target);
     }
 }

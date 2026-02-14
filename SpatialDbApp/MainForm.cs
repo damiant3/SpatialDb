@@ -37,6 +37,12 @@ public partial class MainForm : Form
     // Render-ready handler delegate reference so we can unsubscribe later
     private Action? m_renderingReadyHandler;
 
+    // Render scaling to protect the WPF/Direct3D renderer from huge world coordinates
+    private double m_renderScale = 1.0; // world -> render scale
+    private double m_renderCenterX = 0.0;
+    private double m_renderCenterY = 0.0;
+    private double m_renderCenterZ = 0.0;
+
     public MainForm()
     {
         InitializeComponent();
@@ -88,8 +94,7 @@ public partial class MainForm : Form
             // Propagate to running runner if present (controller will invoke TotalChanged; set directly as best-effort)
             if (m_latticeRunner != null)
             {
-                try { m_latticeRunner.SetTotalObjects((int)nudObjCount.Value); }
-                catch { /* best effort */ }
+                try { m_latticeRunner.SetTotalObjects((int)nudObjCount.Value); } catch { /* best effort */ }
                 m_latticeRunner.DisplayObjectCount = (int)(nudDisplayCount?.Value ?? 0);
             }
         }
@@ -323,9 +328,15 @@ public partial class MainForm : Form
             double compAbs = Math.Max(Math.Abs(pos.X), Math.Max(Math.Abs(pos.Y), Math.Abs(pos.Z)));
             if (compAbs > m_maxComponentAbs) m_maxComponentAbs = compAbs;
         }
-        double sphereRadius = maxDist / 500.0;
+
+        // Compute a safe render scale to keep WPF/Direct3D coordinates in a reasonable range.
+        // Target maximum extent of approximately 1000 units in render space.
+        m_renderScale = maxDist > 0 ? Math.Min(1.0, 1000.0 / maxDist) : 1.0;
+        m_renderCenterX = 0.0; m_renderCenterY = 0.0; m_renderCenterZ = 0.0;
+
+        double sphereRadius = maxDist / 500.0 * m_renderScale;
         if (sphereRadius < 1.0) sphereRadius = 1.0;
-        double cameraDist = maxDist * 4.0;
+        double cameraDist = maxDist * 4.0 * m_renderScale;
         m_viewport!.Camera!.Position = new Point3D(0, 0, cameraDist);
         m_viewport!.CameraController!.CameraTarget = new Point3D(0, 0, 0);
         m_sharedSphereMesh = HelixUtils.CreateSphereMesh(new Point3D(0, 0, 0), sphereRadius, 24, 16);
@@ -338,17 +349,21 @@ public partial class MainForm : Form
         {
             var pos = obj.LocalPosition;
             var brush = HelixUtils.GetPositionBrush(obj, m_maxComponentAbs);
+            // apply render scaling
+            var rx = (pos.X - m_renderCenterX) * m_renderScale + m_renderCenterX;
+            var ry = (pos.Y - m_renderCenterY) * m_renderScale + m_renderCenterY;
+            var rz = (pos.Z - m_renderCenterZ) * m_renderScale + m_renderCenterZ;
             var sphereFront = new GeometryModel3D
             {
                 Geometry = m_sharedSphereMesh,
                 Material = new DiffuseMaterial(brush),
-                Transform = new TranslateTransform3D(pos.X, pos.Y, pos.Z)
+                Transform = new TranslateTransform3D(rx, ry, rz)
             };
             var sphereBack = new GeometryModel3D
             {
                 Geometry = m_sharedSphereMesh,
                 Material = new DiffuseMaterial(brush),
-                Transform = new TranslateTransform3D(pos.X, pos.Y, pos.Z)
+                Transform = new TranslateTransform3D(rx, ry, rz)
             };
             m_modelGroupFront.Children.Add(sphereFront);
             m_modelGroupBack.Children.Add(sphereBack);
@@ -392,9 +407,17 @@ public partial class MainForm : Form
         var centerX = (minX + maxX) / 2.0;
         var centerY = (minY + maxY) / 2.0;
         var centerZ = (minZ + maxZ) / 2.0;
-        double cameraDist = Math.Max(100.0, maxExtent * 2.5);
-        m_viewport.Camera!.Position = new Point3D(centerX, centerY, centerZ + cameraDist);
-        m_viewport.CameraController!.CameraTarget = new Point3D(centerX, centerY, centerZ);
+
+        // Compute safe render scale to bring the largest extent down to ~1000 units
+        m_renderScale = maxExtent > 0 ? Math.Min(1.0, 1000.0 / maxExtent) : 1.0;
+        // store center so Update3DView can apply same transform
+        m_renderCenterX = centerX;
+        m_renderCenterY = centerY;
+        m_renderCenterZ = centerZ;
+
+        double cameraDist = Math.Max(100.0, maxExtent * 2.5) * m_renderScale;
+        m_viewport.Camera!.Position = new Point3D(0, 0, cameraDist);
+        m_viewport.CameraController!.CameraTarget = new Point3D(0, 0, 0);
 
         int minToken = int.MaxValue, maxToken = int.MinValue;
         foreach (var p in points)
@@ -406,7 +429,8 @@ public partial class MainForm : Form
         double baseRadius;
         if (minToken == int.MaxValue) baseRadius = Math.Max(1.0, maxExtent / 200.0);
         else baseRadius = Math.Max(1.0, maxExtent / 200.0);
-        m_sharedSphereMesh = HelixUtils.CreateSphereMesh(new Point3D(0, 0, 0), baseRadius, 24, 16);
+        // scale sphere mesh too
+        m_sharedSphereMesh = HelixUtils.CreateSphereMesh(new Point3D(0, 0, 0), baseRadius * m_renderScale, 24, 16);
         m_modelGroupFront = HelixUtils.CreateModelGroup();
         m_modelGroupBack = HelixUtils.CreateModelGroup();
         m_spheresFront.Clear();
@@ -429,17 +453,21 @@ public partial class MainForm : Form
             var matGroup = new MaterialGroup();
             matGroup.Children.Add(new EmissiveMaterial(brush));
             matGroup.Children.Add(new DiffuseMaterial(brush));
+            // apply center+scale transform
+            var rx = (pos.X - m_renderCenterX) * m_renderScale;
+            var ry = (pos.Y - m_renderCenterY) * m_renderScale;
+            var rz = (pos.Z - m_renderCenterZ) * m_renderScale;
             var sphereFront = new GeometryModel3D
             {
                 Geometry = m_sharedSphereMesh,
                 Material = matGroup,
-                Transform = new TranslateTransform3D(pos.X, pos.Y, pos.Z)
+                Transform = new TranslateTransform3D(rx, ry, rz)
             };
             var sphereBack = new GeometryModel3D
             {
                 Geometry = m_sharedSphereMesh,
                 Material = matGroup,
-                Transform = new TranslateTransform3D(pos.X, pos.Y, pos.Z)
+                Transform = new TranslateTransform3D(rx, ry, rz)
             };
             m_modelGroupFront.Children.Add(sphereFront);
             m_modelGroupBack.Children.Add(sphereBack);
@@ -455,32 +483,72 @@ public partial class MainForm : Form
         m_buffersInitialized = true;
     }
 
-    public void Update3DView(List<TickableSpatialObject> objects, bool useFrontBuffer)
+    public void Update3DView(List<TickableSpatialObject> newObjectList, bool useFrontBuffer)
     {
         if (InvokeRequired)
         {
-            BeginInvoke(new Action(() => Update3DView(objects, useFrontBuffer)));
+            BeginInvoke(new Action(() => Update3DView(newObjectList, useFrontBuffer)));
             return;
         }
         if (!m_buffersInitialized) return;
-        var spheres = useFrontBuffer ? m_spheresFront : m_spheresBack;
-        var nextGroup = useFrontBuffer ? m_modelGroupFront : m_modelGroupBack;
 
-        for (int i = 0; i < objects.Count && i < spheres.Count; i++)
+        // the objects in the list are not the same
+
+        var nextSpheres = useFrontBuffer ? m_spheresFront : m_spheresBack;
+        var nextGroup = useFrontBuffer ? m_modelGroupFront : m_modelGroupBack;
+        int i = 0;
+        for (; i < newObjectList.Count && i < nextSpheres.Count; i++)
         {
-            var pos = objects[i].LocalPosition;
-            var brush = HelixUtils.GetPositionBrush(objects[i], m_maxComponentAbs);
-            if (spheres[i].Transform is TranslateTransform3D tt)
+            var pos = newObjectList[i].LocalPosition;
+            var brush = HelixUtils.GetPositionBrush(newObjectList[i], m_maxComponentAbs);
+            // apply scaling and centering
+            var rx = (pos.X - m_renderCenterX) * m_renderScale;
+            var ry = (pos.Y - m_renderCenterY) * m_renderScale;
+            var rz = (pos.Z - m_renderCenterZ) * m_renderScale;
+            if (nextSpheres[i].Transform is TranslateTransform3D tt)
             {
-                tt.OffsetX = pos.X;
-                tt.OffsetY = pos.Y;
-                tt.OffsetZ = pos.Z;
+                tt.OffsetX = rx;
+                tt.OffsetY = ry;
+                tt.OffsetZ = rz;
             }
-            else spheres[i].Transform = new TranslateTransform3D(pos.X, pos.Y, pos.Z);
-            if (spheres[i].Material is DiffuseMaterial mat)
+            else nextSpheres[i].Transform = new TranslateTransform3D(rx, ry, rz);
+            if (nextSpheres[i].Material is DiffuseMaterial mat)
                 mat.Brush = brush;
-            else spheres[i].Material = new DiffuseMaterial(brush);
+            else nextSpheres[i].Material = new DiffuseMaterial(brush);
         }
+
+        for (int idx = i; idx < newObjectList.Count; idx++)
+        {
+            var obj = newObjectList[idx];
+            var pos = obj.LocalPosition;
+            var brush = HelixUtils.GetPositionBrush(obj, m_maxComponentAbs);
+            var material = new DiffuseMaterial(brush);
+            // scale position
+            var rx = (pos.X - m_renderCenterX) * m_renderScale;
+            var ry = (pos.Y - m_renderCenterY) * m_renderScale;
+            var rz = (pos.Z - m_renderCenterZ) * m_renderScale;
+            var sphereFront = new GeometryModel3D
+            {
+                Geometry = m_sharedSphereMesh,
+                Material = material,
+                Transform = new TranslateTransform3D(rx, ry, rz)
+            };
+            var sphereBack = new GeometryModel3D
+            {
+                Geometry = m_sharedSphereMesh,
+                Material = material,
+                Transform = new TranslateTransform3D(rx, ry, rz)
+            };
+            nextGroup.Children.Add(sphereFront);
+            nextSpheres.Add(sphereFront);
+        }
+
+        for (int j = nextSpheres.Count - 1; j >= i; j--)
+        {
+            nextGroup.Children.RemoveAt(j);
+            nextSpheres.RemoveAt(j);
+        }
+
         if (nextGroup != null)
             m_visual.Content = nextGroup;
     }
