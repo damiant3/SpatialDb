@@ -14,7 +14,7 @@ public interface ISpatialNode
 public abstract class SpatialNode(Region bounds)
     : ISync
 {
-    public Region Bounds { get; } = bounds;
+    public Region Bounds { get; protected set; } = bounds;
     protected readonly ReaderWriterLockSlim Sync  = new(LockRecursionPolicy.SupportsRecursion);
     ReaderWriterLockSlim ISync.Sync => Sync;
     public abstract void AdmitMigrants(IList<ISpatialObject> obj);
@@ -97,7 +97,7 @@ public abstract class LeafNode(Region bounds, OctetParentNode parent)
     : SpatialNode(bounds),
       IChildNode<OctetParentNode>
 {
-    public OctetParentNode Parent { get; } = parent;
+    public OctetParentNode Parent { get; protected set; } = parent;
     public virtual bool CanSubdivide()
         => Bounds.Size.X > 1 && Bounds.Size.Y > 1 && Bounds.Size.Z > 1;
 }
@@ -129,8 +129,18 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
     {
         Occupants.Clear();
         m_isRetired = true;
+        LeafPool<VenueLeafNode>.Return(this);
     }
-    public virtual void Replace(ISpatialObjectProxy proxy)  // Changed signature
+
+    internal virtual void Reinitialize(Region bounds, OctetParentNode parent)
+    {
+        if(!IsRetired) throw new InvalidOperationException("Cannot reinitialize a non-retired leaf node.");
+        Bounds = bounds;
+        Parent = parent;
+        m_isRetired = false;
+    }
+
+    public virtual void Replace(ISpatialObjectProxy proxy)
     {
         using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "VenueLeafNode.Replace");
         var originalObject = proxy.OriginalObject;
@@ -275,7 +285,7 @@ public abstract class SubLatticeBranchNode<TLattice>(Region bounds, OctetParentN
       ISubLatticeBranch
     where TLattice : ISpatialLattice
 {
-    internal TLattice Sublattice { get; set; } = default!;  // to be initialized by subclass constructor
+    internal TLattice Sublattice { get; set; } = default!;
     public ISpatialLattice GetSublattice() => Sublattice;
     public override void AdmitMigrants(IList<ISpatialObject> objs)
         => Sublattice.AdmitMigrants(objs);

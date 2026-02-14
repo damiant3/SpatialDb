@@ -103,7 +103,7 @@ public class ParallelTests
         RunInsertBulk(TestData.GetTinyDispersedObjects(TASKS_PER_ITERATION, 100000));
     }
 
-    //[TestMethod]
+    [TestMethod]
     public void Benchmark_SpatialLattice_vs_ConcurrentDictionary()
     {
         var test = new ConcurrentDictionaryParallelTest(TASKS_PER_ITERATION, BATCH_SIZE, benchmarkTest: true);

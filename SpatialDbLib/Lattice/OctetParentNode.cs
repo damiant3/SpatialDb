@@ -43,7 +43,9 @@ public abstract partial class OctetParentNode
         }
     }
     public virtual VenueLeafNode CreateNewVenueNode(int i, LongVector3 childMin, LongVector3 childMax)
-        => new LargeLeafNode(new(childMin, childMax), this);
+        => LeafPool<LargeLeafNode>.Rent(new (childMin, childMax), this, (bounds, parent) => new LargeLeafNode(bounds, parent));
+   // => new LargeLeafNode(new (childMin, childMax), this);
+
     public SelectChildResult? SelectChild(LongVector3 pos)
     {
         if (!Bounds.Contains(pos)) return null;
