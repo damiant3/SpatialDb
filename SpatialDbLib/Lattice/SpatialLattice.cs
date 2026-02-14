@@ -6,14 +6,12 @@ namespace SpatialDbLib.Lattice;
 
 public class OctetRootNode(Region bounds, byte latticeDepth)
     : RootNode<OctetParentNode, OctetBranchNode, VenueLeafNode, OctetRootNode>(bounds, latticeDepth) { }
-
 public class SpatialLattice: SpatialLattice<OctetRootNode>
 {
     public SpatialLattice() : base() { }
     public SpatialLattice(Region outerBounds, byte latticeDepth) : base(outerBounds, latticeDepth) { }
     public static bool EnablePruning { get; set; } = false;
 }
-
 public interface ISpatialLattice : ISpatialNode
 {
     ISpatialNode GetRootNode();
@@ -54,15 +52,10 @@ public class SpatialLattice<TRoot>
         m_root.OwningLattice = this;
         BoundsTransform = new ParentToSubLatticeTransform(outerBounds);
     }
-
     protected virtual TRoot CreateRoot(Region bounds, byte depth)
-    {
-        // Default creates SpatialRootNode, but can be overridden
-        return (TRoot)(IRootNode<OctetParentNode, OctetBranchNode, VenueLeafNode, TRoot>) new OctetRootNode(bounds, depth);
-    }
+        => (TRoot)(IRootNode<OctetParentNode, OctetBranchNode, VenueLeafNode, TRoot>) new OctetRootNode(bounds, depth);
 
     public byte LatticeDepth => m_root.LatticeDepth;
-
     public static IDisposable PushLatticeDepth(byte depth)
     {
         return new LatticeDepthScope(depth);
@@ -75,7 +68,6 @@ public class SpatialLattice<TRoot>
             m_previousDepth = LatticeDepthContext.CurrentDepth;
             LatticeDepthContext.CurrentDepth = depth;
         }
-
         public void Dispose()
             => LatticeDepthContext.CurrentDepth = m_previousDepth;
     }
@@ -105,21 +97,18 @@ public class SpatialLattice<TRoot>
         return AdmitResult.BulkCreate([.. results.Cast<AdmitResult.Created>().Select(r => r.Proxy)]);
     }
     public AdmitResult Insert(List<ISpatialObject> objs)
-    {
-        return Insert(objs.ToArray());
-    }
+        => Insert(objs.ToArray());
+
     public AdmitResult Insert(ISpatialObject[] objs)
     {
         using var s = PushLatticeDepth(LatticeDepth);
         var admitResult = Admit(objs);
         if (admitResult is AdmitResult.BulkCreated created)
-        {
             foreach (var proxy in created.Proxies)
             {
                 if (proxy.IsCommitted) throw new InvalidOperationException("Proxy is already committed during bulk insert commit.");
                 proxy.Commit();
             }
-        }
         return admitResult;
     }
     public AdmitResult Insert(ISpatialObject obj)
@@ -141,11 +130,11 @@ public class SpatialLattice<TRoot>
             var leaf = m_root.ResolveOccupyingLeaf(obj);
             if (leaf == null) return;
             leaf.Vacate(obj);
-            if (SpatialLattice.EnablePruning)
-                leaf.Parent.PruneIfEmpty();
+            if (SpatialLattice.EnablePruning) leaf.Parent.PruneIfEmpty();
             return;
         }
     }
+
     public void AdmitMigrants(IList<ISpatialObject> objs)
     {
         foreach (var obj in objs)
@@ -184,30 +173,25 @@ public class SpatialLattice<TRoot>
                 var framedPosition = BoundsTransform.OuterToInnerInsertion(proposedPosition, obj.Guid);
                 obj.AppendPosition(framedPosition);
             }
-
         return Admit(buffer);
     }
-
     public VenueLeafNode? ResolveOccupyingLeaf(ISpatialObject obj)
     {
         using var s = PushLatticeDepth(LatticeDepth);
         return m_root.ResolveOccupyingLeaf(obj);
     }
-
     public VenueLeafNode? ResolveLeaf(ISpatialObject obj)
     {
         using var s = PushLatticeDepth(LatticeDepth);
         return m_root.ResolveLeaf(obj);
     }
-
     public IEnumerable<ISpatialObject> QueryWithinDistance(LongVector3 center, ulong radius)
     {
         var results = new List<ISpatialObject>();
-        QueryWithinDistanceRecursive(m_root, center, radius, results);
+        SpatialLattice<TRoot>.QueryWithinDistanceRecursive(m_root, center, radius, results);
         return results;
     }
-
-    private void QueryWithinDistanceRecursive(ISpatialNode node, LongVector3 center, ulong radius, List<ISpatialObject> results)
+    private static void QueryWithinDistanceRecursive(ISpatialNode node, LongVector3 center, ulong radius, List<ISpatialObject> results)
     {
         if (!node.Bounds.IntersectsSphere_SimpleImpl(center, radius)) return;
 
@@ -215,9 +199,7 @@ public class SpatialLattice<TRoot>
         {
             case VenueLeafNode leaf:
             {
-                // Acquire a read lock for the node to get a stable view of Bounds/Children/Occupants.
-                // All concrete node types inherit SpatialNode which implements ISync, so cast is safe.
-                using var _ = new SlimSyncer(((ISync)node).Sync, SlimSyncer.LockMode.Read, "QueryWithinDistance: VenueLeafNode");
+                using var s = new SlimSyncer(((ISync)node).Sync, SlimSyncer.LockMode.Read, "QueryWithinDistance: VenueLeafNode");
                 foreach (var obj in leaf.Occupants)
                 {
                     var distSq = (obj.LocalPosition - center).MagnitudeSquaredBig;
@@ -228,15 +210,13 @@ public class SpatialLattice<TRoot>
             case OctetParentNode parent:
                 foreach (var child in parent.Children)
                     if (child.Bounds.IntersectsSphere_SimpleImpl(center, radius))
-                        QueryWithinDistanceRecursive(child, center, radius, results);
+                        SpatialLattice<TRoot>.QueryWithinDistanceRecursive(child, center, radius, results);
                 break;
             case SubLatticeBranchNode sub:
-                // Transform to inner coordinates
                 var innerCenter = sub.Sublattice.BoundsTransform.OuterToInnerCanonical(center);
-                // Scale radius assuming uniform scale
                 var innerSize = LatticeUniverse.RootRegion.Size;
                 var outerSize = sub.Sublattice.BoundsTransform.OuterLatticeBounds.Size;
-                var scale = innerSize.X / (double)outerSize.X; // Use double for precision
+                var scale = innerSize.X / (double)outerSize.X;
                 var innerRadius = (ulong)(radius * scale);
                 var subResults = sub.Sublattice.QueryWithinDistance(innerCenter, innerRadius);
                 results.AddRange(subResults);

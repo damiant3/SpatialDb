@@ -47,18 +47,17 @@ public abstract class AdmitResult
 
 }
 
-public class ArrayRentalContract(byte[] array)
+public class ArrayRentalContract<T>(T[] array)
     : IDisposable
 {
     private bool m_disposed = false;
-    private readonly byte[] m_array = array;
-
+    private readonly T[] m_array = array;
     public void Dispose()
     {
         if (m_disposed) return;
         m_disposed = true;
         if (m_array != null)
-            ArrayPool<byte>.Shared.Return(m_array, clearArray: false);
+            ArrayPool<T>.Shared.Return(m_array, clearArray: false);
         GC.SuppressFinalize(this);
     }
 }

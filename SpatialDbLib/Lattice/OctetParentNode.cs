@@ -10,7 +10,12 @@ public abstract partial class OctetParentNode
 {
     partial void SubdivideAndMigrate_Impl(OctetParentNode parent, VenueLeafNode subdividingleaf, byte latticeDepth, int childIndex, bool branchOrSublattice);
     partial void BucketAndDispatchMigrants_Impl(IList<ISpatialObject> objs);
-
+    protected static ArrayRentalContract<T> RentArray<T>(int length, out T[] array)
+    {
+        array = ArrayPool<T>.Shared.Rent(length);
+        for (int i = 0; i < length; i++) array[i] = default!;
+        return new ArrayRentalContract<T>(array);
+    }
     public OctetParentNode(Region bounds)
         : base(bounds)
     {
@@ -178,7 +183,7 @@ public abstract partial class OctetParentNode
         void PartitionInPlace(Span<ISpatialObject> span, byte latticeDepth)
         {
             var mid = Parent.Bounds.Mid;
-            using var s = RentArray(span.Length, out var octants);
+            using var s = RentArray<byte>(span.Length, out var octants);
             for (int i = 0; i < span.Length; i++)
             {
                 var pos = span[i].GetPositionAtDepth(latticeDepth);
@@ -225,11 +230,6 @@ public abstract partial class OctetParentNode
                     (octants[pos], octants[swapPos]) = (octants[swapPos], octants[pos]);
                 }
             }
-        }
-        private static ArrayRentalContract RentArray(int length, out byte[] array)
-        {
-            array = ArrayPool<byte>.Shared.Rent(length);
-            return new ArrayRentalContract(array);
         }
     }
     public override AdmitResult Admit(Span<ISpatialObject> buffer)

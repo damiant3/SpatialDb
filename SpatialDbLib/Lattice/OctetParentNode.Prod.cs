@@ -19,13 +19,11 @@ public abstract partial class OctetParentNode
 
     partial void BucketAndDispatchMigrants_Impl(IList<ISpatialObject> objs)
     {
-        var buckets = new List<ISpatialObject>[8];
+        using var s = RentArray<List<ISpatialObject>>(8, out var buckets);
         foreach (var obj in objs)
         {
-            if (!Bounds.Contains(obj.LocalPosition))
-                throw new InvalidOperationException("Migrant has no home.");
-            if (SelectChild(obj.LocalPosition) is not SelectChildResult result)
-                throw new InvalidOperationException("Containment invariant violated");
+            if (!Bounds.Contains(obj.LocalPosition)) throw new InvalidOperationException("Migrant has no home.");
+            if (SelectChild(obj.LocalPosition) is not SelectChildResult result) throw new InvalidOperationException("Containment invariant violated");
             buckets[result.IndexInParent] ??= [];
             buckets[result.IndexInParent].Add(obj);
         }
