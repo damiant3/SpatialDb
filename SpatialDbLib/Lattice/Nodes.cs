@@ -10,7 +10,6 @@ public interface ISpatialNode
     void AdmitMigrants(IList<ISpatialObject> obj);
     Region Bounds { get; }
 }
-
 public abstract class SpatialNode(Region bounds)
     : ISync
 {
@@ -21,7 +20,6 @@ public abstract class SpatialNode(Region bounds)
     public abstract AdmitResult Admit(ISpatialObject obj, LongVector3 proposedPosition);
     public abstract AdmitResult Admit(Span<ISpatialObject> buffer);
 }
-
 public interface IParentNode : ISpatialNode
 {
     IChildNode<OctetParentNode> CreateBranchNodeWithLeafs(
@@ -35,13 +33,11 @@ public interface IParentNode : ISpatialNode
     public abstract VenueLeafNode? ResolveOccupyingLeaf(ISpatialObject obj);
     public abstract VenueLeafNode? ResolveLeaf(ISpatialObject obj);
 }
-
 public interface IChildNode<TParent> : ISpatialNode
     where TParent : OctetParentNode
 {
     public TParent Parent { get; }
 }
-
 public interface IRootNode<TParent, TBranch, TVenue, TSelf>
     : IParentNode
     where TParent : OctetParentNode
@@ -74,7 +70,6 @@ public class RootNode<TParent, TBranch, TVenue, TSelf>(Region bounds, byte latti
     public VenueLeafNode? ResolveLeafFromOuterLattice(ISpatialObject obj)
         => ResolveLeaf(obj);
 }
-
 public abstract class ParentNode(Region bounds)
     : SpatialNode(bounds)
 {
@@ -120,7 +115,6 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
         using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Read, "Venue.HasAnyOccupants: Leaf");
         return Occupants.Count > 0;
     }
-
     internal void Vacate(ISpatialObject obj)
         => Occupants.Remove(obj);
     protected void Occupy(ISpatialObject obj)
@@ -131,7 +125,6 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
         m_isRetired = true;
         LeafPool<VenueLeafNode>.Return(this);
     }
-
     internal virtual void Reinitialize(Region bounds, OctetParentNode parent)
     {
         if(!IsRetired) throw new InvalidOperationException("Cannot reinitialize a non-retired leaf node.");
@@ -139,7 +132,6 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
         Parent = parent;
         m_isRetired = false;
     }
-
     public virtual void Replace(ISpatialObjectProxy proxy)
     {
         using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "VenueLeafNode.Replace");
@@ -162,7 +154,6 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
             Occupants.Add(obj);
         }
     }
-
     public override AdmitResult Admit(ISpatialObject obj, LongVector3 proposedPosition)
     {
         if (!Bounds.Contains(proposedPosition)) return AdmitResult.EscalateRequest();
@@ -174,15 +165,10 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
                 ? AdmitResult.SubdivideRequest(this)
                 : AdmitResult.DelegateRequest(this);
         }
-        if (SlimSyncerDiagnostics.Enabled)
-            Console.WriteLine($"Venue.Admit: leaf.Bounds={Bounds}, proposedPosition={proposedPosition}, IsRetired={IsRetired}, Capacity={Capacity}, Occupants={Occupants.Count}");
         var proxy = CreateProxy((SpatialObject)obj, proposedPosition);
         Occupy(proxy);
-        if (SlimSyncerDiagnostics.Enabled)
-            Console.WriteLine($"Venue.Admit: created proxy for obj.Guid={((SpatialObject)obj).Guid} -> proxy.TargetLeaf.Bounds={proxy.TargetLeaf?.Bounds}");
         return AdmitResult.Create(proxy);
     }
-
     public override AdmitResult Admit(Span<ISpatialObject> buffer)
     {
         using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "Venue.AdmitList: Leaf");
@@ -203,7 +189,6 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
         }
         return AdmitResult.BulkCreate(outProxies);
     }
-
     public MultiObjectScope<ISpatialObject> LockAndSnapshotForMigration()
     {
         var snapshot = new List<ISpatialObject>();
@@ -291,9 +276,7 @@ public abstract class SubLatticeBranchNode<TLattice>(Region bounds, OctetParentN
         => Sublattice.AdmitMigrants(objs);
     public override AdmitResult Admit(ISpatialObject obj, LongVector3 proposedPosition)
     {
-        if (!Bounds.Contains(proposedPosition))
-            return AdmitResult.EscalateRequest();
-
+        if (!Bounds.Contains(proposedPosition)) return AdmitResult.EscalateRequest();
         if (!obj.HasPositionAtDepth(Sublattice.LatticeDepth))
         {
             var sublatticeFramedPosition = Sublattice.BoundsTransform.OuterToInnerInsertion(proposedPosition, obj.Guid);

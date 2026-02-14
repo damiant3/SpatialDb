@@ -100,7 +100,7 @@ public class SerialTests
             Assert.IsTrue(leaf != null);
             lattice.Remove(obj);
             insertedObjects.Remove(obj);
-            Assert.ThrowsException<InvalidOperationException>(() => created.Proxy!.Commit());
+            Assert.Throws<InvalidOperationException>(() => created.Proxy!.Commit());
             leaf = lattice.ResolveOccupyingLeaf(obj);
             Assert.IsTrue(leaf == null);
             Console.WriteLine("Double commit throws, Removed items can't be resolved passed.");
