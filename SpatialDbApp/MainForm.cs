@@ -345,7 +345,7 @@ public partial class MainForm : Form
         m_spheresFront.Clear();
         m_spheresBack.Clear();
 
-        foreach (var obj in objects)
+        foreach (var obj in objects.Take((int)nudDisplayCount.Value))
         {
             var pos = obj.LocalPosition;
             var brush = HelixUtils.GetPositionBrush(obj, m_maxComponentAbs);
@@ -497,7 +497,7 @@ public partial class MainForm : Form
         var nextSpheres = useFrontBuffer ? m_spheresFront : m_spheresBack;
         var nextGroup = useFrontBuffer ? m_modelGroupFront : m_modelGroupBack;
         int i = 0;
-        for (; i < newObjectList.Count && i < nextSpheres.Count; i++)
+        for (; i < newObjectList.Count && i < nextSpheres.Count && i < (int)nudDisplayCount.Value; i++)
         {
             var pos = newObjectList[i].LocalPosition;
             var brush = HelixUtils.GetPositionBrush(newObjectList[i], m_maxComponentAbs);
@@ -517,7 +517,7 @@ public partial class MainForm : Form
             else nextSpheres[i].Material = new DiffuseMaterial(brush);
         }
 
-        for (int idx = i; idx < newObjectList.Count; idx++)
+        for (int idx = i; idx < newObjectList.Count && idx < (int)nudDisplayCount.Value; idx++)
         {
             var obj = newObjectList[idx];
             var pos = obj.LocalPosition;

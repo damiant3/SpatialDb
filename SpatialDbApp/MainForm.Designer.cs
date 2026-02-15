@@ -67,6 +67,7 @@
             // 
             // nudObjCount
             // 
+            nudObjCount.Increment = new decimal(new int[] { 1000, 0, 0, 0 });
             nudObjCount.Location = new Point(193, 7);
             nudObjCount.Maximum = new decimal(new int[] { 100000000, 0, 0, 0 });
             nudObjCount.Name = "nudObjCount";
@@ -77,12 +78,13 @@
             // 
             // nudTime
             // 
+            nudTime.Increment = new decimal(new int[] { 100, 0, 0, 0 });
             nudTime.Location = new Point(557, 7);
             nudTime.Maximum = new decimal(new int[] { 100000000, 0, 0, 0 });
             nudTime.Name = "nudTime";
             nudTime.Size = new Size(55, 23);
             nudTime.TabIndex = 3;
-            nudTime.Value = new decimal(new int[] { 5, 0, 0, 0 });
+            nudTime.Value = new decimal(new int[] { 120, 0, 0, 0 });
             // 
             // label1
             // 
@@ -132,6 +134,7 @@
             // 
             // nudDisplayCount
             // 
+            nudDisplayCount.Increment = new decimal(new int[] { 100, 0, 0, 0 });
             nudDisplayCount.Location = new Point(410, 7);
             nudDisplayCount.Maximum = new decimal(new int[] { 1000000, 0, 0, 0 });
             nudDisplayCount.Name = "nudDisplayCount";

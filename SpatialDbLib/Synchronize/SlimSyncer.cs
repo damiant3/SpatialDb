@@ -110,6 +110,30 @@ public class SlimSyncer : IDisposable
     }
 }
 
+public class MultiSyncerScope()
+    : IDisposable
+{
+
+    readonly List<SlimSyncer> m_locks = [];
+    bool m_disposed;
+    public void Add(SlimSyncer s)
+        => m_locks.Add(s);
+
+    public void Dispose()
+    {
+        if (m_disposed) return;
+        m_disposed = true;
+
+        // reverse order release
+        for (int i = m_locks.Count - 1; i >= 0; i--)
+        {
+            try { m_locks[i].Dispose(); }
+            catch { }
+        }
+
+        GC.SuppressFinalize(this);
+    }
+}
 public class MultiObjectScope<T>(List<T> objects, List<SlimSyncer> locks)
     : IDisposable
 {

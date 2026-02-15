@@ -16,7 +16,6 @@ public abstract partial class OctetParentNode
         subdividingleaf.Retire();
         migrationSnapshot.Dispose();
     }
-
     partial void BucketAndDispatchMigrants_Impl(IList<ISpatialObject> objs)
     {
         using var s = RentArray<List<ISpatialObject>>(8, out var buckets);

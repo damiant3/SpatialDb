@@ -97,6 +97,7 @@ public class SpatialObjectProxy : SpatialObject, ISpatialObjectProxy
         get => m_coordinator.TargetLeaf;
         set => m_coordinator.TargetLeaf = value;
     }
+    public VenueLeafNode? SourceLeaf { get; set; }
     public SpatialObjectProxy(SpatialObject originalObj, VenueLeafNode targetLeaf, LongVector3 proposedPosition)
         : base([.. originalObj.GetPositionStack()])
     {

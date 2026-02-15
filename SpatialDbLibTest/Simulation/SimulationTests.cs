@@ -341,12 +341,15 @@ public class SimulationTests
                 .ToList();
             Assert.IsTrue(finalPositions.Zip(initialPositions, (f, i) => f > i).All(b => b), "All objects should have moved forward");
             Console.WriteLine("✓ PASSED");
+
         }
 
         Console.WriteLine("\n" + "=".PadRight(70, '='));
         Console.WriteLine("ALL SIMULATION FEATURE TESTS PASSED");
         Console.WriteLine("=".PadRight(70, '='));
     }
+
+
 
     private static int GetOctantIndex(LongVector3 pos, LongVector3 mid)
     {

@@ -3,14 +3,12 @@ using SpatialDbLib.Math;
 using SpatialDbLib.Synchronize;
 //////////////////////////////////
 namespace SpatialDbLib.Simulation;
-
 public interface ITickableObject
 {
     TickResult? Tick();
     void RegisterForTicks();
     void UnregisterForTicks();
 }
-
 public interface IMoveableObject
     : ISpatialObject,
       ITickableObject
@@ -20,14 +18,12 @@ public interface IMoveableObject
     IList<IntVector3> GetVelocityStack();
     void SetVelocityStack(IList<IntVector3> newStack);
 }
-
 public interface ITickableMoveableObjectProxy
     : IMoveableObject,
       ISpatialObjectProxy
 {
     new IMoveableObject OriginalObject { get; }
 }
-
 public abstract class TickableSpatialObjectBase(IList<LongVector3> position)
     : SpatialObject(position),
       IMoveableObject
@@ -35,7 +31,7 @@ public abstract class TickableSpatialObjectBase(IList<LongVector3> position)
     private IList<IntVector3> m_velocityStack = [new(0)];
     private int m_lastMsTick = 0;
     private TickableVenueLeafNode? m_occupyingLeaf;
-
+    public VenueLeafNode? GetOccupyingLeaf() => m_occupyingLeaf;
     public bool IsStationary => !SimulationPolicy.MeetsMovementThreshold(LocalVelocity);
 
     public IntVector3 LocalVelocity
@@ -52,49 +48,40 @@ public abstract class TickableSpatialObjectBase(IList<LongVector3> position)
             m_velocityStack[^1] = enforced;
         }
     }
-
     public IntVector3 Velocity
     {
         get => LocalVelocity;
         set => LocalVelocity = value;
     }
-
     public IList<IntVector3> GetVelocityStack()
     {
         using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Read, "TickableSpatialObjectBase.LocalVelocity");
         return [.. m_velocityStack];
     }
-
     public void SetVelocityStack(IList<IntVector3> newStack)
     {
         using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "TickableSpatialObjectBase.LocalVelocity");
         m_velocityStack = newStack;
     }
-
     public void Accelerate(IntVector3 acceleration)
     {
         LocalVelocity += acceleration;
     }
-
     public void SetOccupyingLeaf(TickableVenueLeafNode leaf)
     {
         m_occupyingLeaf = leaf;
     }
-
     public void RegisterForTicks()
     {
         m_lastMsTick = MillisecondTicks32;
         m_occupyingLeaf?.RegisterForTicks(this);
     }
-
     public void UnregisterForTicks()
     {
         m_lastMsTick = 0;
         m_occupyingLeaf?.UnregisterForTicks(this);
     }
-
     public static int MillisecondTicks32 => unchecked((int)((DateTime.Now.Ticks * 429497L) >> 32));
-
     public virtual TickResult? Tick()
     {
         // Avoid int overflow by performing scaling in 64-bit and producing a LongVector3 target.
@@ -106,22 +93,20 @@ public abstract class TickableSpatialObjectBase(IList<LongVector3> position)
         m_lastMsTick = currentMs;
 
         // Scale using 64-bit arithmetic to avoid overflow when velocity * deltaMs exceeds Int32 range
-        long dx = (long)LocalVelocity.X * (long)deltaMs;
-        long dy = (long)LocalVelocity.Y * (long)deltaMs;
-        long dz = (long)LocalVelocity.Z * (long)deltaMs;
+        long dx = LocalVelocity.X * (long)deltaMs;
+        long dy = LocalVelocity.Y * (long)deltaMs;
+        long dz = LocalVelocity.Z * (long)deltaMs;
 
         var pos = LocalPosition;
         var target = new LongVector3(pos.X + dx, pos.Y + dy, pos.Z + dz);
         return TickResult.Move(this, target);
     }
 }
-
 public class TickableSpatialObject : TickableSpatialObjectBase
 {
     public TickableSpatialObject(LongVector3 position) : base([position]) { }
     public TickableSpatialObject(List<LongVector3> position) : base(position) { }
 }
-
 public class TickableSpatialObjectProxy
     : TickableSpatialObjectBase,
       ITickableMoveableObjectProxy
@@ -138,20 +123,18 @@ public class TickableSpatialObjectProxy
         get => m_coordinator.TargetLeaf;
         set => m_coordinator.TargetLeaf = value;
     }
-
-    public TickableSpatialObjectProxy(
-        TickableSpatialObject originalObj,
-        VenueLeafNode targetLeaf,
-        LongVector3 proposedPosition)
+    public VenueLeafNode? SourceLeaf
+    {
+        get => m_coordinator.SourceLeaf;
+        set => m_coordinator.SourceLeaf = value;
+    }
+    public TickableSpatialObjectProxy(TickableSpatialObject originalObj, VenueLeafNode targetLeaf, LongVector3 proposedPosition, VenueLeafNode? sourceLeaf)
         : base([.. originalObj.GetPositionStack()])
     {
-        m_coordinator = new ProxyCommitCoordinator<TickableSpatialObject, TickableSpatialObjectProxy>(
-            originalObj, 
-            targetLeaf);
+        m_coordinator = new ProxyCommitCoordinator<TickableSpatialObject, TickableSpatialObjectProxy>(originalObj, targetLeaf, sourceLeaf);
         SetLocalPosition(proposedPosition);
         SetVelocityStack(originalObj.GetVelocityStack());
     }
-
     public virtual void Commit()
         => m_coordinator.Commit(
             transferState: original =>
@@ -161,8 +144,6 @@ public class TickableSpatialObjectProxy
             },
             clearProxyState: () => SetPositionStack([]),
             proxy: this);
-
-
     public void Rollback()
         => m_coordinator.Rollback(this);
 }

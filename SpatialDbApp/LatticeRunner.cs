@@ -45,7 +45,6 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
     bool m_useFrontBuffer;
 
     List<TickableSpatialObject> m_closestObjects = [];
-    public List<TickableSpatialObject> ClosestObjects => m_closestObjects;
 
     // ===== Display count management =====
     // Setter rules:
@@ -176,13 +175,6 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
             var obj = new TickableSpatialObject(pos)
             {
                 Velocity = velocity
-
-
-
-                //new IntVector3(
-                //    FastRandom.NextInt(-velspan, velspan),
-                //    FastRandom.NextInt(-velspan, velspan),
-                //    FastRandom.NextInt(-velspan, velspan))
             };
             if (!SimulationPolicy.MeetsMovementThreshold(obj.Velocity))
                 throw new InvalidOperationException($"Object velocity {obj.Velocity} should meet movement threshold");
@@ -447,11 +439,15 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
 
         var tickerThread = new Thread(() =>
         {
+            var everyOther = true;
             while (!m_shouldStop)
             {
                 SpatialTicker.TickParallel(m_lattice!);
                 Interlocked.Increment(ref m_tickCount);
                 Thread.Yield(); // GC concession
+                if(everyOther)
+                    m_closestObjects = FindClosestObjectsToOrigin(m_displayObjectCount, m_displayObjectCount);
+                everyOther = !everyOther;
 #if !RenderHandler
                 Update3D();
 #endif
@@ -487,8 +483,6 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
                 }
 
                 Interlocked.Add(ref m_totalMovementDetected, movedThisCheck);
-                m_closestObjects = FindClosestObjectsToOrigin(m_displayObjectCount, m_displayObjectCount);
-
                 Interlocked.Increment(ref m_monitorChecks);
 
                 lock (m_failedObjects)
