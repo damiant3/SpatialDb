@@ -6,13 +6,14 @@ using SpatialDbLib.Simulation;
 using SpatialDbLib.Math;
 //////////////////////////////////////
 namespace SpatialDbLibTest.Diagnostic;
-// Public helper invoked by runtime-compiled variants. Runs a single variant+permutation
-// and returns a concise single-line result string describing detection.
 public static class PublicVariantRunner
 {
     // variantName: "Correct", "LockOrderWrong", "NoLeafLockTaken", "DisposeBeforeRetire"
-    public static string RunVariant(string variantName, bool delaySubdivider, bool delayMigration)
+    public static VariantRunResult RunVariant(string variantName, bool delaySubdivider, bool delayMigration)
     {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var permutation = $"perm(dSub={delaySubdivider},dMig={delayMigration})";
+
         try
         {
             // Map name to enum
@@ -22,14 +23,12 @@ public static class PublicVariantRunner
             SlimSyncerDiagnostics.Enabled = true;
             SpatialLatticeOptions.TrackLocks = true;
 
-            // Reset knobs/hook state
             OctetParentNode.SleepThreadId = 0;
             OctetParentNode.SleepMs = 1;
             OctetParentNode.UseYield = false;
             OctetParentNode.SelectedSubdivideVariant = variant;
             HookSet.Instance.RestetAll();
 
-            // Build lattice & prepare scenario (single permutation)
             var lattice = new TickableSpatialLattice();
             var root = (TickableOctetParentNode)lattice.GetRootNode();
             const int targetChildIndex = 0;
@@ -51,17 +50,26 @@ public static class PublicVariantRunner
             var migrationDelay = new ManualResetEventSlim(true);
             if (delayMigration) migrationDelay.Reset();
 
-            // start subdivider
             var subdivideTask = Task.Run(() =>
                 root.SubdivideAndMigrate(root, subdividingLeaf, lattice.LatticeDepth, targetChildIndex, branchOrSublattice: true)
             );
 
             if (!HookSet.Instance["SignalSubdivideStart"].Wait(TimeSpan.FromSeconds(5)))
-                return $"RUN_ERROR: timed out waiting for subdivider start";
+            {
+                return new VariantRunResult
+                {
+                    VariantName = variantName,
+                    Permutation = permutation,
+                    Completed = false,
+                    Faulted = true,
+                    ErrorMessage = "timed out waiting for subdivider start",
+                    Elapsed = sw.Elapsed,
+                    StackTrace = Environment.StackTrace
+                };
+            }
 
             var subdividerTid = OctetParentNode.CurrentSubdividerThreadId;
 
-            // start migration
             var migrationTask = Task.Run(() =>
             {
                 TickableVenueLeafNode.CurrentTickerThreadId = Environment.CurrentManagedThreadId;
@@ -76,9 +84,19 @@ public static class PublicVariantRunner
             });
 
             if (!HookSet.Instance["SignalTickerStart"].Wait(TimeSpan.FromSeconds(5)))
-                return $"RUN_ERROR: timed out waiting for migration start";
+            {
+                return new VariantRunResult
+                {
+                    VariantName = variantName,
+                    Permutation = permutation,
+                    Completed = false,
+                    Faulted = true,
+                    ErrorMessage = "timed out waiting for migration start",
+                    Elapsed = sw.Elapsed,
+                    StackTrace = Environment.StackTrace
+                };
+            }
 
-            // set subdivider sleep if requested to encourage interleave
             if (delaySubdivider)
             {
                 OctetParentNode.SleepThreadId = subdividerTid;
@@ -89,12 +107,22 @@ public static class PublicVariantRunner
 
             HookSet.Instance["WaitSubdivideProceed"].Set();
             if (!HookSet.Instance["SignalAfterLeafLock"].Wait(TimeSpan.FromSeconds(5)))
-                return $"RUN_ERROR: timed out waiting for subdivider to reach leaf lock";
+            {
+                return new VariantRunResult
+                {
+                    VariantName = variantName,
+                    Permutation = permutation,
+                    Completed = false,
+                    Faulted = true,
+                    ErrorMessage = "timed out waiting for subdivider to reach leaf lock",
+                    Elapsed = sw.Elapsed,
+                    StackTrace = Environment.StackTrace
+                };
+            }
 
             migrationDelay.Set();
             HookSet.Instance["BlockAfterLeafLock"].Set();
 
-            // wait for bucket/dispatch point (or timeout)
             HookSet.Instance["SignalBeforeBucketAndDispatch"].Wait(TimeSpan.FromSeconds(5));
             HookSet.Instance["BlockBeforeBucketAndDispatch"].Set();
             HookSet.Instance["WaitTickerProceed"].Set();
@@ -105,32 +133,96 @@ public static class PublicVariantRunner
             var diag = SlimSyncerDiagnostics.DumpHistory();
             var held = LockTracker.DumpHeldLocks();
 
-            // Narrow detection: only treat specific diagnostic hints as problems.
             var suspiciousDiagTokens = new[]
             {
-                    "Migrant has no home",
-                    "Containment invariant violated",
-                    "Failed to select child",
-                    "(wrong order)"
-                };
+                "Migrant has no home",
+                "Containment invariant violated",
+                "Failed to select child",
+                "(wrong order)"
+            };
             bool diagProblem = !string.IsNullOrEmpty(diag) && suspiciousDiagTokens.Any(tok => diag.Contains(tok, StringComparison.OrdinalIgnoreCase));
 
-            // Detection only if real failure signals appear: timeout, fault, targeted diagnostic messages.
-            if (!completed) return $"DETECTED: tasks timed out (variant={variantName}, dSub={delaySubdivider}, dMig={delayMigration})";
-            if (all.IsFaulted) return $"DETECTED: task faulted (variant={variantName}) - {all.Exception?.Flatten().InnerException?.Message}";
+            if (!completed)
+            {
+                return new VariantRunResult
+                {
+                    VariantName = variantName,
+                    Permutation = permutation,
+                    Completed = false,
+                    Detected = true,
+                    Faulted = false,
+                    ErrorMessage = $"tasks timed out ({variantName})",
+                    Diagnostics = ShortNonEmpty(diag),
+                    LockDump = ShortNonEmpty(held),
+                    Elapsed = sw.Elapsed,
+                    StackTrace = Environment.StackTrace
+                };
+            }
+
+            if (all.IsFaulted)
+            {
+                var ex = all.Exception?.Flatten().InnerException;
+                return new VariantRunResult
+                {
+                    VariantName = variantName,
+                    Permutation = permutation,
+                    Completed = false,
+                    Detected = true,
+                    Faulted = true,
+                    ErrorMessage = ex?.Message ?? "task faulted",
+                    Diagnostics = ShortNonEmpty(diag),
+                    LockDump = ShortNonEmpty(held),
+                    Elapsed = sw.Elapsed,
+                    StackTrace = ex?.StackTrace ?? Environment.StackTrace
+                };
+            }
+
             if (diagProblem)
             {
                 var first = diag.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "<diag>";
-                return $"DETECTED: {first}";
+                return new VariantRunResult
+                {
+                    VariantName = variantName,
+                    Permutation = permutation,
+                    Completed = true,
+                    Detected = true,
+                    Faulted = false,
+                    ErrorMessage = first,
+                    Diagnostics = ShortNonEmpty(diag),
+                    LockDump = ShortNonEmpty(held),
+                    Elapsed = sw.Elapsed,
+                    StackTrace = Environment.StackTrace
+                };
             }
 
-            // LockTracker can be noisy; only report as detection when no other success indicators exist.
-            // If LockTracker shows locks but tasks completed successfully and no targeted diag, treat as NOT_DETECTED.
-            return $"NOT_DETECTED: variant={variantName} perm(dSub={delaySubdivider},dMig={delayMigration})";
+            return new VariantRunResult
+            {
+                VariantName = variantName,
+                Permutation = permutation,
+                Completed = true,
+                Detected = false,
+                Faulted = false,
+                Diagnostics = ShortNonEmpty(diag),
+                LockDump = ShortNonEmpty(held),
+                Elapsed = sw.Elapsed,
+                StackTrace = "" // no need to capture on success
+            };
         }
         catch (Exception ex)
         {
-            return $"RUN_EXCEPTION: {ex.GetType().Name}: {ex.Message}";
+            return new VariantRunResult
+            {
+                VariantName = variantName,
+                Permutation = permutation,
+                Completed = false,
+                Detected = true,
+                Faulted = true,
+                ErrorMessage = ex.Message,
+                Diagnostics = ShortNonEmpty(SlimSyncerDiagnostics.DumpHistory()),
+                LockDump = ShortNonEmpty(LockTracker.DumpHeldLocks()),
+                Elapsed = sw.Elapsed,
+                StackTrace = ex.StackTrace ?? Environment.StackTrace
+            };
         }
         finally
         {
@@ -138,6 +230,14 @@ public static class PublicVariantRunner
             OctetParentNode.SleepThreadId = 0;
             SlimSyncerDiagnostics.Enabled = false;
             SpatialLatticeOptions.TrackLocks = false;
+        }
+
+        static string ShortNonEmpty(string s)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return "";
+            var lines = s.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            if (lines.Length <= 6) return s.Trim();
+            return string.Join(Environment.NewLine, lines.Take(6)) + Environment.NewLine + "...(truncated)";
         }
     }
 }

@@ -1,4 +1,5 @@
 ﻿#if DIAGNOSTIC
+using SpatialDbLib.Lattice;
 
 namespace SpatialDbLibTest.Diagnostic
 {
@@ -11,17 +12,17 @@ namespace SpatialDbLibTest.Diagnostic
         public void Injected_LockOrderWrong_Variant_Stability_25Runs()
         {
             // locate variant source file relative to test build output (deterministic)
-            var buildDir = System.IO.Path.GetDirectoryName(typeof(GeneratedVariantCompilationTests).Assembly.Location) ?? System.AppContext.BaseDirectory;
-            var repoRoot = System.IO.Path.GetFullPath(System.IO.Path.Combine(buildDir, "..", "..", "..", ".."));
-            var variantPath = System.IO.Path.Combine(repoRoot, "SpatialDbLibTest", "Diagnostic", "Variants", "VariantImpl.LockOrderWrong.cs");
+            var buildDir = Path.GetDirectoryName(typeof(GeneratedVariantCompilationTests).Assembly.Location) ?? AppContext.BaseDirectory;
+            var repoRoot = Path.GetFullPath(Path.Combine(buildDir, "..", "..", "..", ".."));
+            var variantPath = Path.Combine(repoRoot, "SpatialDbLibTest", "Diagnostic", "Variants", "VariantImpl.LockOrderWrong.cs");
 
-            if (!System.IO.File.Exists(variantPath))
+            if (!File.Exists(variantPath))
                 Assert.Fail($"Variant file not found at '{variantPath}' (place the small variant file at that path).");
 
-            var source = System.IO.File.ReadAllText(variantPath);
+            var source = File.ReadAllText(variantPath);
 
             // compile & register the variant impl for the LockOrderWrong enum value
-            using var handle = VariantTestHarness.CompileAndRegisterSubdivideImpl(source, SpatialDbLib.Lattice.OctetParentNode.SubdivideVariant.LockOrderWrong);
+            using var handle = VariantTestHarness.CompileAndRegisterSubdivideImpl(source, OctetParentNode.SubdivideVariant.LockOrderWrong);
 
             // run repeated trials for stability
             const int TrialsPerPermutation = 25;
@@ -32,11 +33,15 @@ namespace SpatialDbLibTest.Diagnostic
                 (delaySubdivider: false, delayMigration: true),
                 (delaySubdivider: true,  delayMigration: true)
             };
-
+            TestContext.WriteLine("The purpose of this test is to prove that bad code is bad.  We are going to prove that it is bad");
+            TestContext.WriteLine("by injecting into the lattice code (dynamically!), creating the condition that triggers the bad,");
+            TestContext.WriteLine("capturing it, and reporting it.  This is more an academic exercise than a practical test.");
+            TestContext.WriteLine("And was the result of pushing ChatGPT5-mini to prove the things it was saying.");
+            TestContext.WriteLine("I gave it a great deal of my time to let it build this crazy thing.");
+            TestContext.WriteLine("Luckily, this did get it to stop hallucinating about deadlocks that don't exist. - Damian Tedrow, Feb 2026.");
             foreach (var (delaySubdivider, delayMigration) in permutations)
             {
-                SpatialDbLib.Lattice.OctetParentNode.SelectedSubdivideVariant =
-                    SpatialDbLib.Lattice.OctetParentNode.SubdivideVariant.LockOrderWrong;
+                OctetParentNode.SelectedSubdivideVariant = OctetParentNode.SubdivideVariant.LockOrderWrong;
 
                 int detected = 0;
                 int notDetected = 0;
@@ -45,14 +50,14 @@ namespace SpatialDbLibTest.Diagnostic
                 for (int i = 0; i < TrialsPerPermutation; i++)
                 {
                     var result = PublicVariantRunner.RunVariant("LockOrderWrong", delaySubdivider, delayMigration);
-                    TestContext.WriteLine($"Run #{i+1} perm(dSub={delaySubdivider},dMig={delayMigration}) -> {result}");
+                    TestContext.WriteLine($"Run #{i+1} perm(dSub={delaySubdivider},dMig={delayMigration}) -> {result.VariantName}");
 
-                    if (result.StartsWith("DETECTED", System.StringComparison.OrdinalIgnoreCase)) detected++;
-                    else if (result.StartsWith("NOT_DETECTED", System.StringComparison.OrdinalIgnoreCase)) notDetected++;
-                    else errors++;
+                    if (result.Detected) detected++;
+                    else if (!string.IsNullOrEmpty(result.ErrorMessage)) errors++;
+                    else notDetected++;
                 }
 
-                TestContext.WriteLine($"Summary perm(dSub={delaySubdivider},dMig={delayMigration}): detected={detected}, notDetected={notDetected}, errors={errors}");
+                TestContext.WriteLine($"Summary of permutation (delaySubdivider={delaySubdivider},delayMigrator={delayMigration}): Test condition detected={detected}, notDetected={notDetected}, errors={errors}");
 
                 // Expectation: this injected, obviously-wrong variant should be reliably detected.
                 if (detected == 0)
