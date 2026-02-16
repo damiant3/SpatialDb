@@ -103,8 +103,8 @@ public class AssemblyTypeReport
 
         var sb = new StringBuilder();
         sb.Append($"{GetKind(type)} ");
-        sb.Append($"{GetTypeAccessibility(type).ToString().ToLower()}"); 
-        
+        sb.Append($"{GetTypeAccessibility(type).ToString().ToLower()}");
+
         sb.Append($" {type.FullName}");
         sb.AppendLine();
 

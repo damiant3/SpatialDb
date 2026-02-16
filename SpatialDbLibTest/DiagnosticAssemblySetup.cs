@@ -1,4 +1,3 @@
-using SpatialDbLib.Lattice;
 ///////////////////////////
 namespace SpatialDbLibTest;
 

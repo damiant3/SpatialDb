@@ -1,7 +1,6 @@
 ﻿using SpatialDbLib.Lattice;
-using SpatialDbLib.Math;
 using SpatialDbLibTest.Helpers;
-///////////////////////////
+/////////////////////////////////////
 namespace SpatialDbLibTest.BaseTests;
 
 [TestClass]
@@ -58,7 +57,7 @@ public class ParallelTests
         RunInsertBulk(TestData.GetBimodalObjects(TASKS_PER_ITERATION, BATCH_SIZE, 100000));
 
         Console.WriteLine("=== Single Path Distribution ===");
-        RunInsertBulk(TestData.GetSinglePathObjects(TASKS_PER_ITERATION, BATCH_SIZE, 100000 ));
+        RunInsertBulk(TestData.GetSinglePathObjects(TASKS_PER_ITERATION, BATCH_SIZE, 100000));
 
         Console.WriteLine("=== Skewed Distribution ===");
         RunInsertBulk(TestData.GetSkewedObjects(TASKS_PER_ITERATION, BATCH_SIZE, 100000));

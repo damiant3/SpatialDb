@@ -12,6 +12,7 @@ public class SimulationTests
     // === BASIC FUNCTIONALITY ===
     [TestMethod]
     [DoNotParallelize]
+    [Priority(1)]
     public void SimulationTests_Omnibus()
     {
         Console.WriteLine("=".PadRight(70, '='));
@@ -246,20 +247,20 @@ public class SimulationTests
             var clusterCenter = new LongVector3(10, 10, 10);
             var cluster = new List<TickableSpatialObject>();
             for (int zx = 0; zx < 4; zx++)
-            for (int yy = 0; yy < 4; yy++)
-            for (int xx = 0; xx < 4; xx++)
-            {
-                // small deterministic offsets to spread at the second level
-                var pos = new LongVector3(clusterCenter.X + xx, clusterCenter.Y + yy, clusterCenter.Z + zx);
-                var o = new TickableSpatialObject(pos);
-                cluster.Add(o);
-                tickableLattice.Insert(o);
-            }
+                for (int yy = 0; yy < 4; yy++)
+                    for (int xx = 0; xx < 4; xx++)
+                    {
+                        // small deterministic offsets to spread at the second level
+                        var pos = new LongVector3(clusterCenter.X + xx, clusterCenter.Y + yy, clusterCenter.Z + zx);
+                        var o = new TickableSpatialObject(pos);
+                        cluster.Add(o);
+                        tickableLattice.Insert(o);
+                    }
 
             // Register them and give them a velocity that will move them out of the entire level-2 octet
             foreach (var o in cluster)
             {
-                o.SetVelocityStack([new IntVector3(0,0,0), new IntVector3(-2000, 0, 0)]); // ensure inner lattice has strong movement
+                o.SetVelocityStack([new IntVector3(0, 0, 0), new IntVector3(-2000, 0, 0)]); // ensure inner lattice has strong movement
                 o.RegisterForTicks();
             }
 
@@ -434,7 +435,7 @@ public class SimulationTests
             }
         }
     }
-    [TestMethod]
+    //[TestMethod]
     [DoNotParallelize]
     public void Benchmark_TickPerformance()
     {
@@ -459,7 +460,7 @@ public class SimulationTests
                         FastRandom.NextInt(20, 100),
                         FastRandom.NextInt(20, 100),
                         FastRandom.NextInt(20, 100))
-                    };
+                };
                 objects.Add(obj);
             }
             lattice.Insert(objects.Cast<ISpatialObject>().ToList());

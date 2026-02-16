@@ -112,14 +112,12 @@ public class TickableSpatialObjectProxy
       ITickableMoveableObjectProxy
 {
     private readonly ProxyCommitCoordinator<TickableSpatialObject, TickableSpatialObjectProxy> m_coordinator;
-
     public bool IsCommitted => m_coordinator.IsCommitted;
     public TickableSpatialObject OriginalObject => m_coordinator.OriginalObject;
     IMoveableObject ITickableMoveableObjectProxy.OriginalObject => OriginalObject;
     ISpatialObject ISpatialObjectProxy.OriginalObject => OriginalObject;
-    
     public VenueLeafNode TargetLeaf
-    { 
+    {
         get => m_coordinator.TargetLeaf;
         set => m_coordinator.TargetLeaf = value;
     }

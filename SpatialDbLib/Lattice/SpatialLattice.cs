@@ -5,8 +5,9 @@ using System.Numerics;
 namespace SpatialDbLib.Lattice;
 
 public class OctetRootNode(Region bounds, byte latticeDepth)
-    : RootNode<OctetParentNode, OctetBranchNode, VenueLeafNode, OctetRootNode>(bounds, latticeDepth) { }
-public class SpatialLattice: SpatialLattice<OctetRootNode>
+    : RootNode<OctetParentNode, OctetBranchNode, VenueLeafNode, OctetRootNode>(bounds, latticeDepth)
+{ }
+public class SpatialLattice : SpatialLattice<OctetRootNode>
 {
     public SpatialLattice() : base() { }
     public SpatialLattice(Region outerBounds, byte latticeDepth) : base(outerBounds, latticeDepth) { }
@@ -53,7 +54,7 @@ public class SpatialLattice<TRoot>
         BoundsTransform = new ParentToSubLatticeTransform(outerBounds);
     }
     protected virtual TRoot CreateRoot(Region bounds, byte depth)
-        => (TRoot)(IRootNode<OctetParentNode, OctetBranchNode, VenueLeafNode, TRoot>) new OctetRootNode(bounds, depth);
+        => (TRoot)(IRootNode<OctetParentNode, OctetBranchNode, VenueLeafNode, TRoot>)new OctetRootNode(bounds, depth);
 
     public byte LatticeDepth => m_root.LatticeDepth;
     public static IDisposable PushLatticeDepth(byte depth)
@@ -135,14 +136,14 @@ public class SpatialLattice<TRoot>
         }
     }
 
-    public void AdmitMigrants(IList<ISpatialObject> objs)
+    public void Migrate(IList<ISpatialObject> objs)
     {
         foreach (var obj in objs)
         {
             var inner = BoundsTransform.OuterToInnerInsertion(obj.LocalPosition, obj.Guid);
             obj.AppendPosition(inner);
         }
-        m_root.AdmitMigrants(objs);
+        m_root.Migrate(objs);
     }
 
     public AdmitResult Admit(ISpatialObject obj, LongVector3 proposedPosition)

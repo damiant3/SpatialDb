@@ -11,7 +11,7 @@ public class TestHelperTests
     private const int DICT_SIZE = 1000;
     private const int CONCURRENT_THREADS = 8;
 
-   // [TestMethod]
+    // [TestMethod]
     public void TestConcurrentDictionaryExtensions_Performance()
     {
         Console.WriteLine("=".PadRight(80, '='));
@@ -24,7 +24,7 @@ public class TestHelperTests
         Console.WriteLine($"CURRENT - Avg time per operation: {fastResult.AvgTimeNs:F2} ns");
         Console.WriteLine($"CURRENT - Success rate: {fastResult.SuccessRate:P2}");
         Console.WriteLine($"CURRENT - Operations per second: {fastResult.OpsPerSecond:N0}");
-        
+
         var fastOptResult = BenchmarkTryTakeRandomFastOptimized();
         Console.WriteLine($"OPTIMIZED - Avg time per operation: {fastOptResult.AvgTimeNs:F2} ns");
         Console.WriteLine($"OPTIMIZED - Success rate: {fastOptResult.SuccessRate:P2}");
@@ -37,7 +37,7 @@ public class TestHelperTests
         Console.WriteLine($"CURRENT - Avg time per operation: {accurateResult.AvgTimeNs:F2} ns");
         Console.WriteLine($"CURRENT - Success rate: {accurateResult.SuccessRate:P2}");
         Console.WriteLine($"CURRENT - Operations per second: {accurateResult.OpsPerSecond:N0}");
-        
+
         var accurateOptResult = BenchmarkTryTakeRandomOptimized();
         Console.WriteLine($"OPTIMIZED - Avg time per operation: {accurateOptResult.AvgTimeNs:F2} ns");
         Console.WriteLine($"OPTIMIZED - Success rate: {accurateOptResult.SuccessRate:P2}");
@@ -93,7 +93,7 @@ public class TestHelperTests
         // Test that optimized methods actually remove items
         var dict = CreatePopulatedDictionary(100);
         int initialCount = dict.Count;
-        
+
         bool success = dict.TryTakeRandomFast(out var taken);
         Assert.IsTrue(success, "TryTakeRandomFast should succeed on non-empty dictionary");
         Assert.AreEqual(initialCount - 1, dict.Count, "Item should be removed");
@@ -400,7 +400,7 @@ public class TestHelperTests
         // Single item test 1 - Optimized version should succeed reliably
         var singleDict1 = new ConcurrentDictionary<int, string>();
         singleDict1.TryAdd(1, "value");
-        
+
         Assert.IsTrue(singleDict1.TryTakeRandomFast(out var taken1), "Fast: Should succeed with single item");
         Assert.AreEqual(1, taken1.Key);
         Assert.AreEqual(0, singleDict1.Count);

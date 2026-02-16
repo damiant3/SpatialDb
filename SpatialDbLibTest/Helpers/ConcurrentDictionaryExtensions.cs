@@ -8,7 +8,7 @@ public static class ConcurrentDictionaryTestExtensions
     // ============================================================================
     // CURRENT IMPLEMENTATION (Optimized)
     // ============================================================================
-    
+
     /// <summary>
     /// Attempts to remove a random item using bounded enumeration.
     /// Fast but may fail when dictionary is nearly empty under high contention.
@@ -114,7 +114,7 @@ public static class ConcurrentDictionaryTestExtensions
     // ============================================================================
     // DEPRECATED IMPLEMENTATIONS (for comparison/testing only)
     // ============================================================================
-    
+
     /// <summary>
     /// DEPRECATED: Original implementation with probabilistic failure bug.
     /// Use TryTakeRandomFast instead.
@@ -171,7 +171,7 @@ public static class ConcurrentDictionaryTestExtensions
         int index = FastRandom.NextInt(snapshot.Length);
         var candidate = snapshot[index];
 
-         if (!dict.TryRemove(candidate.Key, out TValue? value))
+        if (!dict.TryRemove(candidate.Key, out TValue? value))
             return false;
 
         taken = new KeyValuePair<TKey, TValue>(candidate.Key, value);
@@ -181,7 +181,7 @@ public static class ConcurrentDictionaryTestExtensions
     // ============================================================================
     // OPTIMIZED IMPLEMENTATIONS (for testing/comparison)
     // ============================================================================
-    
+
     /// <summary>
     /// TESTING ONLY: Alias for current optimized implementation.
     /// Use TryTakeRandomFast for production code.

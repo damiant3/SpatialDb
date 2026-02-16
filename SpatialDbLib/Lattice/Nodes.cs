@@ -7,16 +7,16 @@ public interface ISpatialNode
 {
     AdmitResult Admit(ISpatialObject obj, LongVector3 proposedPosition);
     AdmitResult Admit(Span<ISpatialObject> buffer);
-    void AdmitMigrants(IList<ISpatialObject> obj);
+    void Migrate(IList<ISpatialObject> objects);
     Region Bounds { get; }
 }
 public abstract class SpatialNode(Region bounds)
     : ISync
 {
     public Region Bounds { get; protected set; } = bounds;
-    protected readonly ReaderWriterLockSlim Sync  = new(LockRecursionPolicy.SupportsRecursion);
+    protected readonly ReaderWriterLockSlim Sync = new(LockRecursionPolicy.SupportsRecursion);
     ReaderWriterLockSlim ISync.Sync => Sync;
-    public abstract void AdmitMigrants(IList<ISpatialObject> obj);
+    public abstract void Migrate(IList<ISpatialObject> obj);
     public abstract AdmitResult Admit(ISpatialObject obj, LongVector3 proposedPosition);
     public abstract AdmitResult Admit(Span<ISpatialObject> buffer);
 }
@@ -64,9 +64,6 @@ public class RootNode<TParent, TBranch, TVenue, TSelf>(Region bounds, byte latti
 
     public byte LatticeDepth { get; } = latticeDepth;
 
-    public override void AdmitMigrants(IList<ISpatialObject> objs)
-        => BucketAndDispatchMigrants(objs);
-
     public VenueLeafNode? ResolveLeafFromOuterLattice(ISpatialObject obj)
         => ResolveLeaf(obj);
 }
@@ -84,7 +81,7 @@ public class OctetBranchNode
         : base(bounds)
     {
         Parent = parent;
-        AdmitMigrants(migrants);
+        Migrate(migrants);
     }
     public OctetParentNode Parent { get; }
 }
@@ -127,7 +124,7 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
     }
     internal virtual void Reinitialize(Region bounds, OctetParentNode parent)
     {
-        if(!IsRetired) throw new InvalidOperationException("Cannot reinitialize a non-retired leaf node.");
+        if (!IsRetired) throw new InvalidOperationException("Cannot reinitialize a non-retired leaf node.");
         Bounds = bounds;
         Parent = parent;
         m_isRetired = false;
@@ -145,7 +142,7 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
     public virtual int Capacity => 8;
     public bool IsAtCapacity(int toAdd = 1)
         => Occupants.Count + toAdd > Capacity;
-    public override void AdmitMigrants(IList<ISpatialObject> objs)
+    public override void Migrate(IList<ISpatialObject> objs)
     {
         foreach (var obj in objs)
         {
@@ -214,7 +211,7 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
                     throw;
                 }
             }
-            return new (snapshot, locksAcquired);
+            return new(snapshot, locksAcquired);
         }
         catch
         {
@@ -272,8 +269,8 @@ public abstract class SubLatticeBranchNode<TLattice>(Region bounds, OctetParentN
 {
     internal TLattice Sublattice { get; set; } = default!;
     public ISpatialLattice GetSublattice() => Sublattice;
-    public override void AdmitMigrants(IList<ISpatialObject> objs)
-        => Sublattice.AdmitMigrants(objs);
+    public override void Migrate(IList<ISpatialObject> objs)
+        => Sublattice.Migrate(objs);
     public override AdmitResult Admit(ISpatialObject obj, LongVector3 proposedPosition)
     {
         if (!Bounds.Contains(proposedPosition)) return AdmitResult.EscalateRequest();
@@ -297,6 +294,6 @@ public class SubLatticeBranchNode
         : base(bounds, parent)
     {
         Sublattice = new SpatialLattice(bounds, latticeDepth);
-        Sublattice.AdmitMigrants(migrants);
+        Sublattice.Migrate(migrants);
     }
 }

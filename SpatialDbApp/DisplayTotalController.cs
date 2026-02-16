@@ -1,6 +1,3 @@
-using System;
-using System.Windows.Forms;
-
 namespace SpatialDbApp;
 
 internal sealed class DisplayTotalController : IDisposable

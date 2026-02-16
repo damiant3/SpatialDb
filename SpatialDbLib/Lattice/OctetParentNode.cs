@@ -8,14 +8,19 @@ public abstract partial class OctetParentNode
     : ParentNode,
       IParentNode
 {
-    partial void SubdivideAndMigrate_Impl(OctetParentNode parent, VenueLeafNode subdividingleaf, byte latticeDepth, int childIndex, bool branchOrSublattice);
-    partial void BucketAndDispatchMigrants_Impl(IList<ISpatialObject> objs);
+    partial void Subdivide_Impl(OctetParentNode parent, VenueLeafNode subdividingleaf, byte latticeDepth, int childIndex, bool branchOrSublattice);
+    partial void Migrate_Impl(IList<ISpatialObject> objs);
     protected static ArrayRentalContract<T> RentArray<T>(int length, out T[] array)
     {
         array = ArrayPool<T>.Shared.Rent(length);
         for (int i = 0; i < length; i++) array[i] = default!;
         return new ArrayRentalContract<T>(array);
     }
+    public void Subdivide(OctetParentNode parent, VenueLeafNode subdividingleaf, byte latticeDepth, int childIndex, bool branchOrSublattice)
+    => Subdivide_Impl(parent, subdividingleaf, latticeDepth, childIndex, branchOrSublattice);
+    public override void Migrate(IList<ISpatialObject> objs)
+        => Migrate_Impl(objs);
+
     public OctetParentNode(Region bounds)
         : base(bounds)
     {
@@ -43,8 +48,8 @@ public abstract partial class OctetParentNode
         }
     }
     public virtual VenueLeafNode CreateNewVenueNode(int i, LongVector3 childMin, LongVector3 childMax)
-        => LeafPool<LargeLeafNode>.Rent(new (childMin, childMax), this, (bounds, parent) => new LargeLeafNode(bounds, parent));
-   // => new LargeLeafNode(new (childMin, childMax), this);
+        => LeafPool<LargeLeafNode>.Rent(new(childMin, childMax), this, (bounds, parent) => new LargeLeafNode(bounds, parent));
+    // => new LargeLeafNode(new (childMin, childMax), this);
 
     public SelectChildResult? SelectChild(LongVector3 pos)
     {
@@ -92,12 +97,6 @@ public abstract partial class OctetParentNode
         }
         return null;
     }
-    public void SubdivideAndMigrate(OctetParentNode parent, VenueLeafNode subdividingleaf, byte latticeDepth, int childIndex, bool branchOrSublattice)
-        => SubdivideAndMigrate_Impl(parent, subdividingleaf, latticeDepth, childIndex, branchOrSublattice);
-    public override void AdmitMigrants(IList<ISpatialObject> objs)
-        => BucketAndDispatchMigrants(objs);
-    public void BucketAndDispatchMigrants(IList<ISpatialObject> objs)
-        => BucketAndDispatchMigrants_Impl(objs);
     public struct AdmitFrame(OctetParentNode parent, IChildNode<OctetParentNode> childNode, byte childIndex)
     {
         public OctetParentNode Parent = parent;
@@ -139,7 +138,7 @@ public abstract partial class OctetParentNode
                 {
                     if (frame.ChildNode is not VenueLeafNode subdividingLeaf) throw new InvalidOperationException("Subdivide/Delgate request from non-venue leaf.");
                     if (!subdividingLeaf.IsRetired)
-                        SubdivideAndMigrate(
+                        Subdivide(
                             frame.Parent,
                             subdividingLeaf,
                             SpatialLattice.CurrentThreadLatticeDepth,
@@ -283,7 +282,7 @@ public abstract partial class OctetParentNode
                     {
                         var venue2 = leaf as VenueLeafNode ?? throw new InvalidOperationException("Subdivision requested by non-venueleaf");
                         if (!venue2.IsRetired)
-                            SubdivideAndMigrate(
+                            Subdivide(
                                 frame.Parent,
                                 venue2,
                                 SpatialLattice.CurrentThreadLatticeDepth,

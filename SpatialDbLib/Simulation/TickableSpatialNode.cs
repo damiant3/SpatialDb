@@ -8,17 +8,15 @@ public interface ITickableSpatialNode : ISpatialNode
 {
     void Tick();
 }
-
 public interface ITickableChildNode
-    : IChildNode<TickableOctetParentNode>, ITickableSpatialNode { }
-
+    : IChildNode<TickableOctetParentNode>, ITickableSpatialNode
+{ }
 public class TickableOctetParentNode(Region bounds)
     : OctetParentNode(bounds),
       ITickableSpatialNode
 {
     public override VenueLeafNode CreateNewVenueNode(int i, LongVector3 childMin, LongVector3 childMax)
         => new TickableVenueLeafNode(new Region(childMin, childMax), this);
-
     public override IChildNode<OctetParentNode> CreateBranchNodeWithLeafs(
         OctetParentNode parent,
         VenueLeafNode subdividingLeaf,
@@ -28,16 +26,14 @@ public class TickableOctetParentNode(Region bounds)
     {
         var tickableParent = (TickableOctetParentNode)parent;
         var tickableLeaf = (TickableVenueLeafNode)subdividingLeaf;
-
         return branchOrSublattice
             ? new TickableOctetBranchNode(tickableLeaf.Bounds, tickableParent, occupantsSnapshot)
             : new TickableSubLatticeBranchNode(tickableLeaf.Bounds, tickableParent, latticeDepth, occupantsSnapshot);
     }
-
     protected ITickableChildNode GetTickableChild(int index)
         => (ITickableChildNode)base.Children[index];
 
-public virtual void Tick()
+    public virtual void Tick()
     {
         for (int i = 0; i < 8; i++)
             GetTickableChild(i).Tick();
@@ -46,7 +42,6 @@ public virtual void Tick()
             PruneIfEmpty();
     }
 }
-
 public class TickableOctetBranchNode
     : TickableOctetParentNode,
       IChildNode<OctetParentNode>,
@@ -56,14 +51,13 @@ public class TickableOctetBranchNode
         : base(bounds)
     {
         Parent = parent;
-        AdmitMigrants(migrants);
+        Migrate(migrants);
     }
 
     public TickableOctetParentNode Parent { get; }
     TickableOctetParentNode IChildNode<TickableOctetParentNode>.Parent => Parent;
     OctetParentNode IChildNode<OctetParentNode>.Parent => Parent;
 }
-
 public partial class TickableVenueLeafNode(Region bounds, TickableOctetParentNode parent)
     : VenueLeafNode(bounds, parent),
       ITickableSpatialNode,
@@ -72,19 +66,17 @@ public partial class TickableVenueLeafNode(Region bounds, TickableOctetParentNod
     public partial void Tick();
     public override int Capacity => 64;
     internal List<ITickableObject> m_tickableObjects = [];
+    TickableOctetParentNode IChildNode<TickableOctetParentNode>.Parent => (TickableOctetParentNode)Parent;
+
     protected override ISpatialObjectProxy CreateProxy<T>(T obj, LongVector3 proposedPosition)
     {
         if (obj is TickableSpatialObject tickable)
             return new TickableSpatialObjectProxy(tickable, this, proposedPosition, tickable.GetOccupyingLeaf());
         return base.CreateProxy(obj, proposedPosition);
     }
-
-    TickableOctetParentNode IChildNode<TickableOctetParentNode>.Parent
-        => (TickableOctetParentNode)Parent;
-
-    public override void AdmitMigrants(IList<ISpatialObject> objs)
+    public override void Migrate(IList<ISpatialObject> objs)
     {
-        base.AdmitMigrants(objs);
+        base.Migrate(objs);
         foreach (var obj in objs)
         {
             if (obj is TickableSpatialObjectBase tickable)
@@ -94,7 +86,6 @@ public partial class TickableVenueLeafNode(Region bounds, TickableOctetParentNod
             }
         }
     }
-
     public override void Replace(ISpatialObjectProxy proxy)
     {
         if (proxy is ITickableObject tickableProxy)
@@ -113,7 +104,6 @@ public partial class TickableVenueLeafNode(Region bounds, TickableOctetParentNod
         if (!m_tickableObjects.Contains(obj))
             m_tickableObjects.Add(obj);
     }
-
     public void UnregisterForTicks(ITickableObject obj)
     {
         using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "TickableSpatialNode: UnregisterForTicks");
@@ -137,16 +127,12 @@ public partial class TickableVenueLeafNode(Region bounds, TickableOctetParentNod
     private void HandleBoundaryCrossing(SpatialObject obj, LongVector3 newPosition)
     {
         var tickableObj = obj as TickableSpatialObjectBase;
-        if (tickableObj != null)
-            UnregisterForTicks(tickableObj);
-
+        if (tickableObj != null) UnregisterForTicks(tickableObj);
         var currentParent = Parent;
         AdmitResult admitResult;
-
         while (true)
         {
             admitResult = currentParent.Admit(obj, newPosition);
-
             if (admitResult is AdmitResult.Escalate)
             {
                 if (currentParent is IChildNode<TickableOctetParentNode> child)
@@ -156,14 +142,13 @@ public partial class TickableVenueLeafNode(Region bounds, TickableOctetParentNod
                 }
                 else
                 {
-                    if (tickableObj != null) 
+                    if (tickableObj != null)
                         RegisterForTicks(tickableObj);
                     return;
                 }
             }
             break;
         }
-
 
         switch (admitResult)
         {
@@ -185,7 +170,6 @@ public partial class TickableVenueLeafNode(Region bounds, TickableOctetParentNod
                         Vacate(obj);
                     break;
                 }
-
                 static int CompareBoundsMin(LongVector3 a, LongVector3 b)
                 {
                     var c = a.X.CompareTo(b.X);
@@ -203,11 +187,9 @@ public partial class TickableVenueLeafNode(Region bounds, TickableOctetParentNod
                     first = targetLeaf;
                     second = sourceLeaf;
                 }
-
-                const int maxAttempts = 3;
-                var moved = false;
-                for (int attempt = 0; attempt < maxAttempts; attempt++)
+                while (true)
                 {
+
                     using var l1 = new SlimSyncer(((ISync)first).Sync, SlimSyncer.LockMode.Write, "HandleBoundaryCrossing: move-first");
                     using var l2 = new SlimSyncer(((ISync)second).Sync, SlimSyncer.LockMode.Write, "HandleBoundaryCrossing: move-second");
                     // Double-check retirement while holding both leaf locks.
@@ -218,24 +200,13 @@ public partial class TickableVenueLeafNode(Region bounds, TickableOctetParentNod
                         Thread.Yield();
                         continue;
                     }
-
                     // With both leaf locks held and neither retired, commit then vacate.
                     created.Proxy.Commit();
                     Vacate(obj);
-                    moved = true;
                     break;
                 }
-
-                if (!moved)
-                {
-                    // Bounded retries exhausted — fall back to the robust single-leaf commit path.
-                    // Let ProxyCommitCoordinator handle any internal retry on retired leafs.
-                    created.Proxy.Commit();
-                    Vacate(obj);
-                }
-                break;
             }
-
+            break;
             case AdmitResult.Rejected:
                 if (tickableObj != null)
                     RegisterForTicks(tickableObj);
@@ -294,7 +265,7 @@ public class TickableRootNode<TParent, TBranch, TVenue, TSelf>(Region bounds, by
     public override VenueLeafNode CreateNewVenueNode(int i, LongVector3 childMin, LongVector3 childMax)
         => new TickableVenueLeafNode(new Region(childMin, childMax), this);
 
-    public VenueLeafNode? ResolveLeafFromOuterLattice(ISpatialObject obj) 
+    public VenueLeafNode? ResolveLeafFromOuterLattice(ISpatialObject obj)
         => ResolveLeaf(obj);
 }
 
@@ -336,7 +307,7 @@ public class TickableSubLatticeBranchNode
     {
         Parent = parent;
         Sublattice = new TickableSpatialLattice(bounds, (byte)(latticeDepth + 1));
-        Sublattice.AdmitMigrants(migrants);
+        Sublattice.Migrate(migrants);
     }
     public void Tick() => Sublattice.Tick();
 }

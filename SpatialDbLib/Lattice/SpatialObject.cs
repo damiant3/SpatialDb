@@ -58,7 +58,7 @@ public class SpatialObject(IList<LongVector3> initialPosition)
             return m_positionStack.Count;
         }
     }
-        public bool HasPositionAtDepth(int depth)
+    public bool HasPositionAtDepth(int depth)
     {
         if (depth < 0) return false;
         using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Read, "SpatialObject.HasPositionAtDepth");

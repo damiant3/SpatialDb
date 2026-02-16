@@ -1,7 +1,7 @@
-﻿using System.Collections.Concurrent;
+﻿using SpatialDbLib.Lattice;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
-using SpatialDbLib.Lattice;
 //////////////////////////
 namespace SpatialDbLibTest.Helpers;
 

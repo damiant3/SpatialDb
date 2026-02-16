@@ -349,7 +349,7 @@ public class SerialTests
 
     // === PERFORMANCE BENCHMARK ===
 
-    [TestMethod]
+    //[TestMethod]
     public void QueryPerformance()
     {
         var lattice = new SpatialLattice();

@@ -103,7 +103,7 @@ public class ParentToSubLatticeTransform(Region outerBounds)
         var repX = baseX + discriminator % scaleX;
         var repY = baseY + (discriminator >> 21) % scaleY;
         var repZ = baseZ + (discriminator >> 42) % scaleZ;
-        return new LongVector3(unchecked((long)repX),unchecked((long)repY),unchecked((long)repZ));
+        return new LongVector3(unchecked((long)repX), unchecked((long)repY), unchecked((long)repZ));
     }
     public LongVector3 OuterToInnerCanonical(LongVector3 outerPosition)
     {

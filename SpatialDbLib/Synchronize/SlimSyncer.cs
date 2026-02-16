@@ -138,7 +138,7 @@ public class MultiObjectScope<T>(List<T> objects, List<SlimSyncer> locks)
     : IDisposable
 {
     public List<T> Objects { get; } = objects;
-    
+
     readonly List<SlimSyncer> m_locks = locks;
     bool m_disposed;
 

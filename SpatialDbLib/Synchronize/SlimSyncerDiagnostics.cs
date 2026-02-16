@@ -34,16 +34,13 @@ public static class SlimSyncerDiagnostics
 
     // For per-thread compression & last-seen tracking
     private static readonly ConcurrentDictionary<int, ThreadLogState> _perThread = new();
-
     // Optional historical log for later analysis / debugging
     private static readonly ConcurrentDictionary<int, List<LockEvent>> _threadHistory = new();
 
     private static void Log(EventKind kind, SlimSyncer.LockMode mode, string resource)
     {
         if (!Enabled) return;
-
         int tid = Environment.CurrentManagedThreadId;
-
         // --- compress repeated events per-thread ---
         var state = _perThread.GetOrAdd(tid, _ => new ThreadLogState());
 
@@ -68,7 +65,6 @@ public static class SlimSyncerDiagnostics
             state.Count = 1;
             PrintFirst(tid, state);
         }
-
         var histList = _threadHistory.GetOrAdd(tid, _ => new List<LockEvent>());
         lock (histList)
         {
@@ -93,7 +89,6 @@ public static class SlimSyncerDiagnostics
             }
         }
     }
-
     private static void PrintFirst(int tid, ThreadLogState state)
     {
         if (state.Count != 1) return;
@@ -105,10 +100,8 @@ public static class SlimSyncerDiagnostics
             EventKind.Upgrade => "UPGRD",
             _ => "?????"
         };
-
         Debug.WriteLine($"{prefix} T{tid} {state.Mode} {state.Resource}");
     }
-
     private static void Flush(int tid, ThreadLogState state)
     {
         if (state.Count < 2) return;
@@ -125,14 +118,12 @@ public static class SlimSyncerDiagnostics
         Debug.WriteLine($"{prefix} T{tid} {state.Mode} {state.Resource}{suffix}");
         state.Count = 0;
     }
-
     public static void FlushAll()
     {
         foreach (var kv in _perThread)
             Flush(kv.Key, kv.Value);
     }
-
-   public static string DumpHistory()
+    public static string DumpHistory()
     {
         var sb = new StringBuilder();
         foreach (var kv in _threadHistory)
@@ -151,8 +142,6 @@ public static class SlimSyncerDiagnostics
         }
         return sb.ToString();
     }
-
-
     public static void OnEnter(ReaderWriterLockSlim @lock, string resourceName, SlimSyncer.LockMode mode)
         => Log(EventKind.Enter, mode, resourceName);
 

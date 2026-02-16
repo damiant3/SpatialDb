@@ -1,6 +1,5 @@
 ﻿using SpatialDbLib.Lattice;
 using SpatialDbLib.Synchronize;
-using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
@@ -34,7 +33,7 @@ public class ContainerTestDiagnostics<T>
         Initialize();
     }
 
-    bool  needsCleanup = false;
+    bool needsCleanup = false;
     public void Initialize()
     {
         if (needsCleanup) return;
@@ -341,10 +340,10 @@ public class ParallelContainerTestDiagnostic<T>(int taskCount = 1, int batchSize
 
         if (Inserts > 0) sb.Append($"Inserts: {Inserts}");
         if (FailedInserts > 0) sb.Append($" (failed: {FailedInserts})");
-        if(Inserts > 0 || FailedInserts > 0) sb.AppendLine();
+        if (Inserts > 0 || FailedInserts > 0) sb.AppendLine();
         if (Removes > 0) sb.Append($"Removes: {Removes}");
         if (FailedRemoves > 0) sb.Append($" (failed: {FailedRemoves})");
-        if(Removes > 0 || FailedRemoves > 0) sb.AppendLine();
+        if (Removes > 0 || FailedRemoves > 0) sb.AppendLine();
         sb.Append($"Test Time: {TestTimeTotal}");
         if (Inserts > 0) sb.Append($" Insert time: {InsertTimeTotal}, {InsertTimePerOperation}");
         if (Removes > 0) sb.Append($" Remove time: {RemoveTimeTotal}, {RemoveTimePerOperation}");

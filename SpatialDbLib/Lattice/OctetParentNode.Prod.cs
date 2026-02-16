@@ -4,7 +4,7 @@ using SpatialDbLib.Synchronize;
 namespace SpatialDbLib.Lattice;
 public abstract partial class OctetParentNode
 {
-    partial void SubdivideAndMigrate_Impl(OctetParentNode parent, VenueLeafNode subdividingleaf, byte latticeDepth, int childIndex, bool branchOrSublattice)
+    partial void Subdivide_Impl(OctetParentNode parent, VenueLeafNode subdividingleaf, byte latticeDepth, int childIndex, bool branchOrSublattice)
     {
         using var parentLock = new SlimSyncer(((ISync)parent).Sync, SlimSyncer.LockMode.Write, "SubdivideAndMigrate: Parent");
         using var leafLock = new SlimSyncer(((ISync)subdividingleaf).Sync, SlimSyncer.LockMode.Write, "SubdivideAndMigrate: Leaf");
@@ -16,7 +16,7 @@ public abstract partial class OctetParentNode
         subdividingleaf.Retire();
         migrationSnapshot.Dispose();
     }
-    partial void BucketAndDispatchMigrants_Impl(IList<ISpatialObject> objs)
+    partial void Migrate_Impl(IList<ISpatialObject> objs)
     {
         using var s = RentArray<List<ISpatialObject>>(8, out var buckets);
         foreach (var obj in objs)
@@ -29,7 +29,7 @@ public abstract partial class OctetParentNode
         for (byte i = 0; i < 8; i++)
         {
             if (buckets[i] == null) continue;
-            Children[i].AdmitMigrants(buckets[i]);
+            Children[i].Migrate(buckets[i]);
         }
     }
 }

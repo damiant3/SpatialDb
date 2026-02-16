@@ -1,10 +1,10 @@
-﻿using System.Diagnostics;
-using System.Collections.Concurrent;
+﻿using SpatialDbApp.Log;
+using SpatialDbApp.Reporting;
 using SpatialDbLib.Lattice;
 using SpatialDbLib.Math;
 using SpatialDbLib.Simulation;
-using SpatialDbApp.Reporting;
-using SpatialDbApp.Log;
+using System.Collections.Concurrent;
+using System.Diagnostics;
 ///////////////////////
 namespace SpatialDbApp;
 
@@ -111,7 +111,7 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
 
     public void RunGrandSimulation(int objectCount, int durationMs, int spaceRange = int.MaxValue)
     {
-        if(m_isRunning)
+        if (m_isRunning)
         {
             LogLine("Simulation already running!");
             return;
@@ -546,7 +546,7 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
 
     void FinalReport()
     {
-        if(m_objects == null || m_lattice == null) return;
+        if (m_objects == null || m_lattice == null) return;
         LogLine(ReportBuilder.FinalReport(m_objects, m_lattice, m_initialPositions, m_stopwatch, m_tickCount, m_totalMovementDetected, m_monitorChecks, m_objectCount));
     }
 
@@ -565,14 +565,14 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
         var collected = new HashSet<TickableSpatialObject>();
 
         // Expand radius until we have at least minCount objects or hit a large enough radius
-                while (collected.Count < minCount && radius < (ulong)long.MaxValue / 2)
-                {
+        while (collected.Count < minCount && radius < (ulong)long.MaxValue / 2)
+        {
             var query = m_lattice!.QueryWithinDistance(center, radius);
-                    foreach (var obj in query)
-                    {
-                        if (obj is TickableSpatialObject tickable)
-                            collected.Add(tickable);
-                    }
+            foreach (var obj in query)
+            {
+                if (obj is TickableSpatialObject tickable)
+                    collected.Add(tickable);
+            }
             radius *= 2; // double the radius
         }
 

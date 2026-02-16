@@ -42,9 +42,9 @@ public class LatticeTestHelpers
                 lattice.Insert(obj);
             }
         }
-        catch (Exception ex) 
-        { 
-            Console.WriteLine("Exception during ForceSublattice: " + ex); 
+        catch (Exception ex)
+        {
+            Console.WriteLine("Exception during ForceSublattice: " + ex);
         }
         return tempObjs;
     }
