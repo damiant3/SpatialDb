@@ -622,4 +622,30 @@ public partial class MainForm : Form
             cmbLoadFile.Enabled = true;
         }
     }
+
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        base.OnFormClosing(e);
+
+        try
+        {
+            // If a run is active, request it stop and wait briefly so worker threads don't keep the process alive.
+            if (m_latticeRunner != null)
+            {
+                try { m_latticeRunner.RequestStop(); } catch { }
+                try { m_latticeRunner.WaitForStop(3000); } catch { }
+            }
+
+            // Also remove render handler subscription if present (defensive)
+            if (m_renderHandler != null)
+            {
+                try { CompositionTarget.Rendering -= m_renderHandler; } catch { }
+                m_renderHandler = null;
+            }
+        }
+        catch
+        {
+            // best-effort; avoid throwing during form close
+        }
+    }
 }

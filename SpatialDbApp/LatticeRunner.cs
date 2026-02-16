@@ -1,21 +1,16 @@
-﻿using System;
-using System.Diagnostics;
-using System.Linq;
+﻿using System.Diagnostics;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Threading;
-using System.Windows.Forms;
 using SpatialDbLib.Lattice;
 using SpatialDbLib.Math;
 using SpatialDbLib.Simulation;
-using SpatialDbApp.Logging;
 using SpatialDbApp.Reporting;
-
+using SpatialDbApp.Log;
+///////////////////////
 namespace SpatialDbApp;
 
 internal class LatticeRunner(MainForm form, RichTextBox logRtb)
 {
-    readonly LatticeLogger m_logger = new(logRtb);
+    readonly LatticeLogger m_logger = new(UiLogSink.CreateFor(logRtb));
     readonly MainForm? m_form = form;
 
     bool m_isRunning;
@@ -24,32 +19,26 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
     int m_totalMovementDetected;
     readonly List<TickableSpatialObject> m_failedObjects = [];
     readonly Stopwatch m_stopwatch = new();
+
+    // Shutdown coordination fields (non-volatile as requested)
     bool m_shouldStop;
+    Thread? m_tickerThread;
+    Thread? m_monitorThread;
+    readonly object m_stopSync = new();
+
     TickableSpatialLattice? m_lattice;
     List<TickableSpatialObject>? m_objects;
     ConcurrentDictionary<TickableSpatialObject, LongVector3>? m_initialPositions;
     ConcurrentDictionary<TickableSpatialObject, LongVector3>? m_lastPositions;
-
-    // Total objects and displayed subset logic
     int m_objectCount;
     int m_displayObjectCount;
     public event Action<int>? TotalObjectCountChanged;
     public event Action<int>? DisplayObjectCountChanged;
-
-    // Signal to UI that the lattice + initial view are ready and the render handler may be attached.
     public event Action? RenderingReady;
-
-    // Simulation parameters
     int m_spaceRange;
     int m_durationMs;
     bool m_useFrontBuffer;
-
     List<TickableSpatialObject> m_closestObjects = [];
-
-    // ===== Display count management =====
-    // Setter rules:
-    // - If display == total, it tracks total and follows increases.
-    // - If display != total, it remains unchanged when total changes (except clamp down if total < display).
     public int DisplayObjectCount
     {
         get => m_displayObjectCount;
@@ -64,25 +53,61 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
 
     public void SetTotalObjects(int newTotal)
     {
-        if (newTotal < 0) throw new ArgumentOutOfRangeException(nameof(newTotal));
+        ArgumentOutOfRangeException.ThrowIfNegative(newTotal);
         var oldTotal = m_objectCount;
         m_objectCount = newTotal;
-
-        // Determine whether display was "tracking" the total (exact equality)
         var wasTracking = (m_displayObjectCount == oldTotal);
-
-        if (wasTracking)
-            m_displayObjectCount = newTotal;
-        else if (m_displayObjectCount > newTotal)
-            m_displayObjectCount = newTotal;
-
+        if (wasTracking) m_displayObjectCount = newTotal;
+        else if (m_displayObjectCount > newTotal) m_displayObjectCount = newTotal;
         TotalObjectCountChanged?.Invoke(m_objectCount);
         DisplayObjectCountChanged?.Invoke(m_displayObjectCount);
     }
-
-    // ===== Logging helpers delegating to LatticeLogger =====
     void LogLine(string message) => m_logger.LogLine(message);
     void Log(string message) => m_logger.Log(message);
+
+    /// <summary>
+    /// Request the running simulation to stop. Returns quickly.
+    /// </summary>
+    public void RequestStop()
+    {
+        m_shouldStop = true;
+        try
+        {
+            lock (m_stopSync)
+            {
+                try { m_monitorThread?.Interrupt(); } catch { }
+                try { m_tickerThread?.Interrupt(); } catch { }
+            }
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// Wait up to <paramref name="timeoutMs"/> for worker threads to exit.
+    /// </summary>
+    public bool WaitForStop(int timeoutMs)
+    {
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            Thread? t = m_tickerThread;
+            if (t != null)
+            {
+                var remaining = timeoutMs - (int)sw.ElapsedMilliseconds;
+                if (remaining > 0) t.Join(remaining);
+            }
+
+            t = m_monitorThread;
+            if (t != null)
+            {
+                var remaining = timeoutMs - (int)sw.ElapsedMilliseconds;
+                if (remaining > 0) t.Join(remaining);
+            }
+        }
+        catch { }
+
+        return !(m_tickerThread?.IsAlive ?? false) && !(m_monitorThread?.IsAlive ?? false);
+    }
 
     public void RunGrandSimulation(int objectCount, int durationMs, int spaceRange = int.MaxValue)
     {
@@ -92,8 +117,8 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
             return;
         }
         m_isRunning = true;
+        m_shouldStop = false;
 
-        // Use setter logic so display count reacts as requested by UI rules.
         SetTotalObjects(objectCount);
         m_spaceRange = spaceRange;
         m_durationMs = durationMs;
@@ -103,22 +128,12 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
             m_objects = [];
             m_initialPositions = new ConcurrentDictionary<TickableSpatialObject, LongVector3>();
             m_lastPositions = new ConcurrentDictionary<TickableSpatialObject, LongVector3>();
-
             PerformPreflight();
-
-            // Determine how many objects to request from the lattice for rendering.
-            // Use the UI-requested DisplayObjectCount when > 0; otherwise fall back to a sane default
-            // (min(5000, total)). Always clamp to the total object count.
             var requested = (DisplayObjectCount > 0) ? DisplayObjectCount : Math.Min(5000, m_objectCount);
             var toRender = Math.Max(0, Math.Min(requested, m_objectCount));
-
-            // Initial query and initial view setup.
             m_closestObjects = FindClosestObjectsToOrigin(toRender, toRender);
             m_form?.Setup3DView(m_closestObjects);
-
-            // Signal UI that the lattice and initial view are ready -> UI may attach CompositionTarget.Rendering now.
-            try { RenderingReady?.Invoke(); } catch { /* best effort: swallow to avoid impacting test flow */ }
-
+            RenderingReady?.Invoke();
             TickOnceAndTest();
             RunSimulationForDuration();
             FinalReport();
@@ -128,8 +143,14 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
             LogLine($"\nEXCEPTION during grand simulation: {ex}");
             throw new InvalidOperationException($"Grand simulation threw an exception: {ex}", ex);
         }
-        m_logger.ScrollToEnd();
-        m_isRunning = false;
+        finally
+        {
+            // Ensure worker threads are stopped when the run finishes or is aborted.
+            RequestStop();
+            WaitForStop(5000);
+            try { m_logger.ScrollToEnd(); } catch { }
+            m_isRunning = false;
+        }
     }
 
     void PerformPreflight()
@@ -141,10 +162,7 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
                 FastRandom.NextInt(-m_spaceRange, m_spaceRange),
                 FastRandom.NextInt(-m_spaceRange, m_spaceRange),
                 FastRandom.NextInt(-m_spaceRange, m_spaceRange));
-
-            // Set velocity directed toward origin at ~25000 units (clicks) magnitude
             const double targetSpeed = 45000.0;
-            // direction from position to origin is (-pos)
             double dx = -pos.X;
             double dy = -pos.Y;
             double dz = -pos.Z;
@@ -153,7 +171,6 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
             IntVector3 velocity;
             if (dist <= double.Epsilon)
             {
-                // If already at origin, give a small random nudge to avoid zero-velocity
                 velocity = new IntVector3(
                     FastRandom.NextInt(-2500, 2500),
                     FastRandom.NextInt(-2500, 2500),
@@ -162,7 +179,6 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
             else
             {
                 double scale = targetSpeed / dist;
-                // compute scaled components in 64-bit then clamp to int range
                 long vxL = (long)Math.Round(dx * scale);
                 long vyL = (long)Math.Round(dy * scale);
                 long vzL = (long)Math.Round(dz * scale);
@@ -188,8 +204,6 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
         m_lattice!.Insert(m_objects!.Cast<ISpatialObject>().ToList());
         insertSw.Stop();
         LogLine($"Inserted {m_objectCount} objects in {insertSw.ElapsedMilliseconds}ms");
-
-        // Post-insert validation (collect data and delegate summary formatting)
         var postInsertIssues = new List<string>();
         var objectInOccupantsCount = 0;
         var proxyInOccupantsCount = 0;
@@ -237,18 +251,14 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
             if (proxyRegistered != null)
                 postInsertIssues.Add($"Object {obj.Guid}: PROXY registered in m_tickable_objects instead of original!");
         }
-
-        // Use ReportBuilder to create a concise summary string
         LogLine(ReportBuilder.BuildPostInsertSummary(
             objectInOccupantsCount,
             proxyInOccupantsCount,
             tickableNotRegisteredCount,
             postInsertIssues,
             m_objectCount));
-
         if (postInsertIssues.Count > 0)
             throw new InvalidOperationException($"Post-insert validation failed! {postInsertIssues.Count} issues detected BEFORE RegisterForTicks() was even called!");
-
         LogLine("\nCalling RegisterForTicks() on all objects...");
         var registrationFailures = new List<(TickableSpatialObject obj, string reason)>();
 
@@ -268,7 +278,6 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
             }
             else registrationFailures.Add((obj, "No leaf found"));
         }
-
         if (registrationFailures.Count > 0)
         {
             LogLine($"\n⚠ REGISTRATION FAILURES: {registrationFailures.Count} objects failed to register!");
@@ -280,13 +289,10 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
             throw new InvalidOperationException($"RegisterForTicks() failed for {registrationFailures.Count} objects!");
         }
         LogLine($"✓ All {m_objectCount} objects successfully registered for ticks");
-
-        // Pre-flight validation summary
         var preFlightIssues = new List<string>();
         var unregisteredCount = 0;
         var missingLeafCount = 0;
         var wrongPositionCount = 0;
-
         foreach (var obj in m_objects)
         {
             if (m_lattice.ResolveOccupyingLeaf(obj) is not TickableVenueLeafNode leaf)
@@ -310,9 +316,7 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
                 preFlightIssues.Add($"Object position changed during setup: expected {expectedPos}, got {obj.LocalPosition}");
             }
         }
-
         LogLine(ReportBuilder.BuildPreFlightSummary(missingLeafCount, unregisteredCount, wrongPositionCount, preFlightIssues));
-
         if (preFlightIssues.Count > 0)
             throw new InvalidOperationException($"Pre-flight validation failed with {preFlightIssues.Count} issues. Objects not properly registered before simulation start!");
     }
@@ -321,7 +325,6 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
     {
         Thread.Sleep(50);
         m_lattice!.Tick();
-
         LogLine("\n=== Post-Tick Validation ===");
         var postTickIssues = new List<string>();
         var movedCount = 0;
@@ -331,7 +334,6 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
         var leafChangedCount = 0;
         var movedButNotInTickables = 0;
         var unchangedButNotInTickables = 0;
-
         foreach (var obj in m_objects!)
         {
             var currentPos = obj.LocalPosition;
@@ -386,7 +388,7 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
             if (firstUnmovedUnregistered != null)
                 LogLine($"\n🔍 REGISTRATION HISTORY FOR UNMOVED OBJECT {firstUnmovedUnregistered.Guid}:");
         }
-        ReportBuilder.PostTickReport(
+        LogLine(ReportBuilder.PostTickReport(
             movedCount,
             unchangedCount,
             missingFromLeafCount,
@@ -394,14 +396,13 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
             leafChangedCount,
             movedButNotInTickables,
             unchangedButNotInTickables,
-            m_objectCount);
+            m_objectCount));
 
         if (postTickIssues.Count > 0)
         {
             LogLine($"\n⚠ POST-TICK ISSUES ({postTickIssues.Count} total, showing first 20):");
             foreach (var issue in postTickIssues.Take(20))
                 LogLine($"  {issue}");
-
             if (movedButNotInTickables > 0)
             {
                 var failedMovedObj = m_objects.FirstOrDefault(o =>
@@ -427,178 +428,128 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
         else
             LogLine($"✓ Post-tick validation PASSED - {movedCount} objects moved successfully");
     }
-
-
-
     void RunSimulationForDuration()
     {
-        // after testing one tick, we have high confidence that all objects are properly set up and will move when ticked.
-        // Now we can start the concurrent simulation with many threads pumping ticks and another monitoring object movement.
         LogLine($"\nStarting concurrent ticker and monitor threads for {m_durationMs}ms...");
         m_stopwatch.Restart();
-
-        var tickerThread = new Thread(() =>
+        m_tickerThread = new Thread(() =>
         {
-            var everyOther = true;
-            while (!m_shouldStop)
+            try
             {
-                SpatialTicker.TickParallel(m_lattice!);
-                Interlocked.Increment(ref m_tickCount);
-                Thread.Yield(); // GC concession
-                if(everyOther)
-                    m_closestObjects = FindClosestObjectsToOrigin(m_displayObjectCount, m_displayObjectCount);
-                everyOther = !everyOther;
+                var everyOther = true;
+                while (!m_shouldStop)
+                {
+                    SpatialTicker.TickParallel(m_lattice!);
+                    Interlocked.Increment(ref m_tickCount);
+                    Thread.Yield(); // GC concession
+                    everyOther = !everyOther;
 #if !RenderHandler
-                Update3D();
+                    Update3D();
 #endif
+                }
             }
-        });
-
-        var monitorThread = new Thread(() =>
-        {
-            while (!m_shouldStop)
+            catch (ThreadInterruptedException)
             {
-                var movedThisCheck = 0;
-                var currentFailures = new List<TickableSpatialObject>();
-                foreach (var obj in m_objects!)
-                {
-                    if (obj.IsStationary)
-                    {
-                        currentFailures.Add(obj);
-                        continue;
-                    }
-                    var leaf = m_lattice!.ResolveOccupyingLeaf(obj);
-                    if (leaf == null)
-                    {
-                        currentFailures.Add(obj);
-                        continue;
-                    }
-                    var currentPos = obj.LocalPosition;
-                    var previousPos = m_lastPositions![obj];
-                    if (currentPos != previousPos)
-                    {
-                        movedThisCheck++;
-                        m_lastPositions[obj] = currentPos;
-                    }
-                }
-
-                Interlocked.Add(ref m_totalMovementDetected, movedThisCheck);
-                Interlocked.Increment(ref m_monitorChecks);
-
-                lock (m_failedObjects)
-                {
-                    foreach (var failed in currentFailures)
-                        if (!m_failedObjects.Contains(failed))
-                            m_failedObjects.Add(failed);
-                }
-                Thread.Sleep(10);
-                Log(".");
+                // Expected on shutdown
             }
-        });
-        tickerThread.Start();
+            catch (Exception ex)
+            {
+                try { LogLine($"\nTicker thread exception: {ex}"); } catch { }
+            }
+        })
+        { IsBackground = true };
+
+        m_monitorThread = new Thread(() =>
+        {
+            try
+            {
+                while (!m_shouldStop)
+                {
+                    var movedThisCheck = 0;
+                    var currentFailures = new List<TickableSpatialObject>();
+                    foreach (var obj in m_objects!)
+                    {
+                        if (obj.IsStationary)
+                        {
+                            currentFailures.Add(obj);
+                            continue;
+                        }
+                        var leaf = m_lattice!.ResolveOccupyingLeaf(obj);
+                        if (leaf == null)
+                        {
+                            currentFailures.Add(obj);
+                            continue;
+                        }
+                        var currentPos = obj.LocalPosition;
+                        var previousPos = m_lastPositions![obj];
+                        if (currentPos != previousPos)
+                        {
+                            movedThisCheck++;
+                            m_lastPositions[obj] = currentPos;
+                        }
+                    }
+
+                    Interlocked.Add(ref m_totalMovementDetected, movedThisCheck);
+                    Interlocked.Increment(ref m_monitorChecks);
+
+                    lock (m_failedObjects)
+                    {
+                        foreach (var failed in currentFailures)
+                            if (!m_failedObjects.Contains(failed))
+                                m_failedObjects.Add(failed);
+                    }
+
+                    try
+                    {
+                        Thread.SpinWait(10);
+                        Log(".");
+                    }
+                    catch (ThreadInterruptedException)
+                    {
+                        if (m_shouldStop) break;
+                    }
+
+                    Log(".");
+                }
+            }
+            catch (ThreadInterruptedException)
+            {
+                // expected on shutdown
+            }
+            catch (Exception ex)
+            {
+                try { LogLine($"\nMonitor thread exception: {ex}"); } catch { }
+            }
+        })
+        { IsBackground = true };
+        m_tickerThread.Start();
         Thread.Sleep(100);
-        monitorThread.Start();
-        Thread.Sleep(m_durationMs);
+        m_monitorThread.Start();
+        var sw = Stopwatch.StartNew();
+        while (!m_shouldStop && sw.ElapsedMilliseconds < m_durationMs)
+        {
+            Thread.Sleep(50);
+        }
         m_shouldStop = true;
-        tickerThread.Join();
-        monitorThread.Join();
+        WaitForStop(m_durationMs > 5000 ? 5000 : 2000);
+        if (m_tickerThread?.IsAlive == true || m_monitorThread?.IsAlive == true)
+        {
+            RequestStop();
+            WaitForStop(2000);
+        }
+
+        m_tickerThread = null;
+        m_monitorThread = null;
+
         m_stopwatch.Stop();
     }
 
     void FinalReport()
     {
-        var finalStationaryCount = 0;
-        var finalMissingCount = 0;
-        var finalNoMovementCount = 0;
-        var unmoved = new List<(TickableSpatialObject obj, string diagnosis)>();
-        foreach (var obj in m_objects!)
-        {
-            if (obj.IsStationary) finalStationaryCount++;
-            var leaf = m_lattice!.ResolveOccupyingLeaf(obj) as TickableVenueLeafNode;
-            if (leaf == null) finalMissingCount++;
-            var finalPos = obj.LocalPosition;
-            var initialPos = m_initialPositions![obj];
-            if (finalPos == initialPos)
-            {
-                finalNoMovementCount++;
-                var diagnosis = new System.Text.StringBuilder();
-                diagnosis.Append($"Pos: {initialPos}, Vel: {obj.Velocity}");
-                var hasOccupyingLeaf = leaf != null;
-                diagnosis.Append($", HasLeaf: {hasOccupyingLeaf}");
-                var originalLeaf = m_lattice.ResolveOccupyingLeaf(obj) as TickableVenueLeafNode;
-                var initialLeafStillExists = false;
-                var movedToNewLeaf = false;
-                if (leaf != null)
-                {
-                    initialLeafStillExists = leaf.Bounds.Contains(initialPos);
-                    movedToNewLeaf = !leaf.Bounds.Contains(initialPos);
-                }
-                diagnosis.Append($", LeafContainsInitialPos: {initialLeafStillExists}");
-                diagnosis.Append($", MovedLeaf: {movedToNewLeaf}");
-                var isRegisteredInLeaf = false;
-                var isLeafRetired = false;
-                if (leaf != null)
-                {
-                    var tickableList2 = leaf.m_tickableObjects;
-                    isRegisteredInLeaf = tickableList2?.Contains(obj) ?? false;
-                    isLeafRetired = leaf.IsRetired;
-                }
-                diagnosis.Append($", RegInLeaf: {isRegisteredInLeaf}");
-                diagnosis.Append($", LeafRetired: {isLeafRetired}");
-                diagnosis.Append($", Stationary: {obj.IsStationary}");
-                unmoved.Add((obj, diagnosis.ToString()));
-            }
-        }
-
-        LogLine($"\n=== Simulation Results ===");
-        LogLine($"Duration: {m_stopwatch.ElapsedMilliseconds}ms");
-        LogLine($"Total ticks: {m_tickCount}");
-        LogLine($"Ticks/sec: {m_tickCount * 1000.0 / m_stopwatch.ElapsedMilliseconds:N0}");
-        LogLine($"Avg tick duration: {(m_tickCount > 0 ? m_stopwatch.ElapsedMilliseconds / (double)m_tickCount : 0):N2}ms");
-        LogLine($"Monitor checks: {m_monitorChecks}");
-        LogLine($"Total movement events detected: {m_totalMovementDetected}");
-        LogLine($"Avg movements per check: {(m_monitorChecks > 0 ? m_totalMovementDetected / (double)m_monitorChecks : 0):N1}");
-        LogLine($"\n=== Validation ===");
-        LogLine($"Objects that became stationary: {finalStationaryCount}");
-        LogLine($"Objects missing from lattice: {finalMissingCount}");
-        LogLine($"Objects that never moved from initial position: {finalNoMovementCount}");
-
-        if (finalNoMovementCount > 0)
-        {
-            LogLine($"\n=== Unmoved Object Diagnostics ({finalNoMovementCount} total) ===");
-            foreach (var (obj, diagnosis) in unmoved.Take(10))
-                LogLine($"  {diagnosis}");
-            var unmovedWithLeaf = unmoved.Count(x => x.diagnosis.Contains("HasLeaf: True"));
-            var unmovedRegistered = unmoved.Count(x => x.diagnosis.Contains("RegInLeaf: True"));
-            LogLine($"\nUnmoved objects WITH occupying leaf: {unmovedWithLeaf}/{finalNoMovementCount}");
-            LogLine($"Unmoved objects REGISTERED in leaf: {unmovedRegistered}/{finalNoMovementCount}");
-            var unmovedPercentage = finalNoMovementCount / (double)m_objectCount * 100;
-            LogLine($"Unmoved percentage: {unmovedPercentage:N3}%");
-            var expectedTicksPerObject = m_tickCount / (double)m_objectCount;
-            LogLine($"Expected ticks per object: {expectedTicksPerObject:N2}");
-            if (expectedTicksPerObject < 0.1)
-                LogLine("WARNING: Tick rate too low to guarantee all objects move");
-        }
-
-        if (finalStationaryCount != 0)
-            throw new InvalidOperationException("No objects should become stationary during simulation");
-        if (finalMissingCount != 0)
-            throw new InvalidOperationException("All objects should remain in the lattice throughout simulation");
-        var minExpectedTicksPerObject = 0.5;
-        if (m_tickCount / (double)m_objectCount >= minExpectedTicksPerObject)
-        {
-            if (finalNoMovementCount != 0)
-                throw new InvalidOperationException($"All objects should have moved at least once during simulation (had {m_tickCount} ticks for {m_objectCount} objects)");
-        }
-        else
-            LogLine($"⚠ Skipping movement assertion: Only {m_tickCount / (double)m_objectCount:N2} ticks/object (< {minExpectedTicksPerObject})");
-
-        if (m_tickCount <= 0)
-            throw new InvalidOperationException("Ticker should have completed at least one tick");
-        if (m_totalMovementDetected <= 0)
-            throw new InvalidOperationException("Monitor should have detected movement");
-        LogLine("\n✓ Grand simulation test PASSED");
+        if(m_objects == null || m_lattice == null) return;
+        LogLine(ReportBuilder.FinalReport(m_objects, m_lattice, m_initialPositions, m_stopwatch, m_tickCount, m_totalMovementDetected, m_monitorChecks, m_objectCount));
     }
+
 
     // Call this from your tick loop (or from CompositionTarget.Rendering)
     public void Update3D()
