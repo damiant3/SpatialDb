@@ -22,7 +22,7 @@ public abstract class SpatialNode(Region bounds)
 }
 public interface IParentNode : ISpatialNode
 {
-    IChildNode<OctetParentNode> CreateBranchNodeWithLeafs(
+    IInternalChildNode CreateBranchNodeWithLeafs(
         OctetParentNode parent,
         VenueLeafNode subdividingleaf,
         byte latticeDepth,
@@ -33,6 +33,13 @@ public interface IParentNode : ISpatialNode
     public abstract VenueLeafNode? ResolveOccupyingLeaf(ISpatialObject obj);
     public abstract VenueLeafNode? ResolveLeaf(ISpatialObject obj);
 }
+
+// public child contract to allow parent-side fast calls without exposing members widely
+public interface IInternalChildNode : IChildNode<OctetParentNode>
+{
+    void MigrateInternal(IList<ISpatialObject> objs);
+}
+
 public interface IChildNode<TParent> : ISpatialNode
     where TParent : OctetParentNode
 {
@@ -70,12 +77,13 @@ public class RootNode<TParent, TBranch, TVenue, TSelf>(Region bounds, byte latti
 public abstract class ParentNode(Region bounds)
     : SpatialNode(bounds)
 {
-    public abstract IChildNode<OctetParentNode>[] Children { get; }
+    public abstract IInternalChildNode[] Children { get; }
     public abstract void PruneIfEmpty();
 }
 public class OctetBranchNode
     : OctetParentNode,
-      IChildNode<OctetParentNode>
+      IChildNode<OctetParentNode>,
+      IInternalChildNode
 {
     public OctetBranchNode(Region bounds, OctetParentNode parent, IList<ISpatialObject> migrants)
         : base(bounds)
@@ -84,6 +92,9 @@ public class OctetBranchNode
         Migrate(migrants);
     }
     public OctetParentNode Parent { get; }
+
+    // explicit internal forwarding
+    void IInternalChildNode.MigrateInternal(IList<ISpatialObject> objs) => Migrate(objs);
 }
 public abstract class LeafNode(Region bounds, OctetParentNode parent)
     : SpatialNode(bounds),
@@ -94,7 +105,8 @@ public abstract class LeafNode(Region bounds, OctetParentNode parent)
         => Bounds.Size.X > 1 && Bounds.Size.Y > 1 && Bounds.Size.Z > 1;
 }
 public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
-    : LeafNode(bounds, parent)
+    : LeafNode(bounds, parent),
+      IInternalChildNode
 {
     internal IList<ISpatialObject> Occupants { get; } = [];
     protected virtual ISpatialObjectProxy CreateProxy<T>(T obj, LongVector3 proposedPosition)
@@ -151,6 +163,10 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
             Occupants.Add(obj);
         }
     }
+
+    // explicit internal forwarding
+    void IInternalChildNode.MigrateInternal(IList<ISpatialObject> objs) => Migrate(objs);
+
     public override AdmitResult Admit(ISpatialObject obj, LongVector3 proposedPosition)
     {
         if (!Bounds.Contains(proposedPosition)) return AdmitResult.EscalateRequest();
@@ -264,13 +280,18 @@ public interface ISubLatticeBranch
 }
 public abstract class SubLatticeBranchNode<TLattice>(Region bounds, OctetParentNode parent)
     : LeafNode(bounds, parent),
-      ISubLatticeBranch
+      ISubLatticeBranch,
+      IInternalChildNode
     where TLattice : ISpatialLattice
 {
     internal TLattice Sublattice { get; set; } = default!;
     public ISpatialLattice GetSublattice() => Sublattice;
     public override void Migrate(IList<ISpatialObject> objs)
         => Sublattice.Migrate(objs);
+
+    // explicit internal forwarding
+    void IInternalChildNode.MigrateInternal(IList<ISpatialObject> objs) => Migrate(objs);
+
     public override AdmitResult Admit(ISpatialObject obj, LongVector3 proposedPosition)
     {
         if (!Bounds.Contains(proposedPosition)) return AdmitResult.EscalateRequest();

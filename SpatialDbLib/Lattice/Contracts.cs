@@ -53,10 +53,10 @@ internal sealed class BufferSlice(int start, int length)
     public int Length { get; } = length;
     public Span<ISpatialObject> GetSpan(Span<ISpatialObject> rootBuffer) => rootBuffer.Slice(Start, Length);
 }
-public readonly struct SelectChildResult(byte indexInParent, IChildNode<OctetParentNode> childNode)
+public readonly struct SelectChildResult(byte indexInParent, IInternalChildNode childNode)
 {
     public readonly byte IndexInParent = indexInParent;
-    public readonly IChildNode<OctetParentNode> ChildNode = childNode;
+    public readonly IInternalChildNode ChildNode = childNode;
 }
 internal static class LeafPool<T> where T : VenueLeafNode
 {

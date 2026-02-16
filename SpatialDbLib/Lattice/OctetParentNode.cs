@@ -27,7 +27,7 @@ public abstract partial class OctetParentNode
         CreateChildLeafNodes();
     }
 
-    public override IChildNode<OctetParentNode>[] Children { get; } = new IChildNode<OctetParentNode>[8];
+    public override IInternalChildNode[] Children { get; } = new IInternalChildNode[8];
 
     public void CreateChildLeafNodes()
     {
@@ -97,10 +97,10 @@ public abstract partial class OctetParentNode
         }
         return null;
     }
-    public struct AdmitFrame(OctetParentNode parent, IChildNode<OctetParentNode> childNode, byte childIndex)
+    public struct AdmitFrame(OctetParentNode parent, IInternalChildNode childNode, byte childIndex)
     {
         public OctetParentNode Parent = parent;
-        public IChildNode<OctetParentNode> ChildNode = childNode;
+        public IInternalChildNode ChildNode = childNode;
         public byte ChildIndex = childIndex;
     }
     public override AdmitResult Admit(ISpatialObject obj, LongVector3 proposedPosition)
@@ -152,7 +152,7 @@ public abstract partial class OctetParentNode
             }
         }
     }
-    public virtual IChildNode<OctetParentNode> CreateBranchNodeWithLeafs(
+    public virtual IInternalChildNode CreateBranchNodeWithLeafs(
         OctetParentNode parent,
         VenueLeafNode subdividingleaf,
         byte latticeDepth,

@@ -17,7 +17,7 @@ public class TickableOctetParentNode(Region bounds)
 {
     public override VenueLeafNode CreateNewVenueNode(int i, LongVector3 childMin, LongVector3 childMax)
         => new TickableVenueLeafNode(new Region(childMin, childMax), this);
-    public override IChildNode<OctetParentNode> CreateBranchNodeWithLeafs(
+    public override IInternalChildNode CreateBranchNodeWithLeafs(
         OctetParentNode parent,
         VenueLeafNode subdividingLeaf,
         byte latticeDepth,
@@ -45,7 +45,8 @@ public class TickableOctetParentNode(Region bounds)
 public class TickableOctetBranchNode
     : TickableOctetParentNode,
       IChildNode<OctetParentNode>,
-      ITickableChildNode
+      ITickableChildNode,
+      IInternalChildNode
 {
     public TickableOctetBranchNode(Region bounds, TickableOctetParentNode parent, IList<ISpatialObject> migrants)
         : base(bounds)
@@ -57,6 +58,9 @@ public class TickableOctetBranchNode
     public TickableOctetParentNode Parent { get; }
     TickableOctetParentNode IChildNode<TickableOctetParentNode>.Parent => Parent;
     OctetParentNode IChildNode<OctetParentNode>.Parent => Parent;
+
+    // forward internal contract
+    void IInternalChildNode.MigrateInternal(IList<ISpatialObject> objs) => Migrate(objs);
 }
 public partial class TickableVenueLeafNode(Region bounds, TickableOctetParentNode parent)
     : VenueLeafNode(bounds, parent),
@@ -67,7 +71,6 @@ public partial class TickableVenueLeafNode(Region bounds, TickableOctetParentNod
     public override int Capacity => 64;
     internal List<ITickableObject> m_tickableObjects = [];
     TickableOctetParentNode IChildNode<TickableOctetParentNode>.Parent => (TickableOctetParentNode)Parent;
-
     protected override ISpatialObjectProxy CreateProxy<T>(T obj, LongVector3 proposedPosition)
     {
         if (obj is TickableSpatialObject tickable)

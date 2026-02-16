@@ -1,5 +1,6 @@
 #if !DIAGNOSTIC
 using SpatialDbLib.Synchronize;
+using System.Runtime.CompilerServices;
 ///////////////////////////////
 namespace SpatialDbLib.Lattice;
 public abstract partial class OctetParentNode
@@ -11,7 +12,7 @@ public abstract partial class OctetParentNode
         if (subdividingleaf.IsRetired) return;
         var migrationSnapshot = subdividingleaf.LockAndSnapshotForMigration();
         var occupantsSnapshot = migrationSnapshot.Objects;
-        IChildNode<OctetParentNode> newBranch = CreateBranchNodeWithLeafs(parent, subdividingleaf, latticeDepth, branchOrSublattice, occupantsSnapshot);
+        IInternalChildNode newBranch = CreateBranchNodeWithLeafs(parent, subdividingleaf, latticeDepth, branchOrSublattice, occupantsSnapshot);
         parent.Children[childIndex] = newBranch;
         subdividingleaf.Retire();
         migrationSnapshot.Dispose();
@@ -19,17 +20,19 @@ public abstract partial class OctetParentNode
     partial void Migrate_Impl(IList<ISpatialObject> objs)
     {
         using var s = RentArray<List<ISpatialObject>>(8, out var buckets);
-        foreach (var obj in objs)
+        for (int i = 0; i < objs.Count; i++)
         {
+            var obj = objs[i];
             if (!Bounds.Contains(obj.LocalPosition)) throw new InvalidOperationException("Migrant has no home.");
             if (SelectChild(obj.LocalPosition) is not SelectChildResult result) throw new InvalidOperationException("Containment invariant violated");
-            buckets[result.IndexInParent] ??= [];
-            buckets[result.IndexInParent].Add(obj);
+            var idx = result.IndexInParent;
+            buckets[idx] ??= new List<ISpatialObject>();
+            buckets[idx].Add(obj);
         }
         for (byte i = 0; i < 8; i++)
         {
             if (buckets[i] == null) continue;
-            Children[i].Migrate(buckets[i]);
+            Children[i].MigrateInternal(buckets[i]);
         }
     }
 }
