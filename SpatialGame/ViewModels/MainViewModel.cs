@@ -5,10 +5,14 @@ using System.ComponentModel;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Windows.Media.Media3D;
+using System.Collections.Generic;
+using System.Reflection;
+using System.Linq;
 //using MeshGeometry3D IS NOT HelixToolkit.Geometry.MeshGeometry3D;
 //using MeshGeometry3D IS NOT HelixToolkit.Wpf.SharpDX.MeshGeometry3D;
 using MeshGeometry3D = HelixToolkit.SharpDX.MeshGeometry3D;
 using MeshMaterial = HelixToolkit.Wpf.SharpDX.PhongMaterial;
+using MeshGeometryModel3D = HelixToolkit.Wpf.SharpDX.MeshGeometryModel3D;
 ////////////////////////////////
 namespace SpatialGame.ViewModels
 {
@@ -16,43 +20,74 @@ namespace SpatialGame.ViewModels
     {
         public MainViewModel()
         {
-            Regenerate(1, 1, 1, 1.0f, 5.0f); // Example: single sphere, radius 5
+            // Use shared geometry from the catalog
+            SharedSphereGeometry = GeometryCatalog.GetOrCreate("Sphere", Resolution.Medium);
+            SharedMaterial = MaterialCatalog.Compose("Bright_LimeGreen");
+
+            latticeMesh = SharedSphereGeometry;
+            meshMaterial = SharedMaterial;
+            meshTransform = new MatrixTransform3D(Matrix3D.Identity);
+
+            MeshModel = new MeshGeometryModel3D
+            {
+                Geometry = latticeMesh,
+                Material = meshMaterial,
+                Transform = meshTransform
+            };
+
+            // Solar system models are produced by helper
+            Planets = SolarSystem.CreatePlanet3DData();
+            SunModel = SolarSystem.CreateSunModel();
         }
 
+        public MeshGeometryModel3D SunModel { get; }
+        public Dictionary<string, MeshGeometryModel3D> Planets { get; }
+
+        public MeshGeometry3D SharedSphereGeometry { get; }
+        public MeshMaterial SharedMaterial { get; }
+        public MeshGeometryModel3D MeshModel { get; }
+
         private MeshMaterial meshMaterial = default!;
-        public MeshMaterial MeshMaterial { get => meshMaterial; set => SetProperty(ref meshMaterial, value); }
+        public MeshMaterial MeshMaterial { get => meshMaterial; set => SetMaterial(value); }
 
         private MeshGeometry3D latticeMesh = default!;
         public MeshGeometry3D LatticeMesh
         {
             get => latticeMesh;
-            set { latticeMesh = value ?? new MeshGeometry3D(); OnPropertyChanged(); }
+            set { SetGeometry(value ?? new MeshGeometry3D()); }
         }
 
         private Transform3D meshTransform = new MatrixTransform3D(Matrix3D.Identity);
         public Transform3D MeshTransform
         {
             get => meshTransform;
-            set { meshTransform = value ?? new MatrixTransform3D(Matrix3D.Identity); OnPropertyChanged(); }
+            set { SetTransform(value ?? new MatrixTransform3D(Matrix3D.Identity)); }
         }
+
         public IEffectsManager EffectsManager { get; } = new DefaultEffectsManager();
-        public void Regenerate(int nx, int ny, int nz, float spacing, float radius)
+
+        public void SetGeometry(MeshGeometry3D geo)
         {
-            var builder = new MeshBuilder();
-            builder.Reset();
-            builder.AddSphere(new Vector3(0f, 0f, 0f), 5f, 32, 16);
+            if (geo == null) return;
+            latticeMesh = geo;
+            MeshModel.Geometry = latticeMesh;
+            OnPropertyChanged(nameof(LatticeMesh));
+        }
 
-            LatticeMesh = builder.ToMeshGeometry3D();
+        public void SetMaterial(MeshMaterial mat)
+        {
+            if (mat == null) return;
+            meshMaterial = mat;
+            MeshModel.Material = meshMaterial;
+            OnPropertyChanged(nameof(MeshMaterial));
+        }
 
-            MeshMaterial = new MeshMaterial
-            {
-                Name = "Dull White",
-                AmbientColor = new Color4(0.5f, 0.5f, 0.5f, 1f),
-                DiffuseColor = new Color4(1f, 1f, 1f, 1f),
-                SpecularColor = new Color4(1f, 1f, 1f, 1f),
-                EmissiveColor = new Color4(0.4f, 0.4f, 0.4f, 1f),
-                SpecularShininess = 100f,
-            };
+        public void SetTransform(Transform3D t)
+        {
+            if (t == null) return;
+            meshTransform = t;
+            MeshModel.Transform = meshTransform;
+            OnPropertyChanged(nameof(MeshTransform));
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -68,6 +103,22 @@ namespace SpatialGame.ViewModels
                 return true;
             }
             return false;
+        }
+
+    }
+
+    static class ReflectionExtensions
+    {
+        public static IEnumerable<Type> GetTypesSafe(this Assembly asm)
+        {
+            try
+            {
+                return asm.GetTypes();
+            }
+            catch
+            {
+                return Enumerable.Empty<Type>();
+            }
         }
     }
 }

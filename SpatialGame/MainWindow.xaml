@@ -8,7 +8,7 @@
         xmlns:viewmodels="clr-namespace:SpatialGame.ViewModels" 
         d:DataContext="{d:DesignInstance Type=viewmodels:MainViewModel}"
         mc:Ignorable="d"
-        Title="SpatialGame" Height="600" Width="900">
+        Title="SpatialGame" Width="1024" Height="768" >
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -21,32 +21,23 @@
         </StackPanel>
 
         <ht:Viewport3DX
-            x:Name="View"
+            x:Name="UniverseView"
             Grid.Row="1"
             Background="Black"
             ShowCoordinateSystem="True"
-            ZoomExtentsWhenLoaded="True"
+            ZoomExtentsWhenLoaded="False"
             EffectsManager="{Binding EffectsManager}"
             Margin="4">
             <ht:Viewport3DX.Camera>
-                <ht:PerspectiveCamera Position="0,0,40" LookDirection="0,0,-4" UpDirection="0,1,0" FieldOfView="45" />
+                <ht:PerspectiveCamera Position="0,0,80" LookDirection="0,0,-80" UpDirection="0,1,0" FieldOfView="45" />
             </ht:Viewport3DX.Camera>
-            <ht:AmbientLight3D Color="#FFFFFF" />
-            <ht:DirectionalLight3D Color="#FFFFFF" Direction="-1,-1,-1" />
-            <ht:DirectionalLight3D Color="#FFFFFF" Direction="1,1,0.5" />
-            <ht:MeshGeometryModel3D
-                x:Name="Model"
-                Visibility="Visible"
-                IsEnabled="True"
-                RenderOptions.EdgeMode="Aliased"
-                IsThrowingShadow="True"
-                RenderWireframe="False"
-                WireframeColor="Yellow"
-                CullMode="None"
-                Geometry="{Binding LatticeMesh}"
-                Material="{Binding MeshMaterial}"
-                Transform="{Binding MeshTransform}">
-            </ht:MeshGeometryModel3D>
+
+            <!-- Explicit lights so the sun actually lights the scene 
+            <ht:AmbientLight3D Color="#00ffffff" />-->
+
+            <ht:PointLight3D Color="White" Position="0,0,0" Range="100" Attenuation="1,0,0"/>
+
+
         </ht:Viewport3DX>
     </Grid>
 </Window>
