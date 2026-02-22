@@ -51,7 +51,7 @@ public static class PublicVariantRunner
             if (delayMigration) migrationDelay.Reset();
 
             var subdivideTask = Task.Run(() =>
-                root.SubdivideAndMigrate(root, subdividingLeaf, lattice.LatticeDepth, targetChildIndex, branchOrSublattice: true)
+                root.Subdivide(root, subdividingLeaf, lattice.LatticeDepth, targetChildIndex, branchOrSublattice: true)
             );
 
             if (!HookSet.Instance["SignalSubdivideStart"].Wait(TimeSpan.FromSeconds(5)))

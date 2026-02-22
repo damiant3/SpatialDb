@@ -2,6 +2,7 @@
 using SpatialGame.ViewModels;
 using HelixToolkit.Maths;
 using System;
+using System.Linq;
 
 namespace SpatialDb.SpatialGameTest;
 
@@ -117,13 +118,83 @@ public sealed class Test1
     {
         var t = "GetOrCompose_TestToken";
         // Ensure not present
-        if (MaterialCatalog.Materials.ContainsKey(t)) MaterialCatalog.Materials.Remove(t);
 
         var m1 = MaterialCatalog.GetOrCompose(t);
         Assert.IsNotNull(m1);
         // subsequent GetOrCompose should return same instance from cache
         var m2 = MaterialCatalog.GetOrCompose(t);
         Assert.IsTrue(ReferenceEquals(m1, m2));
+    }
+
+    [TestMethod]
+    public void Compose_EquivalentForms_ProduceSameMaterial()
+    {
+        var forms = new[]
+        {
+            "BrightLimeGreenTest",
+            "Bright_LimeGreen_Test",
+            "Bright-LimeGreen-Test",
+            "Bright LimeGreen Test"
+        };
+        var mats = forms.Select(MaterialCatalog.Compose).ToArray();
+        for (int i = 1; i < mats.Length; i++)
+            Assert.IsTrue(ReferenceEquals(mats[0], mats[i]), $"All forms should resolve to the same cached material instance: {forms[i]}");
+    }
+
+    [TestMethod]
+    public void Compose_GlowsColor_OverridesEmissive()
+    {
+        var m = MaterialCatalog.Compose("ShinyRedGlowsWhite");
+        Assert.IsNotNull(m);
+        // Emissive should be white, not red
+        Assert.IsTrue(Math.Abs(m.EmissiveColor.Red - 1f) < EPS && Math.Abs(m.EmissiveColor.Green - 1f) < EPS && Math.Abs(m.EmissiveColor.Blue - 1f) < EPS,
+            "GlowsWhite should set emissive to white");
+    }
+
+    [TestMethod]
+    public void Compose_EmissiveColor_OverridesEmissive()
+    {
+        var m = MaterialCatalog.Compose("MatteBlueEmissiveYellow");
+        Assert.IsNotNull(m);
+        // Emissive should be yellow
+        Assert.IsTrue(m.EmissiveColor.Red > 0.9f && m.EmissiveColor.Green > 0.9f && m.EmissiveColor.Blue < 0.2f,
+            "EmissiveYellow should set emissive to yellow");
+    }
+
+    [TestMethod]
+    public void Compose_GreedyColorMatch_LongColorNames()
+    {
+        var m = MaterialCatalog.Compose("DullLightSkyBlue");
+        Assert.IsNotNull(m);
+        // LightSkyBlue is a valid WPF color
+        Assert.IsTrue(MaterialCatalog.DiffuseColors.ContainsKey("LightSkyBlue"), "DiffuseColors should contain LightSkyBlue");
+        var d = m.DiffuseColor;
+        Assert.IsTrue(d.Blue > d.Red && d.Blue > d.Green, "LightSkyBlue should be blue-dominant");
+    }
+
+    [TestMethod]
+    public void Compose_CatalogsContainNormalizedKeys()
+    {
+        var keys = new[]
+        {
+            "BrightLimeGreenTest",
+            "ShinyRedGlowsWhite",
+            "MatteBlueEmissiveYellow",
+            "DullLightSkyBlue"
+        };
+        foreach (var k in keys)
+        {
+            var m = MaterialCatalog.Compose(k);
+            // Compose should add to Materials with the original string as key
+            Assert.IsTrue(MaterialCatalog.Materials.ContainsKey(k), $"Materials should contain the original key: {k}");
+            // DiffuseColors should contain the normalized color name
+            if (k.Contains("LimeGreen"))
+                Assert.IsTrue(MaterialCatalog.DiffuseColors.ContainsKey("LimeGreen"), "DiffuseColors should contain LimeGreen");
+            if (k.Contains("Red"))
+                Assert.IsTrue(MaterialCatalog.DiffuseColors.ContainsKey("Red"), "DiffuseColors should contain Red");
+            if (k.Contains("Blue"))
+                Assert.IsTrue(MaterialCatalog.DiffuseColors.ContainsKey("Blue") || MaterialCatalog.DiffuseColors.ContainsKey("LightSkyBlue"), "DiffuseColors should contain Blue or LightSkyBlue");
+        }
     }
 }
 

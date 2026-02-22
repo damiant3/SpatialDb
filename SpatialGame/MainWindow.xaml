@@ -14,30 +14,260 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
+        <StackPanel Orientation="Vertical" Grid.Row="0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="32" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Expander x:Name="LightDetailsExpander" IsExpanded="True" Grid.Column="0" Width="24" Height="24" VerticalAlignment="Center" HorizontalAlignment="Left" />
+                <CheckBox Content="Point Light" IsChecked="{Binding PointLightOn, Mode=TwoWay}" Grid.Column="1" HorizontalAlignment="Left" TabIndex="1" />
+                <CheckBox Content="Directional Light" IsChecked="{Binding DirectionalLightOn, Mode=TwoWay}"  Grid.Column="2" HorizontalAlignment="Left" TabIndex="2" />
+                <CheckBox Content="Spot Light" IsChecked="{Binding SpotLightOn, Mode=TwoWay}" Grid.Column="3" HorizontalAlignment="Left" TabIndex="3" />
+            </Grid>
+            <Grid Visibility="{Binding ElementName=LightDetailsExpander, Path=IsExpanded, Converter={StaticResource BoolToVis}}" HorizontalAlignment="Stretch">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="32" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                
+                <!-- Point light -->
+                <Grid Grid.Column="1">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
 
+                    <!--Point light position -->
+                    <Grid Grid.Row="0" Grid.Column="0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="X"/>
+                        <Slider Grid.Row="0" Grid.Column="1" Minimum="-90" Maximum="90" Value="{Binding PointLightPositionX, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Y"/>
+                        <Slider Grid.Row="1" Grid.Column="1" Minimum="-90" Maximum="90" Value="{Binding PointLightPositionY, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Z"/>
+                        <Slider Grid.Row="2" Grid.Column="1" Minimum="-90" Maximum="90" Value="{Binding PointLightPositionZ, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
+                    </Grid>
+                    <!-- Point light range -->
+                    <Grid Grid.Row="1" Grid.Column="0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        
+                        <TextBlock Text="Range" Grid.Row="0" Grid.Column="0" />
+                        <Slider Grid.Row="0" Grid.Column="1" Minimum="{Binding PointLightRangeMin}" Maximum="{Binding PointLightRangeMax}" Value="{Binding PointLightRange, Mode=TwoWay}" />
+                    </Grid>
+                    
+                    <!-- Point light color -->
+                    <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top">
+                        <Button Width="24" Height="24" Command="{Binding PickDirectionalLightColorCommand}" VerticalAlignment="Bottom">
+                            <Rectangle Width="24" Height="24" Fill="{Binding DirectionalLightColor}" Stroke="Black"/>
+                        </Button>
+                        <StackPanel Orientation="Vertical">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="A" Width="28" TextAlignment="Center" />
+                                <TextBlock Text="R" Width="28" TextAlignment="Center" />
+                                <TextBlock Text="G" Width="28" TextAlignment="Center" />
+                                <TextBlock Text="B" Width="28" TextAlignment="Center" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBox Width="28" Text="{Binding PointLightColorA, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="3" />
+                                <TextBox Width="28" Text="{Binding PointLightColorR, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="3" />
+                                <TextBox Width="28" Text="{Binding PointLightColorG, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="3" />
+                                <TextBox Width="28" Text="{Binding PointLightColorB, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="3" />
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
 
-        <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="4">
-            <!-- Buttons / outputs will go here -->
+                <!-- Directional Light-->
+                <Grid Grid.Column="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Directional light direction-->
+                    <Grid Grid.Row="0" Grid.Column="0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Grid.Row="0" Text="X" HorizontalAlignment="Center"/>
+                        <Slider Grid.Column="0" Grid.Row="1" Minimum="-1" Maximum="1" Value="{Binding DirectionalLightDirectionX, Mode=TwoWay}" />
+                        <TextBlock Grid.Column="1" Grid.Row="0" Text="Y" HorizontalAlignment="Center"/>
+                        <Slider Grid.Column="1" Grid.Row="1" Minimum="-1" Maximum="1" Value="{Binding DirectionalLightDirectionY, Mode=TwoWay}" />
+                        <TextBlock Grid.Column="2" Grid.Row="0" Text="Z" HorizontalAlignment="Center"/>
+                        <Slider Grid.Column="2" Grid.Row="1" Minimum="-1" Maximum="1" Value="{Binding DirectionalLightDirectionZ, Mode=TwoWay}" />
+                    </Grid>
+
+                    <!-- Directional light color -->
+                    <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top">
+                        <Button Width="24" Height="24" Command="{Binding PickDirectionalLightColorCommand}" VerticalAlignment="Bottom">
+                            <Rectangle Width="24" Height="24" Fill="{Binding DirectionalLightColor}" Stroke="Black"/>
+                        </Button>
+                        <StackPanel Orientation="Vertical">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="A" Width="28" TextAlignment="Center" />
+                                <TextBlock Text="R" Width="28" TextAlignment="Center" />
+                                <TextBlock Text="G" Width="28" TextAlignment="Center" />
+                                <TextBlock Text="B" Width="28" TextAlignment="Center" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBox Width="28" Text="{Binding DirectionalLightColorA, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="3" />
+                                <TextBox Width="28" Text="{Binding DirectionalLightColorR, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="3" />
+                                <TextBox Width="28" Text="{Binding DirectionalLightColorG, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="3" />
+                                <TextBox Width="28" Text="{Binding DirectionalLightColorB, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="3" />
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+                <!-- Spot light-->
+                <Grid Grid.Column="3">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Spot light Position -->
+                    <Grid Grid.Row="0" Grid.Column="0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="X"/>
+                        <Slider Grid.Row="0" Grid.Column="1" Minimum="-90" Maximum="90" Value="{Binding SpotLightPositionX, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Y"/>
+                        <Slider Grid.Row="1" Grid.Column="1" Minimum="-90" Maximum="90" Value="{Binding SpotLightPositionY, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Z"/>
+                        <Slider Grid.Row="2" Grid.Column="1" Minimum="-90" Maximum="90" Value="{Binding SpotLightPositionZ, Mode=TwoWay}" HorizontalAlignment="Stretch"/>
+                    </Grid>
+                    <!-- Spot light direction-->
+                    <Grid Grid.Row="0" Grid.Column="1">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Grid.Row="0" Text="X" HorizontalAlignment="Center"  />
+                        <Slider Grid.Column="0" Grid.Row="1" Minimum="-1" Maximum="1" Value="{Binding SpotLightDirectionX, Mode=TwoWay}" />
+                        <TextBlock Grid.Column="1" Grid.Row="0" Text="Y" HorizontalAlignment="Center"/>
+                        <Slider Grid.Column="1" Grid.Row="1" Minimum="-1" Maximum="1" Value="{Binding SpotLightDirectionY, Mode=TwoWay}" />
+                        <TextBlock Grid.Column="2" Grid.Row="0" Text="Z" HorizontalAlignment="Center"/>
+                        <Slider Grid.Column="2" Grid.Row="1" Minimum="-1" Maximum="1" Value="{Binding SpotLightDirectionZ, Mode=TwoWay}" />
+                    </Grid>
+
+                    <!-- Spot light color -->
+                    <StackPanel Grid.Row="1" Grid.Column="3" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top">
+                        <Button Width="24" Height="24" Command="{Binding PickPointLightColorCommand}" VerticalAlignment="Bottom">
+                            <Rectangle Width="24" Height="24" Fill="{Binding PointLightColor}" Stroke="Black"/>
+                        </Button>
+                        <StackPanel Orientation="Vertical">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="A" Width="28" TextAlignment="Center" />
+                                <TextBlock Text="R" Width="28" TextAlignment="Center" />
+                                <TextBlock Text="G" Width="28" TextAlignment="Center" />
+                                <TextBlock Text="B" Width="28" TextAlignment="Center" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBox Width="28" Text="{Binding SpotLightColorA, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="3" />
+                                <TextBox Width="28" Text="{Binding SpotLightColorR, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="3" />
+                                <TextBox Width="28" Text="{Binding SpotLightColorG, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="3" />
+                                <TextBox Width="28" Text="{Binding SpotLightColorB, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="3" />
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+
+                <StackPanel Grid.Row="3" Grid.Column="0" Orientation="Vertical">
+                        <TextBlock Text="Rang" />
+                        <Slider Minimum="{Binding SpotLightRangeMin}" Maximum="{Binding SpotLightRangeMax}" Value="{Binding SpotLightRange, Mode=TwoWay}" HorizontalAlignment="Stretch" TabIndex="32" />
+                        <TextBlock Text="Falloff +-5" />
+                        <Slider Minimum="{Binding SpotLightFalloffMin}" Maximum="{Binding SpotLightFalloffMax}" Value="{Binding SpotLightFalloff, Mode=TwoWay}" HorizontalAlignment="Stretch" TabIndex="35" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Vertical">
+                        <TextBlock Text="OutAngle +-120" />
+                        <Slider Minimum="{Binding SpotLightOuterAngleMin}" Maximum="{Binding SpotLightOuterAngleMax}" Value="{Binding SpotLightOuterAngle, Mode=TwoWay}" HorizontalAlignment="Stretch" TabIndex="33" />
+                        <TextBlock Text="InAngle +-120" />
+                        <Slider Minimum="{Binding SpotLightInnerAngleMin}" Maximum="{Binding SpotLightInnerAngleMax}" Value="{Binding SpotLightInnerAngle, Mode=TwoWay}" HorizontalAlignment="Stretch" TabIndex="34" />
+                    </StackPanel>
+                </Grid>
+            </Grid>
         </StackPanel>
 
+        <!-- Viewport -->
         <ht:Viewport3DX
             x:Name="UniverseView"
             Grid.Row="1"
             Background="Black"
             ShowCoordinateSystem="True"
             ZoomExtentsWhenLoaded="False"
-            EffectsManager="{Binding EffectsManager}"
-            Margin="4">
+            EffectsManager="{Binding EffectsManager}">
             <ht:Viewport3DX.Camera>
-                <ht:PerspectiveCamera Position="0,0,80" LookDirection="0,0,-80" UpDirection="0,1,0" FieldOfView="45" />
+                <ht:PerspectiveCamera x:Name="Camera1" Position="0,0,80" LookDirection="0,0,-80" UpDirection="0,1,0" FieldOfView="45" />
             </ht:Viewport3DX.Camera>
-
-            <!-- Explicit lights so the sun actually lights the scene 
-            <ht:AmbientLight3D Color="#00ffffff" />-->
-
-            <ht:PointLight3D Color="White" Position="0,0,0" Range="100" Attenuation="1,0,0"/>
-
-
+            <ht:ShadowMap3D x:Name="shadowMap" Distance="2000" Bias="0.0005" Intensity="1.0" IsSceneDynamic="True" />
+            <ht:DirectionalLight3D x:Name="directionalLight"
+                Color="{Binding DirectionalLightColor}"
+                Direction="{Binding DirectionalLightDirection}"
+                IsRendering="{Binding DirectionalLightOn, Mode=TwoWay}" />
+            <ht:PointLight3D x:Name="pointLight"
+                Color="{Binding PointLightColor}"
+                Position="{Binding PointLightPosition}"
+                IsRendering="{Binding PointLightOn, Mode=TwoWay}"
+                Range="{Binding PointLightRange}" />
+            <ht:SpotLight3D x:Name="spotLight"
+                Direction="{Binding SpotLightDirection}"
+                OuterAngle="{Binding SpotLightOuterAngle}"
+                Position="{Binding SpotLightPosition}"
+                Range="{Binding SpotLightRange}"
+                Color="{Binding SpotLightColor}"
+                IsRendering="{Binding SpotLightOn, Mode=TwoWay}" />
         </ht:Viewport3DX>
     </Grid>
 </Window>

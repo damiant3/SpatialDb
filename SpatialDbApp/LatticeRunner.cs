@@ -489,6 +489,8 @@ internal class LatticeRunner(MainForm form, RichTextBox logRtb)
                         }
                     }
 
+                    m_closestObjects = FindClosestObjectsToOrigin(DisplayObjectCount, DisplayObjectCount);
+
                     Interlocked.Add(ref m_totalMovementDetected, movedThisCheck);
                     Interlocked.Increment(ref m_monitorChecks);
 

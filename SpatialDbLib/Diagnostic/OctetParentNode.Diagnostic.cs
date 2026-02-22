@@ -60,7 +60,7 @@ public abstract partial class OctetParentNode
         }
     }
 
-    partial void SubdivideAndMigrate_Impl(OctetParentNode parent, VenueLeafNode subdividingleaf, byte latticeDepth, int childIndex, bool branchOrSublattice)
+    partial void Subdivide_Impl(OctetParentNode parent, VenueLeafNode subdividingleaf, byte latticeDepth, int childIndex, bool branchOrSublattice)
     {
         switch (SelectedSubdivideVariant)
         {
@@ -104,13 +104,13 @@ public abstract partial class OctetParentNode
         if (subdividingleaf.IsRetired) return;
         var migrationSnapshot = subdividingleaf.LockAndSnapshotForMigration();
         var occupantsSnapshot = migrationSnapshot.Objects;
-        IChildNode<OctetParentNode> newBranch = CreateBranchNodeWithLeafs(parent, subdividingleaf, latticeDepth, branchOrSublattice, occupantsSnapshot);
+        IInternalChildNode newBranch = CreateBranchNodeWithLeafs(parent, subdividingleaf, latticeDepth, branchOrSublattice, occupantsSnapshot);
         parent.Children[childIndex] = newBranch;
         subdividingleaf.Retire();
         migrationSnapshot.Dispose();
     }
 
-    partial void BucketAndDispatchMigrants_Impl(IList<ISpatialObject> objs)
+    partial void Migrate_Impl(IList<ISpatialObject> objs)
     {
         // diagnostic
         HookSet.Instance["SignalBeforeBucketAndDispatch"].Set();
@@ -130,7 +130,7 @@ public abstract partial class OctetParentNode
         for (byte i = 0; i < 8; i++)
         {
             if (buckets[i] == null) continue;
-            Children[i].AdmitMigrants(buckets[i]);
+            Children[i].Migrate(buckets[i]);
         }
     }
 
@@ -158,7 +158,7 @@ public abstract partial class OctetParentNode
         if (subdividingleaf.IsRetired) return;
         var migrationSnapshot = subdividingleaf.LockAndSnapshotForMigration();
         var occupantsSnapshot = migrationSnapshot.Objects;
-        IChildNode<OctetParentNode> newBranch = CreateBranchNodeWithLeafs(parent, subdividingleaf, latticeDepth, branchOrSublattice, occupantsSnapshot);
+        IInternalChildNode newBranch = CreateBranchNodeWithLeafs(parent, subdividingleaf, latticeDepth, branchOrSublattice, occupantsSnapshot);
         parent.Children[childIndex] = newBranch;
         subdividingleaf.Retire();
         migrationSnapshot.Dispose();
@@ -187,7 +187,7 @@ public abstract partial class OctetParentNode
         if (subdividingleaf.IsRetired) return;
         var migrationSnapshot = subdividingleaf.LockAndSnapshotForMigration(); // snapshot will try to acquire occupant locks without leaf lock held
         var occupantsSnapshot = migrationSnapshot.Objects;
-        IChildNode<OctetParentNode> newBranch = CreateBranchNodeWithLeafs(parent, subdividingleaf, latticeDepth, branchOrSublattice, occupantsSnapshot);
+        IInternalChildNode newBranch = CreateBranchNodeWithLeafs(parent, subdividingleaf, latticeDepth, branchOrSublattice, occupantsSnapshot);
         parent.Children[childIndex] = newBranch;
         subdividingleaf.Retire();
         migrationSnapshot.Dispose();
@@ -216,7 +216,7 @@ public abstract partial class OctetParentNode
         if (subdividingleaf.IsRetired) return;
         var migrationSnapshot = subdividingleaf.LockAndSnapshotForMigration();
         var occupantsSnapshot = migrationSnapshot.Objects;
-        IChildNode<OctetParentNode> newBranch = CreateBranchNodeWithLeafs(parent, subdividingleaf, latticeDepth, branchOrSublattice, occupantsSnapshot);
+        IInternalChildNode newBranch = CreateBranchNodeWithLeafs(parent, subdividingleaf, latticeDepth, branchOrSublattice, occupantsSnapshot);
         parent.Children[childIndex] = newBranch;
 
         // WRONG ORDER: dispose snapshot first, then retire leaf

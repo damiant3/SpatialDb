@@ -89,7 +89,7 @@ namespace SpatialDbLibTest.Diagnostic
 
                     // start subdivider task
                     var subdivideTask = Task.Run(() =>
-                        root.SubdivideAndMigrate(root, subdividingLeaf, lattice.LatticeDepth, targetChildIndex, branchOrSublattice: true)
+                        root.Subdivide(root, subdividingLeaf, lattice.LatticeDepth, targetChildIndex, branchOrSublattice: true)
                     );
 
                     if (!HookSet.Instance["SignalSubdivideStart"].Wait(TimeSpan.FromSeconds(5)))
@@ -225,7 +225,7 @@ namespace SpatialDbLibTest.Diagnostic
 
                         // start subdivider
                         var subdivideTask = Task.Run(() =>
-                            root.SubdivideAndMigrate(root, subdividingLeaf, lattice.LatticeDepth, targetChildIndex, branchOrSublattice: true)
+                            root.Subdivide(root, subdividingLeaf, lattice.LatticeDepth, targetChildIndex, branchOrSublattice: true)
                         );
 
                         // wait for subdivider to signal it started
