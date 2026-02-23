@@ -1,21 +1,22 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
+using System.Windows.Media;
 /////////////////////////////////
 namespace SpatialGame.Converters;
-
-public class BoolToVisConverter : IValueConverter
+public class ColorToBrushConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
-        if (value is bool b)
-            return b ? Visibility.Visible : Visibility.Collapsed;
-        return Visibility.Collapsed;
+        if (value is Color color)
+            return new SolidColorBrush(color);
+        return Brushes.Transparent;
     }
+
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
     {
-        if (value is Visibility v)
-            return v == Visibility.Visible;
-        return false;
+        if (value is SolidColorBrush brush)
+            return brush.Color;
+        return Colors.Transparent;
     }
 }
