@@ -314,6 +314,24 @@ public class SpotLight : ViewModel
     }
 }
 
+public class AmbientLight(Color color, bool on = true) : ViewModel
+{
+    private Color color = color;
+    private bool on = on;
+
+    public Color Color
+    {
+        get => color;
+        set { color = value; OnPropertyChanged(); }
+    }
+
+    public bool On
+    {
+        get => on;
+        set { on = value; OnPropertyChanged(); }
+    }
+}
+
 public abstract class ViewModel : INotifyPropertyChanged
 {
     public event PropertyChangedEventHandler? PropertyChanged;

@@ -260,21 +260,28 @@
             Grid.Row="1"
             Background="Black"
             ShowCoordinateSystem="True"
-            ZoomExtentsWhenLoaded="False"
-            EffectsManager="{Binding EffectsManager}">
-            <ht:Viewport3DX.Camera>
-                <ht:PerspectiveCamera x:Name="Camera1" Position="0,0,80" LookDirection="0,0,-80" UpDirection="0,1,0" FieldOfView="45" />
-            </ht:Viewport3DX.Camera>
-            <ht:ShadowMap3D x:Name="shadowMap" Distance="{Binding ShadowMapDistance}" Bias="0.0005" Intensity="1.0" IsSceneDynamic="True" LightCamera="{Binding Camera1}" Resolution="{Binding ShadowMapResolution}"/>
 
+            ZoomExtentsWhenLoaded="False"
+            EffectsManager="{Binding EffectsManager}"
+            Camera="{Binding Camera1}">
+            <ht:ShadowMap3D x:Name="shadowMap"
+                Distance="{Binding ShadowMap.Distance}"
+                Bias="{Binding ShadowMap.Bias}"
+                Intensity="{Binding ShadowMap.Intensity}"
+                IsSceneDynamic="{Binding ShadowMap.IsSceneDynamic}"
+                LightCamera="{Binding Camera1}"
+                Resolution="{Binding ShadowMap.Resolution}"/>
+            <ht:AmbientLight3D x:Name="ambientLight"
+                Color="{Binding AmbientLight.Color}"
+                IsRendering="{Binding AmbientLight.On}" />
             <ht:DirectionalLight3D x:Name="directionalLight"
                 Color="{Binding DirectionalLight.Color}"
                 Direction="{Binding DirectionalLight.Direction}"
-                IsRendering="{Binding DirectionalLight.On, Mode=TwoWay}" />
+                IsRendering="{Binding DirectionalLight.On}" />
             <ht:PointLight3D x:Name="pointLight"
                 Color="{Binding PointLight.Color}"
                 Position="{Binding PointLight.Position}"
-                IsRendering="{Binding PointLight.On, Mode=TwoWay}"
+                IsRendering="{Binding PointLight.On}"
                 Range="{Binding PointLight.Range}" />
             <ht:SpotLight3D x:Name="spotLight"
                 Direction="{Binding SpotLight.Direction}"
@@ -282,7 +289,7 @@
                 Position="{Binding SpotLight.Position}"
                 Range="{Binding SpotLight.Range}"
                 Color="{Binding SpotLight.Color}"
-                IsRendering="{Binding SpotLight.On, Mode=TwoWay}" />
+                IsRendering="{Binding SpotLight.On}" />
         </ht:Viewport3DX>
     </Grid>
 </Window>

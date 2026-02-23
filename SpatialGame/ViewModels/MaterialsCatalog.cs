@@ -218,7 +218,7 @@ namespace SpatialGame.ViewModels
                 tokens.RemoveRange(colorStart, colorLen);
 
             // Default ambient to pure black
-            Color4 ambient = Color4.Black;
+            Color4 ambient = Color4.White;
             Color4 specular = SpecularColors["Default"];
             Color4 emissive = emissiveOverride ?? EmissiveColors["Default"];
             float shininess = Shininess["Default"];
