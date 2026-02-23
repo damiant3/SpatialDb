@@ -4,7 +4,7 @@ using HelixToolkit.Maths;
 using System;
 using System.Linq;
 
-namespace SpatialDb.SpatialGameTest;
+namespace SpatialGameTest;
 
 [TestClass]
 public sealed class Test1
@@ -195,6 +195,50 @@ public sealed class Test1
             if (k.Contains("Blue"))
                 Assert.IsTrue(MaterialCatalog.DiffuseColors.ContainsKey("Blue") || MaterialCatalog.DiffuseColors.ContainsKey("LightSkyBlue"), "DiffuseColors should contain Blue or LightSkyBlue");
         }
+    }
+
+    [TestMethod]
+    public void Compare_MaterialCatalog_vs_Library_Color4Aware()
+    {
+        var myMat = MaterialCatalog.Compose_("Red");
+        var libMat = HelixToolkit.Wpf.SharpDX.PhongMaterials.Red;
+
+        var props = typeof(HelixToolkit.Wpf.SharpDX.PhongMaterial).GetProperties(
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
+
+        Console.WriteLine("Comparing MaterialCatalog.Compose_(\"Red\") vs PhongMaterials.Red:");
+        foreach (var prop in props)
+        {
+            try
+            {
+                var v1 = prop.GetValue(myMat);
+                var v2 = prop.GetValue(libMat);
+                bool equal;
+                if (v1 is Color4 c1 && v2 is Color4 c2)
+                {
+                    equal = Color4AlmostEqual(c1, c2);
+                    Console.WriteLine($"{prop.Name}: {(equal ? "EQUAL" : "DIFFERENT")} | Mine: {c1.ToString2()} | Lib: {c2.ToString2()}");
+                }
+                else
+                {
+                    equal = Equals(v1, v2) || (v1 != null && v1.Equals(v2));
+                    Console.WriteLine($"{prop.Name}: {(equal ? "EQUAL" : "DIFFERENT")} | Mine: {v1} | Lib: {v2}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"{prop.Name}: EXCEPTION {ex.Message}");
+            }
+        }
+    }
+
+
+    private static bool Color4AlmostEqual(Color4 a, Color4 b, float tol = 1e-3f)
+    {
+        return Math.Abs(a.Red - b.Red) < tol
+            && Math.Abs(a.Green - b.Green) < tol
+            && Math.Abs(a.Blue - b.Blue) < tol
+            && Math.Abs(a.Alpha - b.Alpha) < tol;
     }
 }
 

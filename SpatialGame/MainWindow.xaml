@@ -110,10 +110,11 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- Directional Light-->
+                <!-- Directional/Ambient Light-->
                 <Grid Grid.Column="2">
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" /> <!-- Directional Light -->
+                        <RowDefinition Height="Auto" /> <!-- Ambient Light -->
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -158,6 +159,30 @@
                                 <TextBox Width="28" Text="{Binding DirectionalLight.Color.R, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="3" />
                                 <TextBox Width="28" Text="{Binding DirectionalLight.Color.G, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="3" />
                                 <TextBox Width="28" Text="{Binding DirectionalLight.Color.B, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="3" />
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Ambient light on/off -->
+                    <CheckBox Grid.Row="1" Grid.Column="0" Content="Ambient Light" IsChecked="{Binding AmbientLight.On, Mode=TwoWay}" HorizontalAlignment="Left" />
+
+                    <!-- Ambient light color -->
+                    <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top">
+                        <Button Width="24" Height="24" Command="{Binding AmbientLight.PickColorCommand}" VerticalAlignment="Bottom">
+                            <Rectangle Width="24" Height="24" Fill="{Binding AmbientLight.Color, Converter={StaticResource ColorToBrushConverter}}" Stroke="Black"/>
+                        </Button>
+                        <StackPanel Orientation="Vertical">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="A" Width="28" TextAlignment="Center" />
+                                <TextBlock Text="R" Width="28" TextAlignment="Center" />
+                                <TextBlock Text="G" Width="28" TextAlignment="Center" />
+                                <TextBlock Text="B" Width="28" TextAlignment="Center" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBox Width="28" Text="{Binding AmbientLight.Color.A, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="3" />
+                                <TextBox Width="28" Text="{Binding AmbientLight.Color.R, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="3" />
+                                <TextBox Width="28" Text="{Binding AmbientLight.Color.G, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="3" />
+                                <TextBox Width="28" Text="{Binding AmbientLight.Color.B, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="3" />
                             </StackPanel>
                         </StackPanel>
                     </StackPanel>
@@ -260,9 +285,10 @@
             Grid.Row="1"
             Background="Black"
             ShowCoordinateSystem="True"
-
             ZoomExtentsWhenLoaded="False"
             EffectsManager="{Binding EffectsManager}"
+            IsShadowMappingEnabled="True"
+            ShowCameraInfo="True"
             Camera="{Binding Camera1}">
             <ht:ShadowMap3D x:Name="shadowMap"
                 Distance="{Binding ShadowMap.Distance}"
@@ -270,7 +296,8 @@
                 Intensity="{Binding ShadowMap.Intensity}"
                 IsSceneDynamic="{Binding ShadowMap.IsSceneDynamic}"
                 LightCamera="{Binding Camera1}"
-                Resolution="{Binding ShadowMap.Resolution}"/>
+                Resolution="{Binding ShadowMap.Resolution}"
+                IsRendering="True" />
             <ht:AmbientLight3D x:Name="ambientLight"
                 Color="{Binding AmbientLight.Color}"
                 IsRendering="{Binding AmbientLight.On}" />

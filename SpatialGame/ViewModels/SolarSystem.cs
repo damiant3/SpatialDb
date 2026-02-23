@@ -81,12 +81,13 @@ namespace SpatialGame.ViewModels
 
                 var model = new MeshGeometryModel3D
                 {
-                    // planets both cast and receive shadows
                     IsThrowingShadow = true,
-                    IsDepthClipEnabled = true,
+                    DepthBias = 1,
+                    FillMode = SharpDX.Direct3D11.FillMode.Solid,
                     Geometry = planetGeo,
                     Material = mat,
-                    Transform = tg
+                    Transform = tg,
+                     CullMode = SharpDX.Direct3D11.CullMode.Back
                 };
 
                 dict[p.name] = model;

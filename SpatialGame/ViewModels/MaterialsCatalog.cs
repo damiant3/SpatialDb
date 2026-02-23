@@ -6,9 +6,9 @@ using HelixToolkit.SharpDX;
 using System.Reflection;
 using System.Windows.Media;
 using MeshGeometry3D = HelixToolkit.SharpDX.MeshGeometry3D;
-using MeshMaterial = HelixToolkit.Wpf.SharpDX.PhongMaterial;
 using MeshGeometryModel3D = HelixToolkit.Wpf.SharpDX.MeshGeometryModel3D;
 using System.Drawing;
+using HelixToolkit.Wpf.SharpDX;
 
 namespace SpatialGame.ViewModels
 {
@@ -145,7 +145,17 @@ namespace SpatialGame.ViewModels
 
         private static string JoinPascalCase(IEnumerable<string> toks) => string.Concat(toks.Select(NormalizeToken));
 
-        public static MeshMaterial Compose(string materialDescription)
+        public static PhongMaterial Compose_(string materialDescription)
+        {
+            // For testing: always return the Indigo material from the HelixToolkit library
+            // and mutate it directly as the demo does.
+            var mat = PhongMaterials.Indigo;
+            // Optionally mutate properties here if needed for further testing
+            // e.g. mat.RenderShadowMap = true;
+            mat.RenderShadowMap = true; // Ensure shadows are enabled for testing
+            return mat;
+        }
+        public static PhongMaterial Compose(string materialDescription)
         {
             if (string.IsNullOrWhiteSpace(materialDescription)) materialDescription = "Default";
 
@@ -217,50 +227,16 @@ namespace SpatialGame.ViewModels
             if (colorStart >= 0 && colorLen > 0)
                 tokens.RemoveRange(colorStart, colorLen);
 
-            // Default ambient to pure black
-            Color4 ambient = Color4.White;
-            Color4 specular = SpecularColors["Default"];
-            Color4 emissive = emissiveOverride ?? EmissiveColors["Default"];
-            float shininess = Shininess["Default"];
-            float diffuseMul = 1f, emissiveMul = 1f, specularMul = 1f, shininessMul = 1f;
-            float? shininessOverride = null;
+            // Ambient is a simple transform of diffuse (library uses ~0.8)
+            Color4 ambient = new Color4(0.349f, 0.349f, 0.349f, 1.0f);
+            // Specular: use a low gray value unless overridden
+            Color4 specular = chromePresent ? new Color4(1f, 1f, 1f, 1f) : new Color4(0.161f, 0.161f, 0.161f, 1.0f);
+            // Emissive: default to black unless overridden
+            Color4 emissive = emissiveOverride ?? new Color4(0f, 0f, 0f, 1.0f);
+            // Shininess: use a lower value unless overridden
+            float shininess = chromePresent ? 200f : 12.8f;
 
-            // Apply modifiers
-            foreach (var t in tokens)
-            {
-                if (ModifierCatalog.Modifiers.TryGetValue(t, out var mod))
-                {
-                    diffuseMul *= mod.DiffuseMul;
-                    emissiveMul *= mod.EmissiveMul;
-                    if (!chromePresent) // Only apply specularMul if Chrome is not present
-                        specularMul *= mod.SpecularMul;
-                    shininessMul *= mod.ShininessMul;
-                    if (mod.ShininessOverride.HasValue)
-                        shininessOverride = mod.ShininessOverride;
-                }
-                // Chrome: override specular color to white
-                if (t.Equals("Chrome", StringComparison.OrdinalIgnoreCase))
-                    specular = new Color4(1f, 1f, 1f, 1f);
-            }
-
-            // Compose final values
-            diffuse = new Color4(diffuse.Red * diffuseMul, diffuse.Green * diffuseMul, diffuse.Blue * diffuseMul, diffuse.Alpha);
-            if (emissiveOverride.HasValue)
-                emissive = new Color4(emissiveOverride.Value.Red * emissiveMul,
-                                     emissiveOverride.Value.Green * emissiveMul,
-                                     emissiveOverride.Value.Blue * emissiveMul,
-                                     emissiveOverride.Value.Alpha);
-            else
-                emissive = new Color4((emissive.Red == 0 ? diffuse.Red : emissive.Red) * emissiveMul,
-                                      (emissive.Green == 0 ? diffuse.Green : emissive.Green) * emissiveMul,
-                                      (emissive.Blue == 0 ? diffuse.Blue : emissive.Blue) * emissiveMul,
-                                      emissive.Alpha);
-            specular = new Color4(specular.Red * specularMul, specular.Green * specularMul, specular.Blue * specularMul, specular.Alpha);
-            if (chromePresent) // Chrome: specular color is white, do not multiply
-                specular = new Color4(1f, 1f, 1f, 1f);
-            shininess = shininessOverride ?? (shininess * shininessMul);
-
-            var result = new MeshMaterial
+            var result = new PhongMaterial
             {
                 Name = materialDescription,
                 AmbientColor = ambient,
@@ -271,15 +247,6 @@ namespace SpatialGame.ViewModels
                 RenderShadowMap = true
             };
 
-            // DEBUG: Complete material summary
-            System.Diagnostics.Debug.WriteLine($"  -> FULL MATERIAL:");
-            System.Diagnostics.Debug.WriteLine($"     Ambient:   R={result.AmbientColor.Red:F3} G={result.AmbientColor.Green:F3} B={result.AmbientColor.Blue:F3}");
-            System.Diagnostics.Debug.WriteLine($"     Diffuse:   R={result.DiffuseColor.Red:F3} G={result.DiffuseColor.Green:F3} B={result.DiffuseColor.Blue:F3}");
-            System.Diagnostics.Debug.WriteLine($"     Specular:  R={result.SpecularColor.Red:F3} G={result.SpecularColor.Green:F3} B={result.SpecularColor.Blue:F3}");
-            System.Diagnostics.Debug.WriteLine($"     Emissive:  R={result.EmissiveColor.Red:F3} G={result.EmissiveColor.Green:F3} B={result.EmissiveColor.Blue:F3}");
-            System.Diagnostics.Debug.WriteLine($"     Shininess: {result.SpecularShininess:F1}");
-
-            // Cache the composed material using normalized key
             if (Materials != null)
                 Materials[normalizedKey] = result;
 
@@ -315,7 +282,7 @@ namespace SpatialGame.ViewModels
             return false;
         }
 
-        public static MeshMaterial GetOrCompose(string key)
+        public static PhongMaterial GetOrCompose(string key)
         {
             // Always normalize the key for lookup
             var rawTokens = Tokenize(key);
@@ -335,7 +302,7 @@ namespace SpatialGame.ViewModels
         public FloatDictionary() : base(StringComparer.OrdinalIgnoreCase) { }
     }
 
-    public class MeshMaterialDictionary : ConcurrentDictionary<string, MeshMaterial>
+    public class MeshMaterialDictionary : ConcurrentDictionary<string, PhongMaterial>
     {
         public MeshMaterialDictionary() : base(StringComparer.OrdinalIgnoreCase) { }
     }

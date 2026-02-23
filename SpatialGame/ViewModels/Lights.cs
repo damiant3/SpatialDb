@@ -6,30 +6,10 @@ using System.Windows.Forms;
 /////////////////////////////////
 namespace SpatialGame.ViewModels;
 
-public class DirectionalLight : ViewModel
+public class DirectionalLight(Vector3D direction, Color color, bool on = false) : ColorViewModel(color, on)
 {
-    Vector3D direction;
-    Color color;
-    bool on;
-    public ICommand PickColorCommand { get; private set; }
+    Vector3D direction = direction;
 
-    public DirectionalLight(Vector3D direction, Color color, bool on = true)
-    {
-        this.direction = direction;
-        this.color = color;
-        this.on = on;
-        PickColorCommand = new RelayCommand(_ => PickColor());
-    }
-
-    void PickColor()
-    {
-        var dlg = new ColorDialog { Color = System.Drawing.Color.FromArgb(color.A, color.R, color.G, color.B) };
-        if (dlg.ShowDialog() == DialogResult.OK)
-        {
-            color = Color.FromArgb(dlg.Color.A, dlg.Color.R, dlg.Color.G, dlg.Color.B);
-            OnPropertyChanged(nameof(Color));
-        }
-    }
     public Vector3D Direction
     {
         get => direction;
@@ -50,46 +30,15 @@ public class DirectionalLight : ViewModel
         get => direction.Z;
         set { direction.Z = value; OnPropertyChanged(); OnPropertyChanged(nameof(Direction)); }
     }
-    public Color Color
-    {
-        get => color;
-        set { color = value; OnPropertyChanged(); }
-    }
-    public bool On
-    {
-        get => on;
-        set { on = value; OnPropertyChanged(); }
-    }
 }
 
-public class PointLight : ViewModel
+public class PointLight(Point3D position, Color color, double range, bool on = true, double rangeMin = 10, double rangeMax = 1000) : ColorViewModel(color, on)
 {
-    Point3D position;
-    Color color;
-    double range;
-    bool on;
-    double rangeMin;
-    double rangeMax;
-    public ICommand PickColorCommand { get; }
-    public PointLight(Point3D position, Color color, double range, bool on = false, double rangeMin = 10, double rangeMax = 1000)
-    {
-        this.position = position;
-        this.color = color;
-        this.range = range;
-        this.on = on;
-        this.rangeMin = rangeMin;
-        this.rangeMax = rangeMax;
-        PickColorCommand = new RelayCommand(_ => PickColor());
-    }
-    void PickColor()
-    {
-        var dlg = new ColorDialog { Color = System.Drawing.Color.FromArgb(color.A, color.R, color.G, color.B) };
-        if (dlg.ShowDialog() == DialogResult.OK)
-        {
-            color = Color.FromArgb(dlg.Color.A, dlg.Color.R, dlg.Color.G, dlg.Color.B);
-            OnPropertyChanged(nameof(Color));
-        }
-    }
+    Point3D position = position;
+    double range = range;
+    double rangeMin = rangeMin;
+    double rangeMax = rangeMax;
+
     public Point3D Position
     {
         get => position;
@@ -110,20 +59,10 @@ public class PointLight : ViewModel
         get => position.Z;
         set { position.Z = value; OnPropertyChanged(); OnPropertyChanged(nameof(Position)); }
     }
-    public Color Color
-    {
-        get => color;
-        set { color = value; OnPropertyChanged(); }
-    }
     public double Range
     {
         get => range;
         set { range = value; OnPropertyChanged(); }
-    }
-    public bool On
-    {
-        get => on;
-        set { on = value; OnPropertyChanged(); }
     }
     public double RangeMin
     {
@@ -137,71 +76,39 @@ public class PointLight : ViewModel
     }
 }
 
-public class SpotLight : ViewModel
+public class SpotLight(
+    Point3D position,
+    Vector3D direction,
+    Color color,
+    double range,
+    bool on = false,
+    double rangeMin = 10,
+    double rangeMax = 2000,
+    double outerAngle = 60,
+    double outerAngleMin = 10,
+    double outerAngleMax = 120,
+    double innerAngle = 30,
+    double innerAngleMin = 0,
+    double innerAngleMax = 120,
+    double falloff = 1.0,
+    double falloffMin = 0.1,
+    double falloffMax = 5.0) : ColorViewModel(color, on)
 {
-    Point3D position;
-    Vector3D direction;
-    Color color;
-    double range;
-    bool on;
-    double rangeMin;
-    double rangeMax;
-    double outerAngle;
-    double outerAngleMin;
-    double outerAngleMax;
-    double innerAngle;
-    double innerAngleMin;
-    double innerAngleMax;
-    double falloff;
-    double falloffMin;
-    double falloffMax;
-    public ICommand PickColorCommand { get; }
-    public SpotLight(
-        Point3D position,
-        Vector3D direction,
-        Color color,
-        double range,
-        bool on = true,
-        double rangeMin = 10,
-        double rangeMax = 2000,
-        double outerAngle = 60,
-        double outerAngleMin = 10,
-        double outerAngleMax = 120,
-        double innerAngle = 30,
-        double innerAngleMin = 0,
-        double innerAngleMax = 120,
-        double falloff = 1.0,
-        double falloffMin = 0.1,
-        double falloffMax = 5.0)
-    {
-        this.position = position;
-        this.direction = direction;
-        this.color = color;
-        this.range = range;
-        this.on = on;
-        this.rangeMin = rangeMin;
-        this.rangeMax = rangeMax;
-        this.outerAngle = outerAngle;
-        this.outerAngleMin = outerAngleMin;
-        this.outerAngleMax = outerAngleMax;
-        this.innerAngle = innerAngle;
-        this.innerAngleMin = innerAngleMin;
-        this.innerAngleMax = innerAngleMax;
-        this.falloff = falloff;
-        this.falloffMin = falloffMin;
-        this.falloffMax = falloffMax;
-        PickColorCommand = new RelayCommand(_ => PickColor());
-    }
+    Point3D position = position;
+    Vector3D direction = direction;
+    double range = range;
+    double rangeMin = rangeMin;
+    double rangeMax = rangeMax;
+    double outerAngle = outerAngle;
+    double outerAngleMin = outerAngleMin;
+    double outerAngleMax = outerAngleMax;
+    double innerAngle = innerAngle;
+    double innerAngleMin = innerAngleMin;
+    double innerAngleMax = innerAngleMax;
+    double falloff = falloff;
+    double falloffMin = falloffMin;
+    double falloffMax = falloffMax;
 
-    void PickColor()
-    {
-        var dlg = new ColorDialog { Color = System.Drawing.Color.FromArgb(color.A, color.R, color.G, color.B) };
-        if (dlg.ShowDialog() == DialogResult.OK)
-        {
-            color = Color.FromArgb(dlg.Color.A, dlg.Color.R, dlg.Color.G, dlg.Color.B);
-            OnPropertyChanged(nameof(Color));
-        }
-    }
     public Point3D Position
     {
         get => position;
@@ -242,20 +149,10 @@ public class SpotLight : ViewModel
         get => direction.Z;
         set { direction.Z = value; OnPropertyChanged(); OnPropertyChanged(nameof(Direction)); }
     }
-    public Color Color
-    {
-        get => color;
-        set { color = value;  OnPropertyChanged(); }
-    }
     public double Range
     {
         get => range;
         set { range = value; OnPropertyChanged(); }
-    }
-    public bool On
-    {
-        get => on;
-        set { on = value; OnPropertyChanged(); }
     }
     public double RangeMin
     {
@@ -314,22 +211,8 @@ public class SpotLight : ViewModel
     }
 }
 
-public class AmbientLight(Color color, bool on = true) : ViewModel
+public class AmbientLight(Color color, bool on = false) : ColorViewModel(color, on)
 {
-    private Color color = color;
-    private bool on = on;
-
-    public Color Color
-    {
-        get => color;
-        set { color = value; OnPropertyChanged(); }
-    }
-
-    public bool On
-    {
-        get => on;
-        set { on = value; OnPropertyChanged(); }
-    }
 }
 
 public abstract class ViewModel : INotifyPropertyChanged
@@ -351,4 +234,68 @@ public class RelayCommand : ICommand
     public void Execute(object? parameter) => execute(parameter);
     public event EventHandler? CanExecuteChanged;
     public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+}
+
+public abstract class ColorViewModel : ViewModel
+{
+    private Color color;
+    private bool on;
+    public ICommand PickColorCommand { get; }
+
+    protected ColorViewModel(Color color, bool on = true)
+    {
+        this.color = color;
+        this.on = on;
+        PickColorCommand = new RelayCommand(_ => PickColor());
+    }
+
+    public Color Color
+    {
+        get => color;
+        set
+        {
+            color = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(A));
+            OnPropertyChanged(nameof(R));
+            OnPropertyChanged(nameof(G));
+            OnPropertyChanged(nameof(B));
+        }
+    }
+
+    public byte A
+    {
+        get => color.A;
+        set { Color = Color.FromArgb(value, color.R, color.G, color.B); }
+    }
+    public byte R
+    {
+        get => color.R;
+        set { Color = Color.FromArgb(color.A, value, color.G, color.B); }
+    }
+    public byte G
+    {
+        get => color.G;
+        set { Color = Color.FromArgb(color.A, color.R, value, color.B); }
+    }
+    public byte B
+    {
+        get => color.B;
+        set { Color = Color.FromArgb(color.A, color.R, color.G, value); }
+    }
+
+    public bool On
+    {
+        get => on;
+        set { on = value; OnPropertyChanged(); }
+    }
+
+    protected virtual void PickColor()
+    {
+        var dlg = new ColorDialog { Color = System.Drawing.Color.FromArgb(color.A, color.R, color.G, color.B) };
+        if (dlg.ShowDialog() == DialogResult.OK)
+        {
+            Color = Color.FromArgb(dlg.Color.A, dlg.Color.R, dlg.Color.G, dlg.Color.B);
+        }
+    }
 }

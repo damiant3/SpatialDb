@@ -1,8 +1,10 @@
-using System.Windows.Media;
-using System.Windows;
+using HelixToolkit.Geometry;
 using HelixToolkit.SharpDX;
-using MeshGeometryModel3D = HelixToolkit.Wpf.SharpDX.MeshGeometryModel3D;
 using HelixToolkit.Wpf.SharpDX;
+using System.Numerics;
+using System.Windows;
+using System.Windows.Media;
+using MeshGeometryModel3D = HelixToolkit.Wpf.SharpDX.MeshGeometryModel3D;
 ////////////////////////////////
 namespace SpatialGame.ViewModels
 {
@@ -15,9 +17,9 @@ namespace SpatialGame.ViewModels
             EffectsManager = new DefaultEffectsManager();
             LightDetailsVisible = true;
             DirectionalLight = new DirectionalLight(new(0, 0, -1), Colors.White);
-            PointLight = new PointLight(new(0, 10, 0), Colors.White, 200);
+            PointLight = new PointLight(new(0, 0, 0), Colors.White, 200);
             SpotLight = new SpotLight(new(0, 0, 0), new(0, 0, -1), Colors.White, 500);
-            AmbientLight = new AmbientLight(Colors.White);
+            AmbientLight = new AmbientLight(Colors.Black);
             Camera1 = new PerspectiveCamera
             {
                 Position = new(0, 50, 100),
@@ -25,8 +27,11 @@ namespace SpatialGame.ViewModels
                 UpDirection = new(0, 1, 0),
                 FieldOfView = 45
             };
-            ShadowMap = new ShadowMapViewModel();
-            ShadowMap.LightCamera = Camera1;
+            ShadowMap = new ShadowMapViewModel
+            {
+                LightCamera = Camera1
+            };
+
         }
         public Camera Camera1 { get; }
         public MeshGeometryModel3D SunModel { get; }
