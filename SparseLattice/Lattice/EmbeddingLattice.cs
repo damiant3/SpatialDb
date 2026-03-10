@@ -58,6 +58,17 @@ public sealed class EmbeddingLattice<TPayload>
     public SparseTreeStats CollectStats()
         => CollectStatsRecursive(m_root, 0);
 
+    /// <summary>
+    /// Collects a full <see cref="SparsityReport"/> by walking the tree.
+    /// Reports nnz distribution, dimension coverage, leaf occupancy, and branch balance.
+    /// </summary>
+    public SparsityReport CollectSparsityReport()
+    {
+        SparsityReportAccumulator acc = new();
+        CollectSparsityRecursive(m_root, acc);
+        return acc.Build();
+    }
+
     public List<SparseOccupant<TPayload>> QueryWithinDistanceL2(
         SparseVector center,
         BigInteger radiusSquared)
@@ -185,6 +196,39 @@ public sealed class EmbeddingLattice<TPayload>
             MaxDepth = System.Math.Max(belowStats.MaxDepth, aboveStats.MaxDepth),
             AverageLeafOccupancy = avgOccupancy,
         };
+    }
+
+    // --- sparsity report ---
+
+    private static void CollectSparsityRecursive(ISparseNode node, SparsityReportAccumulator acc)
+    {
+        if (node is SparseLeafNode<TPayload> leaf)
+        {
+            acc.RecordLeaf(leaf);
+            return;
+        }
+
+        ISparseNode? below;
+        ISparseNode? above;
+
+        if (node is FrozenBranchNode frozen)
+        {
+            below = frozen.Below;
+            above = frozen.Above;
+        }
+        else if (node is SparseBranchNode mutable)
+        {
+            below = mutable.Below;
+            above = mutable.Above;
+        }
+        else
+            return;
+
+        int realizedCount = (below is not null ? 1 : 0) + (above is not null ? 1 : 0);
+        acc.RecordBranch(realizedCount);
+
+        if (below is not null) CollectSparsityRecursive(below, acc);
+        if (above is not null) CollectSparsityRecursive(above, acc);
     }
 
     // --- L2 radius query ---
