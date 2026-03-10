@@ -24,6 +24,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShadowMapDemo", "..\helix-t
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LightingDemo", "..\helix-toolkit-develop3\Source\Examples\WPF.SharpDX\LightingDemo\LightingDemo.csproj", "{B987188E-D1DF-262B-8380-6A7343160BE9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SparseLattice", "SparseLattice\SparseLattice.csproj", "{C077DDFE-49FC-44F3-937C-C9C23459876C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SparseLattice.Test", "SparseLattice.Test\SparseLattice.Test.csproj", "{1549C9F4-786F-41AA-953D-E8A5079EBB1E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -73,6 +77,18 @@ Global
 		{B987188E-D1DF-262B-8380-6A7343160BE9}.Diagnostic|Any CPU.Build.0 = Release|Any CPU
 		{B987188E-D1DF-262B-8380-6A7343160BE9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B987188E-D1DF-262B-8380-6A7343160BE9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C077DDFE-49FC-44F3-937C-C9C23459876C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C077DDFE-49FC-44F3-937C-C9C23459876C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C077DDFE-49FC-44F3-937C-C9C23459876C}.Diagnostic|Any CPU.ActiveCfg = Release|Any CPU
+		{C077DDFE-49FC-44F3-937C-C9C23459876C}.Diagnostic|Any CPU.Build.0 = Release|Any CPU
+		{C077DDFE-49FC-44F3-937C-C9C23459876C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C077DDFE-49FC-44F3-937C-C9C23459876C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1549C9F4-786F-41AA-953D-E8A5079EBB1E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1549C9F4-786F-41AA-953D-E8A5079EBB1E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1549C9F4-786F-41AA-953D-E8A5079EBB1E}.Diagnostic|Any CPU.ActiveCfg = Release|Any CPU
+		{1549C9F4-786F-41AA-953D-E8A5079EBB1E}.Diagnostic|Any CPU.Build.0 = Release|Any CPU
+		{1549C9F4-786F-41AA-953D-E8A5079EBB1E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1549C9F4-786F-41AA-953D-E8A5079EBB1E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
