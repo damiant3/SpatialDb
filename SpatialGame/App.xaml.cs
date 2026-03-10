@@ -1,4 +1,5 @@
-﻿using System.Configuration;
+﻿using SpatialGame.ViewModels;
+using System.Configuration;
 using System.Data;
 using System.Windows;
 
@@ -9,6 +10,10 @@ namespace SpatialGame
     /// </summary>
     public partial class App : Application
     {
+        public App()
+        {
+            XkcdColors.ReadFileAndOutputProperties();
+        }
     }
 
 }

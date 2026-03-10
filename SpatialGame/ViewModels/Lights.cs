@@ -6,6 +6,10 @@ using System.Windows.Forms;
 /////////////////////////////////
 namespace SpatialGame.ViewModels;
 
+public class AmbientLight(Color color, bool on = true) : ColorViewModel(color, on)
+{
+}
+
 public class DirectionalLight(Vector3D direction, Color color, bool on = false) : ColorViewModel(color, on)
 {
     Vector3D direction = direction;
@@ -209,16 +213,6 @@ public class SpotLight(
         get => falloffMax;
         set { falloffMax = value; OnPropertyChanged(); }
     }
-}
-
-public class AmbientLight(Color color, bool on = false) : ColorViewModel(color, on)
-{
-}
-
-public abstract class ViewModel : INotifyPropertyChanged
-{
-    public event PropertyChangedEventHandler? PropertyChanged;
-    protected void OnPropertyChanged([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 }
 
 public class RelayCommand : ICommand

@@ -19,13 +19,13 @@ namespace SpatialGame.ViewModels
             DirectionalLight = new DirectionalLight(new(0, 0, -1), Colors.White);
             PointLight = new PointLight(new(0, 0, 0), Colors.White, 200);
             SpotLight = new SpotLight(new(0, 0, 0), new(0, 0, -1), Colors.White, 500);
-            AmbientLight = new AmbientLight(Colors.Black);
+            AmbientLight = new AmbientLight(Color.FromArgb(255, 50, 50, 50));
             Camera1 = new PerspectiveCamera
             {
                 Position = new(0, 50, 100),
                 LookDirection = new(0, -50, -100),
                 UpDirection = new(0, 1, 0),
-                FieldOfView = 45
+                FieldOfView = 65
             };
             ShadowMap = new ShadowMapViewModel
             {

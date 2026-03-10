@@ -5,17 +5,17 @@ using HelixToolkit.Geometry;
 using HelixToolkit.Maths;
 using HelixToolkit.SharpDX;
 using MeshGeometry3D = HelixToolkit.SharpDX.MeshGeometry3D;
-using MeshMaterial = HelixToolkit.Wpf.SharpDX.PhongMaterial;
 using MeshGeometryModel3D = HelixToolkit.Wpf.SharpDX.MeshGeometryModel3D;
+using HelixToolkit.Wpf.SharpDX;
 
 namespace SpatialGame.ViewModels
 {
     public static class SolarSystem
     {
-        private static MeshMaterial CloneMaterial(MeshMaterial src)
+        private static PhongMaterial CloneMaterial(PhongMaterial src)
         {
-            if (src == null) return new MeshMaterial();
-            return new MeshMaterial
+            if (src == null) return new PhongMaterial();
+            return new PhongMaterial
             {
                 Name = src.Name,
                 AmbientColor = src.AmbientColor,
@@ -45,7 +45,7 @@ namespace SpatialGame.ViewModels
 
         public static readonly (string name, double au, double sizeRatio, string materialDescription)[] Planets =
         [
-            ("Mercury", 0.39, 0.383, "Black"), // Mercury is black
+            ("Mercury", 0.39, 0.383, "Charcoal"), // Mercury is black
             ("Venus", 0.72, 0.949, "White"),
             ("Earth", 1.00, 1.000, "Shiny_Blue"),
             ("Mars", 1.52, 0.532, "Dull_Red"),

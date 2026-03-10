@@ -173,7 +173,7 @@ namespace SpatialGame.ViewModels
                 for (int len = toks.Count - start; len > 0; len--)
                 {
                     var candidate = JoinPascalCase(toks.Skip(start).Take(len));
-                    if (TryLookupWpfColor(candidate, out color))
+                    if (TryLookupXkcdColor(candidate, out color))
                     {
                         length = len;
                         return true;
@@ -227,8 +227,23 @@ namespace SpatialGame.ViewModels
             if (colorStart >= 0 && colorLen > 0)
                 tokens.RemoveRange(colorStart, colorLen);
 
-            // Ambient is a simple transform of diffuse (library uses ~0.8)
-            Color4 ambient = new Color4(0.349f, 0.349f, 0.349f, 1.0f);
+            // Ambient is a scaled version of the diffuse color (preserving hue, much darker)
+            // Set these to whatever ambient light color you want to match
+            var ambientReference = Colors.DarkGray;
+            var whiteReference = Colors.White;
+
+            // Compute scaling factor based on average intensity
+            float avgAmbient = (ambientReference.R + ambientReference.G + ambientReference.B) / (3f * 255f);
+            float avgWhite = (whiteReference.R + whiteReference.G + whiteReference.B) / (3f * 255f);
+            float ambientScale = avgWhite == 0 ? 0 : avgAmbient / avgWhite;
+
+            // Now scale the diffuse color by this factor to get the ambient color
+            Color4 ambient = new Color4(
+                diffuse.Red * ambientScale,
+                diffuse.Green * ambientScale,
+                diffuse.Blue * ambientScale,
+                1.0f
+            );
             // Specular: use a low gray value unless overridden
             Color4 specular = chromePresent ? new Color4(1f, 1f, 1f, 1f) : new Color4(0.161f, 0.161f, 0.161f, 1.0f);
             // Emissive: default to black unless overridden
@@ -280,6 +295,11 @@ namespace SpatialGame.ViewModels
             }
 
             return false;
+        }
+
+        private static bool TryLookupXkcdColor(string name, out Color4 c)
+        {
+            return XkcdColors.TryGet(name, out c);
         }
 
         public static PhongMaterial GetOrCompose(string key)
