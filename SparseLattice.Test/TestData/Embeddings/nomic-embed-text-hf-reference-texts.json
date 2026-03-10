@@ -1,0 +1,22 @@
+[
+  "public int Add(int a, int b) => a + b;",
+  "public string Greet(string name) => $\"Hello, {name}!\";",
+  "public bool IsEven(int n) => n % 2 == 0;",
+  "public double Sqrt(double x) => Math.Sqrt(x);",
+  "public List<int> Range(int n) => Enumerable.Range(0, n).ToList();",
+  "public void Log(string msg) => Console.WriteLine(msg);",
+  "public int Max(int a, int b) => a > b ? a : b;",
+  "public bool Contains<T>(IEnumerable<T> src, T item) => src.Any(x => x!.Equals(item));",
+  "public string Reverse(string s) => new string(s.Reverse().ToArray());",
+  "public int Factorial(int n) => n <= 1 ? 1 : n * Factorial(n - 1);",
+  "public Task<T> AsTask<T>(T value) => Task.FromResult(value);",
+  "public bool IsNullOrEmpty(string? s) => string.IsNullOrEmpty(s);",
+  "public IEnumerable<T> Flatten<T>(IEnumerable<IEnumerable<T>> src) => src.SelectMany(x => x);",
+  "public Dictionary<K,V> ToDictionary<K,V>(IEnumerable<(K,V)> pairs) => pairs.ToDictionary(p => p.Item1, p => p.Item2);",
+  "public int Clamp(int v, int min, int max) => Math.Clamp(v, min, max);",
+  "public byte[] ToBytes(string s) => Encoding.UTF8.GetBytes(s);",
+  "public string FromBytes(byte[] b) => Encoding.UTF8.GetString(b);",
+  "public int CountDistinct<T>(IEnumerable<T> src) => src.Distinct().Count();",
+  "public T First<T>(IList<T> list) => list[0];",
+  "public T Last<T>(IList<T> list) => list[list.Count - 1];"
+]

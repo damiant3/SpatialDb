@@ -9,6 +9,8 @@ trim_trailing_whitespace = true
 max_line_length = 120
 indent_style = space
 indent_size = 4
+dotnet_style_operator_placement_when_wrapping = beginning_of_line
+tab_width = 4
 
 [*.cs]
 # C# specifics
@@ -17,17 +19,31 @@ dotnet_style_qualification_for_property = false:suggestion
 dotnet_style_qualification_for_method = false:suggestion
 dotnet_style_qualification_for_event = false:suggestion
 
-# naming: keep the project's convention where private fields use 'm_' prefix
-dotnet_naming_rule.private_fields_m_prefix.severity = warning
-dotnet_naming_rule.private_fields_m_prefix.symbols = private_fields
-dotnet_naming_rule.private_fields_m_prefix.style = m_prefix_style
+# naming: keep the project's convention where private instance fields use 'm_' and static fields use 's_'
 
-dotnet_naming_symbols.private_fields.applicable_kinds = field
-dotnet_naming_symbols.private_fields.applicable_accessibilities = private
-dotnet_naming_symbols.private_fields.required_modifiers = none
+# private instance fields -> m_ prefix, camelCase
+dotnet_naming_rule.private_instance_fields_m_prefix.severity = warning
+dotnet_naming_rule.private_instance_fields_m_prefix.symbols = private_instance_fields
+dotnet_naming_rule.private_instance_fields_m_prefix.style = m_prefix_style
+
+dotnet_naming_symbols.private_instance_fields.applicable_kinds = field
+dotnet_naming_symbols.private_instance_fields.applicable_accessibilities = private
+dotnet_naming_symbols.private_instance_fields.required_modifiers = none
 
 dotnet_naming_style.m_prefix_style.required_prefix = m_
 dotnet_naming_style.m_prefix_style.capitalization = camel_case
+
+# static fields -> s_ prefix, camelCase (applies to any accessibility)
+dotnet_naming_rule.static_fields_s_prefix.severity = warning
+dotnet_naming_rule.static_fields_s_prefix.symbols = static_fields
+dotnet_naming_rule.static_fields_s_prefix.style = s_prefix_style
+
+dotnet_naming_symbols.static_fields.applicable_kinds = field
+dotnet_naming_symbols.static_fields.applicable_accessibilities = *
+dotnet_naming_symbols.static_fields.required_modifiers = static
+
+dotnet_naming_style.s_prefix_style.required_prefix = s_
+dotnet_naming_style.s_prefix_style.capitalization = camel_case
 
 # Member accessibility ordering
 file_header_template = 
@@ -45,6 +61,23 @@ dotnet_diagnostic.IDE0044.severity = suggestion
 
 # Prefer using pattern matching where appropriate
 csharp_style_pattern_matching_over_is_with_cast_check = true:silent
+csharp_indent_labels = one_less_than_current
+csharp_using_directive_placement = outside_namespace:silent
+csharp_prefer_simple_using_statement = true:suggestion
+csharp_prefer_braces = true:silent
+csharp_style_namespace_declarations = block_scoped:silent
+csharp_style_prefer_method_group_conversion = true:silent
+csharp_style_prefer_top_level_statements = true:silent
+csharp_style_prefer_primary_constructors = true:suggestion
+csharp_prefer_system_threading_lock = true:suggestion
+csharp_style_expression_bodied_methods = false:silent
+csharp_style_expression_bodied_constructors = false:silent
+csharp_style_expression_bodied_operators = false:silent
+csharp_style_expression_bodied_properties = true:silent
+csharp_style_expression_bodied_indexers = true:silent
+csharp_style_expression_bodied_accessors = true:silent
+csharp_style_expression_bodied_lambdas = true:silent
+csharp_style_expression_bodied_local_functions = false:silent
 
 
 [*.{cs,csproj}]

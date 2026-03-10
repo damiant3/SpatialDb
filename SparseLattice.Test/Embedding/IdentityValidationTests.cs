@@ -1,6 +1,7 @@
 using SparseLattice.Embedding;
 using SparseLattice.Lattice;
 using SparseLattice.Math;
+using System.Text.Json;
 /////////////////////////////////////////////////////
 namespace SparseLattice.Test.Embedding;
 
@@ -172,68 +173,142 @@ public sealed class IdentityValidationTests
         }
     }
 
-    // -----------------------------------------------------------------------
-    // File-based corpus tests — auto-discovered from TestData/Embeddings/
-    // -----------------------------------------------------------------------
-
     [TestMethod]
-    public void Unit_Identity_FileCorpus_Discovery_ReportsFoundFiles()
+    [TestCategory("Integration")]
+    public async Task Integration_Identity_AllServerEmbeddingModels_ConfidenceReported()
     {
-        string testDataDir = GetTestDataEmbeddingsDir();
-        if (!System.IO.Directory.Exists(testDataDir))
+        string baseUrl = GetOllamaBaseUrl();
+
+        if (!await IsOllamaReachable(baseUrl))
         {
-            WriteSkipMessage(
-                $"TestData directory not found at {testDataDir}. " +
-                "To enable deeper testing, drop embedding CSV files there. " +
-                "Format: one row per vector, one float per column, comma-separated. " +
-                "File name pattern: {{modelName}}_{{dimensions}}.csv");
+            WriteSkipMessage($"Ollama not reachable at {baseUrl}. Skipping.");
             return;
         }
 
-        string[] files = System.IO.Directory.GetFiles(testDataDir, "*.csv");
-        WriteOutput($"Found {files.Length} embedding file(s) in {testDataDir}:");
-        foreach (string file in files)
-            WriteOutput($"  {System.IO.Path.GetFileName(file)}");
-    }
-
-    [TestMethod]
-    public async Task Unit_Identity_FileCorpus_AllDiscovered_ConfidenceReported()
-    {
-        string testDataDir = GetTestDataEmbeddingsDir();
-        if (!System.IO.Directory.Exists(testDataDir))
+        using HttpClient client = new() { Timeout = TimeSpan.FromSeconds(10) };
+        HttpResponseMessage resp;
+        try
         {
-            WriteSkipMessage("TestData/Embeddings directory not found. Skipping file corpus tests.");
+            resp = await client.GetAsync(baseUrl.TrimEnd('/') + "/api/ps").ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            WriteSkipMessage($"Failed to list models from Ollama: {ex.Message}");
             return;
         }
 
-        string[] files = System.IO.Directory.GetFiles(testDataDir, "*.csv");
-        if (files.Length == 0)
+        if (!resp.IsSuccessStatusCode)
         {
-            WriteSkipMessage("No .csv files found in TestData/Embeddings. Skipping.");
+            WriteSkipMessage($"Ollama /api/ps returned {(int)resp.StatusCode}. Skipping.");
             return;
         }
 
-        foreach (string file in files)
+        string body = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+        System.Collections.Generic.HashSet<string> modelNames = new();
+        try
         {
-            string modelName = System.IO.Path.GetFileNameWithoutExtension(file);
-            float[][] allVectors = LoadEmbeddingCsv(file);
-            if (allVectors.Length < 5)
+            using JsonDocument doc = JsonDocument.Parse(body);
+            if (doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("models", out JsonElement modelsElem) && modelsElem.ValueKind == JsonValueKind.Array)
             {
-                WriteOutput($"  {modelName}: only {allVectors.Length} vectors, need >= 5. Skipping.");
+                foreach (JsonElement item in modelsElem.EnumerateArray())
+                {
+                    if (item.ValueKind == JsonValueKind.Object)
+                    {
+                        if (item.TryGetProperty("name", out JsonElement nameProp) && nameProp.ValueKind == JsonValueKind.String)
+                            modelNames.Add(nameProp.GetString()!);
+                        else if (item.TryGetProperty("model", out JsonElement modelProp) && modelProp.ValueKind == JsonValueKind.String)
+                            modelNames.Add(modelProp.GetString()!);
+                    }
+                    else if (item.ValueKind == JsonValueKind.String)
+                        modelNames.Add(item.GetString()!);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            WriteSkipMessage($"Failed to parse /api/ps response: {ex.Message}");
+            return;
+        }
+
+        if (modelNames.Count == 0)
+        {
+            WriteSkipMessage("No models discovered on server. Skipping.");
+            return;
+        }
+
+        foreach (string model in modelNames)
+        {
+            // For each model, probe model info to see if it advertises embedding length
+            try
+            {
+                var payload = new { name = model };
+                string payloadJson = System.Text.Json.JsonSerializer.Serialize(payload);
+                using StringContent sc = new(payloadJson, System.Text.Encoding.UTF8, "application/json");
+                HttpResponseMessage infoResp = await client.PostAsync(baseUrl.TrimEnd('/') + "/api/show", sc).ConfigureAwait(false);
+                if (!infoResp.IsSuccessStatusCode)
+                {
+                    WriteSkipMessage($"Model {model}: /api/show returned {(int)infoResp.StatusCode}. Skipping model.");
+                    continue;
+                }
+
+                string infoBody = await infoResp.Content.ReadAsStringAsync().ConfigureAwait(false);
+                using JsonDocument infoDoc = JsonDocument.Parse(infoBody);
+
+                // Try to find model_info.general.embedding_length (fallbacks handled)
+                int embedLen = 0;
+                if (infoDoc.RootElement.TryGetProperty("model_info", out JsonElement mi) && mi.ValueKind == JsonValueKind.Object)
+                {
+                    if (mi.TryGetProperty("general.embedding_length", out JsonElement ge) && ge.ValueKind == JsonValueKind.Number)
+                    {
+                        embedLen = ge.GetInt32();
+                    }
+                    else if (mi.TryGetProperty("general", out JsonElement general) && general.ValueKind == JsonValueKind.Object && general.TryGetProperty("embedding_length", out JsonElement el) && el.ValueKind == JsonValueKind.Number)
+                    {
+                        embedLen = el.GetInt32();
+                    }
+                }
+
+                if (embedLen <= 0)
+                {
+                    // Some servers don't populate model_info; try the details->embedding_length path
+                    if (infoDoc.RootElement.TryGetProperty("ModelInfoData", out JsonElement mid) && mid.ValueKind == JsonValueKind.Object)
+                    {
+                        if (mid.TryGetProperty("EmbeddingLength", out JsonElement el2) && el2.ValueKind == JsonValueKind.Number)
+                            embedLen = el2.GetInt32();
+                    }
+                }
+
+                if (embedLen <= 0)
+                {
+                    WriteOutput($"Model {model}: does not advertise embedding length (skipping).");
+                    continue;
+                }
+
+                // Run identity validation for this embedding model
+                using OllamaEmbeddingSource source = new(baseUrl, model);
+                List<(string text, string label)> corpus = BuildCodeSnippetCorpus();
+
+                try
+                {
+                    IdentityReport report = await RunIdentityValidation(
+                        source,
+                        corpus,
+                        queriesFromCorpus: 5,
+                        k: 3,
+                        zeroThreshold: 0.01f);
+                    WriteReport(report, $"Ollama/{model}");
+                }
+                catch (HttpRequestException ex)
+                {
+                    WriteSkipMessage($"Model {model}: HTTP error during embed ({ex.Message}). Skipping.");
+                    continue;
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteSkipMessage($"Model {model}: unexpected error ({ex.Message}). Skipping.");
                 continue;
             }
-
-            PreloadedEmbeddingSource source = new(modelName, allVectors);
-            List<(string text, string label)> corpus = BuildLabelledCorpus(allVectors.Length);
-
-            IdentityReport report = await RunIdentityValidation(
-                source,
-                corpus,
-                queriesFromCorpus: System.Math.Min(10, allVectors.Length / 2),
-                k: 5,
-                zeroThreshold: 0.01f);
-
-            WriteReport(report, $"File/{modelName} ({allVectors.Length} vectors)");
         }
     }
 
