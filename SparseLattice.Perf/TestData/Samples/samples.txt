@@ -1,238 +1,1000 @@
-public sealed class EmbeddingLattice<TPayload>
-public bool IsFrozen => m_frozen;
-public void Freeze()
-public List<SparseOccupant<TPayload>> QueryWithinDistanceL2(SparseVector center, BigInteger radiusSquared)
-private static ISparseNode FreezeNode(ISparseNode node)
-private static SparseTreeStats CollectStatsRecursive(ISparseNode node, int depth)
-private void QueryKNearestRecursiveL2(ISparseNode node, SparseVector center, int k, KnnHeap heap)
-private sealed class KnnHeap(int capacity)
-private void SiftUp(int index)
-private void SiftDown(int index)
-return result;
-public sealed class QuantizationOptions
-public static SparseVector Quantize(float[] embedding, QuantizationOptions? options = null)
-if (MathF.Abs(embedding[i]) < effectiveOptions.ZeroThreshold) continue;
-return new SparseVector(entries, embedding.Length);
-public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
-public static TransformerEmbeddingSource Load(string ggufPath, Action<int, int, string>? onProgress = null)
-public Task<float[]> EmbedAsync(string text, CancellationToken ct = default)
-private float[] Forward(string text)
-float[] x = BuildEmbeddings(tokenIds, sequenceLen);
-ApplyLayerNorm(x, sequenceLen, m_embdNormW, m_embdNormB);
-public interface IOptimizedPartitioner
-int PartitionInPlace(Span<SparseOccupant<string>> span, ushort splitDimension, long pivotValue);
-public static class EmbeddingAdapter
-public static LongVectorN QuantizeDense(float[] embedding, QuantizationOptions? options = null)
-public static float[] Dequantize(LongVectorN vector, QuantizationOptions? options = null)
-private static SparseEntry[] ApplySparsityBudget(SparseEntry[] entries, int budget)
-using SparseLattice.Embedding;
-using SparseLattice.Lattice;
-using SparseLattice.Math;
-public static class Program
-string mode = args.Length > 0 ? args[0].ToLowerInvariant() : "local";
-foreach (int concurrency in new[] { 1, 8, 32 })
-const int maxCorpus = 5000;
-var allEmbeddings = new List<float[]>(maxCorpus);
-allEmbeddings.Add(await src.EmbedAsync(samples[i % samples.Length]).ConfigureAwait(false));
-QuantizationOptions qo = new();
-var allOccupants = allEmbeddings.Select((v, i) => new SparseOccupant<string>(EmbeddingAdapter.Quantize(v, qo), $"id{i}")).ToArray();
-Console.WriteLine(new string('-', 65));
-EmbeddingLattice<string> lattice = new(occupants, new LatticeOptions { LeafThreshold = 16 });
-lattice.Freeze();
-int qCount = System.Math.Min(500, n);
-System.Array.Sort(latencies);
-double qps = qCount / swq.Elapsed.TotalSeconds;
-double avgMs = swq.Elapsed.TotalMilliseconds / qCount;
-Console.WriteLine($"{n,8}  {k,3}  {swBuild.Elapsed.TotalMilliseconds,10:F1}  {qps,10:F1}  {avgMs,10:F3}  {p99,8:F3}");
-public Task<float[][]> EmbedBatchAsync(IReadOnlyList<string> texts, CancellationToken ct = default)
-public void Dispose() => m_disposed = true;
-float[] pooled = MeanPool(x, sequenceLen);
-L2Normalize(pooled);
-int[] tokenIds = m_tokenizer.Encode(text, addSpecialTokens: true);
-int sequenceLen = tokenIds.Length;
-float[] x = new float[sequenceLen * m_nEmbd];
-for (int t = 0; t < sequenceLen; t++)
-Array.Copy(ffnOut, x, seqLen * embd);
-// Additional simple samples
-public int Add(int a, int b) => a + b;
-public string Greet(string name) => $"Hello, {name}!";
-public bool IsEven(int n) => n % 2 == 0;
-public double Sqrt(double x) => Math.Sqrt(x);
-public void Log(string msg) => Console.WriteLine(msg);
-public int Max(int a, int b) => a > b ? a : b;
-public string Reverse(string s) => new string(s.Reverse().ToArray());
-public int Factorial(int n) => n <= 1 ? 1 : n * Factorial(n - 1);
-public Task<T> AsTask<T>(T value) => Task.FromResult(value);
-public byte[] ToBytes(string s) => Encoding.UTF8.GetBytes(s);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+﻿public class HookSet : ConcurrentDictionary<string, ManualResetEventSlim>
+private HookSet() { }
+private static readonly Lazy<HookSet> s_instance = new(() => new HookSet(), LazyThreadSafetyMode.ExecutionAndPublication);
+public static HookSet Instance => s_instance.Value;
+public new ManualResetEventSlim this[string name]
+get => GetOrAdd(name, _ => new ManualResetEventSlim(false));
+set => base[name] = value;
+public void RestetAll()
+foreach (var kvp in this)
+kvp.Value.Reset();
+public abstract partial class OctetParentNode
+static OctetParentNode()
+var hookNames = new[]
+foreach (var name in hookNames)
+HookSet.Instance[name].Reset();
+public static int SleepThreadId { get; set; } = 0;
+public static int SleepMs { get; set; } = 1;
+public static bool UseYield { get; set; } = false;
+public static int CurrentSubdividerThreadId { get; set; }
+public enum SubdivideVariant
+public static SubdivideVariant SelectedSubdivideVariant { get; set; } = SubdivideVariant.Correct;
+public delegate void SubdivideImplDelegate(OctetParentNode parent, VenueLeafNode subdividingleaf, byte latticeDepth, int childIndex, bool branchOrSublattice);
+private static readonly Dictionary<SubdivideVariant, SubdivideImplDelegate> s_subdivideImplRegistry = [];
+private static readonly object s_subdivideRegistryLock = new();
+public static void RegisterSubdivideImpl(SubdivideVariant variant, SubdivideImplDelegate impl)
+if (impl == null) throw new ArgumentNullException(nameof(impl));
+s_subdivideImplRegistry[variant] = impl;
+public static void UnregisterSubdivideImpl(SubdivideVariant variant)
+s_subdivideImplRegistry.Remove(variant);
+partial void Subdivide_Impl(OctetParentNode parent, VenueLeafNode subdividingleaf, byte latticeDepth, int childIndex, bool branchOrSublattice)
+SubdivideAndMigrate_ImplCorrect(parent, subdividingleaf, latticeDepth, childIndex, branchOrSublattice);
+SubdivideAndMigrate_Impl_LockOrderWrong(parent, subdividingleaf, latticeDepth, childIndex, branchOrSublattice);
+SubdivideAndMigrate_Impl_NoLeafLockTaken(parent, subdividingleaf, latticeDepth, childIndex, branchOrSublattice);
+SubdivideAndMigrate_Impl_DisposeBeforeRetire(parent, subdividingleaf, latticeDepth, childIndex, branchOrSublattice);
+throw new InvalidOperationException($"Unknown SubdivideVariant: {SelectedSubdivideVariant}");
+void SubdivideAndMigrate_ImplCorrect(OctetParentNode parent, VenueLeafNode subdividingleaf, byte latticeDepth, int childIndex, bool branchOrSublattice)
+HookSet.Instance["SignalSubdivideStart"].Set();
+HookSet.Instance["WaitSubdivideProceed"].Wait();
+CurrentSubdividerThreadId = Environment.CurrentManagedThreadId;
+HookSet.Instance["SignalAfterLeafLock"].Set();
+if (SleepThreadId == Environment.CurrentManagedThreadId)
+if (UseYield) Thread.Yield();
+else Thread.Sleep(System.Math.Max(1, SleepMs));
+HookSet.Instance["BlockAfterLeafLock"].Wait();
+if (subdividingleaf.IsRetired) return;
+var migrationSnapshot = subdividingleaf.LockAndSnapshotForMigration();
+var occupantsSnapshot = migrationSnapshot.Objects;
+IInternalChildNode newBranch = CreateBranchNodeWithLeafs(parent, subdividingleaf, latticeDepth, branchOrSublattice, occupantsSnapshot);
+parent.Children[childIndex] = newBranch;
+subdividingleaf.Retire();
+migrationSnapshot.Dispose();
+partial void Migrate_Impl(IList<ISpatialObject> objs)
+HookSet.Instance["SignalBeforeBucketAndDispatch"].Set();
+HookSet.Instance["BlockBeforeBucketAndDispatch"].Wait();
+var buckets = new List<ISpatialObject>[8];
+foreach (var obj in objs)
+if (!Bounds.Contains(obj.LocalPosition))
+throw new InvalidOperationException("Migrant has no home.");
+if (SelectChild(obj.LocalPosition) is not SelectChildResult result)
+throw new InvalidOperationException("Containment invariant violated");
+buckets[result.IndexInParent] ??= [];
+buckets[result.IndexInParent].Add(obj);
+for (byte i = 0; i < 8; i++)
+if (buckets[i] == null) continue;
+Children[i].Migrate(buckets[i]);
+void SubdivideAndMigrate_Impl_LockOrderWrong(OctetParentNode parent, VenueLeafNode subdividingleaf, byte latticeDepth, int childIndex, bool branchOrSublattice)
+void SubdivideAndMigrate_Impl_NoLeafLockTaken(OctetParentNode parent, VenueLeafNode subdividingleaf, byte latticeDepth, int childIndex, bool branchOrSublattice)
+var migrationSnapshot = subdividingleaf.LockAndSnapshotForMigration(); // snapshot will try to acquire occupant locks without leaf lock held
+void SubdivideAndMigrate_Impl_DisposeBeforeRetire(OctetParentNode parent, VenueLeafNode subdividingleaf, byte latticeDepth, int childIndex, bool branchOrSublattice)
+public partial class TickableVenueLeafNode
+public static int CurrentTickerThreadId { get; set; }
+public partial void Tick()
+HookSet.Instance["SignalTickerStart"].Set();
+HookSet.Instance["WaitTickerProceed"].Wait();
+CurrentTickerThreadId = Environment.CurrentManagedThreadId;
+if (OctetParentNode.SleepThreadId == Environment.CurrentManagedThreadId)
+if (OctetParentNode.UseYield) Thread.Yield();
+else Thread.Sleep(System.Math.Max(1, OctetParentNode.SleepMs));
+List<ITickableObject> tickables;
+tickables = [.. m_tickableObjects];
+foreach (var obj in tickables)
+var result = obj.Tick();
+if (result.HasValue)
+HandleTickResult(result.Value);
+public abstract class AdmitResult
+private AdmitResult() { }
+public sealed class BulkCreated(List<ISpatialObjectProxy> proxies) : AdmitResult
+public List<ISpatialObjectProxy> Proxies { get; } = proxies;
+public sealed class Created(ISpatialObjectProxy proxy) : AdmitResult
+public ISpatialObjectProxy Proxy { get; } = proxy;
+public sealed class Rejected : AdmitResult { }
+public sealed class Escalate : AdmitResult { }
+public sealed class Retry : AdmitResult { }
+public sealed class Subdivide(LeafNode leaf) : AdmitResult
+public LeafNode Leaf { get; } = leaf;
+public sealed class Delegate(LeafNode leaf) : AdmitResult
+public static AdmitResult BulkCreate(List<ISpatialObjectProxy> proxies) => new BulkCreated(proxies);
+public static AdmitResult Create(ISpatialObjectProxy proxy) => new Created(proxy);
+public static AdmitResult Reject() => new Rejected();
+public static AdmitResult EscalateRequest() => new Escalate();
+public static AdmitResult RetryRequest() => new Retry();
+public static AdmitResult SubdivideRequest(LeafNode leaf) => new Subdivide(leaf);
+public static AdmitResult DelegateRequest(LeafNode leaf) => new Delegate(leaf);
+public class ArrayRentalContract<T>(T[] array)
+private bool m_disposed = false;
+private readonly T[] m_array = array;
+public void Dispose()
+if (m_disposed) return;
+m_disposed = true;
+if (m_array != null)
+ArrayPool<T>.Shared.Return(m_array, clearArray: false);
+GC.SuppressFinalize(this);
+internal sealed class BufferSlice(int start, int length)
+public int Start { get; } = start;
+public int Length { get; } = length;
+public Span<ISpatialObject> GetSpan(Span<ISpatialObject> rootBuffer) => rootBuffer.Slice(Start, Length);
+public readonly struct SelectChildResult(byte indexInParent, IInternalChildNode childNode)
+public readonly byte IndexInParent = indexInParent;
+public readonly IInternalChildNode ChildNode = childNode;
+internal static class LeafPool<T> where T : VenueLeafNode
+private static readonly ConcurrentBag<T> s_pool = [];
+public static T Rent(Region bounds, OctetParentNode parent, Func<Region, OctetParentNode, T> factory)
+if (s_pool.TryTake(out var leaf))
+leaf.Reinitialize(bounds, parent);
+return leaf;
+return factory(bounds, parent);
+public static void Return(T leaf) => s_pool.Add(leaf);
+public interface ISpatialNode
+AdmitResult Admit(ISpatialObject obj, LongVector3 proposedPosition);
+AdmitResult Admit(Span<ISpatialObject> buffer);
+void Migrate(IList<ISpatialObject> objects);
+Region Bounds { get; }
+public abstract class SpatialNode(Region bounds)
+public Region Bounds { get; protected set; } = bounds;
+protected readonly ReaderWriterLockSlim Sync = new(LockRecursionPolicy.SupportsRecursion);
+ReaderWriterLockSlim ISync.Sync => Sync;
+public abstract void Migrate(IList<ISpatialObject> obj);
+public abstract AdmitResult Admit(ISpatialObject obj, LongVector3 proposedPosition);
+public abstract AdmitResult Admit(Span<ISpatialObject> buffer);
+public interface IParentNode : ISpatialNode
+bool branchOrSublattice,
+List<ISpatialObject> occupantsSnapshot);
+VenueLeafNode CreateNewVenueNode(int i, LongVector3 childMin, LongVector3 childMax);
+public abstract VenueLeafNode? ResolveOccupyingLeaf(ISpatialObject obj);
+public abstract VenueLeafNode? ResolveLeaf(ISpatialObject obj);
+public interface IInternalChildNode : IChildNode<OctetParentNode>
+void MigrateInternal(IList<ISpatialObject> objs);
+public interface IChildNode<TParent> : ISpatialNode
+public TParent Parent { get; }
+public interface IRootNode<TParent, TBranch, TVenue, TSelf>
+byte LatticeDepth { get; }
+VenueLeafNode? ResolveLeafFromOuterLattice(ISpatialObject obj);
+ISpatialLattice? OwningLattice { get; set; }
+public class RootNode<TParent, TBranch, TVenue, TSelf>(Region bounds, byte latticeDepth)
+protected RootNode(Region bounds)
+public ISpatialLattice? OwningLattice { get; set; }
+public byte LatticeDepth { get; } = latticeDepth;
+public VenueLeafNode? ResolveLeafFromOuterLattice(ISpatialObject obj)
+=> ResolveLeaf(obj);
+public abstract class ParentNode(Region bounds)
+public abstract IInternalChildNode[] Children { get; }
+public abstract void PruneIfEmpty();
+public class OctetBranchNode
+public OctetBranchNode(Region bounds, OctetParentNode parent, IList<ISpatialObject> migrants)
+Parent = parent;
+Migrate(migrants);
+public OctetParentNode Parent { get; }
+void IInternalChildNode.MigrateInternal(IList<ISpatialObject> objs) => Migrate(objs);
+public abstract class LeafNode(Region bounds, OctetParentNode parent)
+public OctetParentNode Parent { get; protected set; } = parent;
+public virtual bool CanSubdivide()
+=> Bounds.Size.X > 1 && Bounds.Size.Y > 1 && Bounds.Size.Z > 1;
+public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
+internal IList<ISpatialObject> Occupants { get; } = [];
+protected virtual ISpatialObjectProxy CreateProxy<T>(T obj, LongVector3 proposedPosition)
+=> new SpatialObjectProxy(obj, this, proposedPosition);
+internal bool m_isRetired = false;
+public bool IsRetired => m_isRetired;
+public bool Contains(ISpatialObject obj)
+return Occupants.Contains(obj);
+public bool HasAnyOccupants()
+return Occupants.Count > 0;
+internal void Vacate(ISpatialObject obj)
+=> Occupants.Remove(obj);
+protected void Occupy(ISpatialObject obj)
+=> Occupants.Add(obj); // private, assumes write lock held and is not retired
+public void Retire()
+Occupants.Clear();
+m_isRetired = true;
+LeafPool<VenueLeafNode>.Return(this);
+internal virtual void Reinitialize(Region bounds, OctetParentNode parent)
+if (!IsRetired) throw new InvalidOperationException("Cannot reinitialize a non-retired leaf node.");
+Bounds = bounds;
+m_isRetired = false;
+public virtual void Replace(ISpatialObjectProxy proxy)
+var originalObject = proxy.OriginalObject;
+int index = Occupants.IndexOf(proxy);
+if (index == -1)
+throw new InvalidOperationException("Proxy not found in occupants list.");
+Occupants[index] = originalObject;
+public virtual int Capacity => 8;
+public bool IsAtCapacity(int toAdd = 1)
+=> Occupants.Count + toAdd > Capacity;
+public override void Migrate(IList<ISpatialObject> objs)
+if (obj is SpatialObjectProxy proxy)
+proxy.TargetLeaf = this;
+Occupants.Add(obj);
+public override AdmitResult Admit(ISpatialObject obj, LongVector3 proposedPosition)
+if (!Bounds.Contains(proposedPosition)) return AdmitResult.EscalateRequest();
+if (IsRetired) return AdmitResult.RetryRequest();
+if (IsAtCapacity(1))
+return CanSubdivide()
+: AdmitResult.DelegateRequest(this);
+var proxy = CreateProxy((SpatialObject)obj, proposedPosition);
+Occupy(proxy);
+return AdmitResult.Create(proxy);
+public override AdmitResult Admit(Span<ISpatialObject> buffer)
+if (IsRetired)
+return AdmitResult.RetryRequest();
+if (IsAtCapacity(buffer.Length))
+var outProxies = new List<ISpatialObjectProxy>();
+foreach (var obj in buffer)
+var proxy = CreateProxy((SpatialObject)obj, obj.LocalPosition);
+outProxies.Add(proxy);
+return AdmitResult.BulkCreate(outProxies);
+public MultiObjectScope<ISpatialObject> LockAndSnapshotForMigration()
+var snapshot = new List<ISpatialObject>();
+var locksAcquired = new List<SlimSyncer>();
+for (int i = 0; i < Occupants.Count; i++)
+SlimSyncer syncer = null!;
+var occupant = Occupants[i];
+if (!occupant.Sync.IsWriteLockHeld)
+syncer = new SlimSyncer(occupant.Sync, SlimSyncer.LockMode.Write, "Venue.LockAndSnap: Occupant");
+locksAcquired.Add(syncer);
+snapshot.Add(occupant);
+try { syncer?.Dispose(); } catch { }
+return new(snapshot, locksAcquired);
+foreach (var l in locksAcquired)
+try { l.Dispose(); } catch { }
+public IEnumerable<ISpatialObject> QueryNeighbors(LongVector3 center, ulong radius)
+var results = new List<ISpatialObject>();
+QueryNeighborsRecursive(this, center, radius, results);
+return results;
+private static void QueryNeighborsRecursive(ISpatialNode node, LongVector3 center, ulong radius, List<ISpatialObject> results)
+if (!node.Bounds.IntersectsSphere_SimpleImpl(center, radius)) return;
+foreach (var obj in leaf.Occupants)
+var distSq = (obj.LocalPosition - center).MagnitudeSquaredBig;
+if (distSq <= (BigInteger)radius * radius) results.Add(obj);
+foreach (var child in parent.Children)
+if (child.Bounds.IntersectsSphere_SimpleImpl(center, radius))
+QueryNeighborsRecursive(child, center, radius, results);
+var innerCenter = sub.Sublattice.BoundsTransform.OuterToInnerCanonical(center);
+var scale = LatticeUniverse.RootRegion.Size.X / (double)sub.Sublattice.BoundsTransform.OuterLatticeBounds.Size.X;
+var innerRadius = (ulong)(radius * scale);
+var subResults = sub.Sublattice.QueryWithinDistance(innerCenter, innerRadius);
+results.AddRange(subResults);
+public class LargeLeafNode(Region bounds, OctetParentNode parent)
+public override int Capacity => 16;
+public interface ISubLatticeBranch
+ISpatialLattice GetSublattice();
+public abstract class SubLatticeBranchNode<TLattice>(Region bounds, OctetParentNode parent)
+internal TLattice Sublattice { get; set; } = default!;
+public ISpatialLattice GetSublattice() => Sublattice;
+=> Sublattice.Migrate(objs);
+if (!obj.HasPositionAtDepth(Sublattice.LatticeDepth))
+var sublatticeFramedPosition = Sublattice.BoundsTransform.OuterToInnerInsertion(proposedPosition, obj.Guid);
+obj.AppendPosition(sublatticeFramedPosition);
+var subFramePosition = obj.GetPositionAtDepth(Sublattice.LatticeDepth);
+return Sublattice.Admit(obj, subFramePosition);
+=> Sublattice.ResolveLeafFromOuterLattice(obj);
+=> Sublattice.AdmitForInsert(buffer);
+public class SubLatticeBranchNode
+public SubLatticeBranchNode(Region bounds, OctetParentNode parent, byte latticeDepth, IList<ISpatialObject> migrants)
+Sublattice = new SpatialLattice(bounds, latticeDepth);
+Sublattice.Migrate(migrants);
+partial void Subdivide_Impl(OctetParentNode parent, VenueLeafNode subdividingleaf, byte latticeDepth, int childIndex, bool branchOrSublattice);
+partial void Migrate_Impl(IList<ISpatialObject> objs);
+protected static ArrayRentalContract<T> RentArray<T>(int length, out T[] array)
+array = ArrayPool<T>.Shared.Rent(length);
+for (int i = 0; i < length; i++) array[i] = default!;
+return new ArrayRentalContract<T>(array);
+public void Subdivide(OctetParentNode parent, VenueLeafNode subdividingleaf, byte latticeDepth, int childIndex, bool branchOrSublattice)
+=> Subdivide_Impl(parent, subdividingleaf, latticeDepth, childIndex, branchOrSublattice);
+=> Migrate_Impl(objs);
+public OctetParentNode(Region bounds)
+CreateChildLeafNodes();
+public override IInternalChildNode[] Children { get; } = new IInternalChildNode[8];
+public void CreateChildLeafNodes()
+var min = Bounds.Min;
+var max = Bounds.Max;
+var mid = Bounds.Mid;
+for (int i = 0; i < 8; i++)
+var childMin = new LongVector3(
+(i & 1) != 0 ? mid.Z : min.Z);
+var childMax = new LongVector3(
+(i & 1) != 0 ? max.Z : mid.Z);
+Children[i] = CreateNewVenueNode(i, childMin, childMax);
+public virtual VenueLeafNode CreateNewVenueNode(int i, LongVector3 childMin, LongVector3 childMax)
+=> LeafPool<LargeLeafNode>.Rent(new(childMin, childMax), this, (bounds, parent) => new LargeLeafNode(bounds, parent));
+public SelectChildResult? SelectChild(LongVector3 pos)
+if (!Bounds.Contains(pos)) return null;
+((pos.Z >= mid.Z) ? 1 : 0));
+return new SelectChildResult(index, Children[index]);
+public VenueLeafNode? ResolveOccupyingLeaf(ISpatialObject obj)
+var resolveleaf = ResolveLeaf(obj);
+if (resolveleaf == null) return null;
+if (!resolveleaf.Contains(obj))
+return null;
+return resolveleaf;
+public VenueLeafNode? ResolveLeaf(ISpatialObject obj)
+LongVector3 pos = obj.GetPositionStack()[LatticeDepthContext.CurrentDepth];
+ISpatialNode current = this;
+while (current != null)
+return sublatticebranch.GetSublattice().ResolveLeafFromOuterLattice(obj);
+var result = parent.SelectChild(pos)
+?? throw new InvalidOperationException("Failed to select child during occupation resolution");
+current = result.ChildNode;
+return venue;
+throw new InvalidOperationException("Unknown node type during occupation resolution");
+public struct AdmitFrame(OctetParentNode parent, IInternalChildNode childNode, byte childIndex)
+public OctetParentNode Parent = parent;
+public IInternalChildNode ChildNode = childNode;
+public byte ChildIndex = childIndex;
+AdmitFrame frame = new(this, Children[0], 0);
+while (true)
+if (current is OctetParentNode parent)
+if (parent.SelectChild(proposedPosition) is not SelectChildResult selectChildResult)
+frame.Parent = parent;
+frame.ChildIndex = selectChildResult.IndexInParent;
+frame.ChildNode = selectChildResult.ChildNode;
+current = frame.ChildNode;
+if (current is not LeafNode leaf) throw new InvalidOperationException("Current node is not a LeafNode during Admit");
+var admitResult = current is VenueLeafNode venue && obj.PositionStackDepth > SpatialLattice.CurrentThreadLatticeDepth + 1 // deep insert
+: leaf.Admit(obj, proposedPosition);
+return admitResult;
+current = frame.Parent;
+if (frame.ChildNode is not VenueLeafNode subdividingLeaf) throw new InvalidOperationException("Subdivide/Delgate request from non-venue leaf.");
+if (!subdividingLeaf.IsRetired)
+admitResult is AdmitResult.Subdivide);
+throw new InvalidOperationException("Unknown AdmitResponse");
+public virtual IInternalChildNode CreateBranchNodeWithLeafs(
+=> branchOrSublattice
+? new OctetBranchNode(subdividingleaf.Bounds, parent, occupantsSnapshot)
+: new SubLatticeBranchNode(subdividingleaf.Bounds, parent, (byte)(latticeDepth + 1), occupantsSnapshot);
+internal sealed class AdmitWorkFrame
+public OctetParentNode Parent;
+public BufferSlice WorkingSlice;
+public byte BucketCount;
+public byte NextBucket;
+public BufferSlice[] Buckets;
+public byte[] BucketChildIndex;
+public List<ISpatialObjectProxy> Proxies;
+public AdmitWorkFrame(OctetParentNode parent, Span<ISpatialObject> rootBuffer, BufferSlice workingSlice, byte latticeDepth)
+WorkingSlice = workingSlice;
+NextBucket = 0;
+BucketCount = 0;
+Buckets = new BufferSlice[8];
+BucketChildIndex = new byte[8];
+Proxies = [];
+PartitionInPlace(workingSlice.GetSpan(rootBuffer), latticeDepth);
+void PartitionInPlace(Span<ISpatialObject> span, byte latticeDepth)
+var mid = Parent.Bounds.Mid;
+for (int i = 0; i < span.Length; i++)
+var pos = span[i].GetPositionAtDepth(latticeDepth);
+Span<int> counts = stackalloc int[8];
+for (int i = 0; i < span.Length; i++) counts[octants[i]]++;
+int runningOffset = 0;
+byte bucketIdx = 0;
+if (counts[i] == 0) continue;
+Buckets[bucketIdx] = new(WorkingSlice.Start + runningOffset, counts[i]);
+BucketChildIndex[bucketIdx] = i;
+bucketIdx++;
+runningOffset += counts[i];
+BucketCount = bucketIdx;
+Span<int> bucketStart = stackalloc int[BucketCount];
+Span<int> bucketEnd = stackalloc int[BucketCount];
+for (byte i = 0; i < BucketCount; i++)
+bucketStart[i] = Buckets[i].Start - WorkingSlice.Start;
+bucketEnd[i] = bucketStart[i] + Buckets[i].Length;
+Span<int> octantToBucket = stackalloc int[8];
+octantToBucket.Fill(-1);
+for (byte i = 0; i < BucketCount; i++) octantToBucket[BucketChildIndex[i]] = i;
+for (byte b = 0; b < BucketCount; b++)
+int pos = bucketStart[b];
+byte octant = BucketChildIndex[b];
+while (pos < bucketEnd[b])
+byte targetOctant = octants[pos];
+if (targetOctant == octant) { pos++; continue; }
+int targetBucket = octantToBucket[targetOctant];
+int swapPos = bucketStart[targetBucket]++;
+(span[pos], span[swapPos]) = (span[swapPos], span[pos]);
+(octants[pos], octants[swapPos]) = (octants[swapPos], octants[pos]);
+var stack = new Stack<AdmitWorkFrame>();
+stack.Push(new AdmitWorkFrame(this, buffer, new BufferSlice(0, buffer.Length), SpatialLattice.CurrentThreadLatticeDepth));
+AdmitResult.BulkCreated? topResult = null;
+while (stack.Count > 0)
+var frame = stack.Peek();
+if (frame.NextBucket == frame.BucketCount)
+stack.Pop();
+if (stack.Count > 0)
+var parentFrame = stack.Peek();
+parentFrame.Proxies.AddRange(frame.Proxies);
+topResult = new AdmitResult.BulkCreated(frame.Proxies);
+var bucket = frame.Buckets[frame.NextBucket];
+if (bucket.Length == 0) { frame.NextBucket++; continue; }
+var child = frame.Parent.Children[frame.BucketChildIndex[frame.NextBucket]];
+if (child is OctetParentNode parent)
+stack.Push(new AdmitWorkFrame(parent, buffer, bucket, SpatialLattice.CurrentThreadLatticeDepth));
+frame.NextBucket++;
+var slice = bucket.GetSpan(buffer);
+var leaf = (LeafNode)child ?? throw new InvalidOperationException("Child is not a LeafNode");
+var result = leaf is VenueLeafNode venue && NeedsDeeper(slice) // deep insert
+: leaf.Admit(slice);
+frame.Proxies.AddRange(bulk.Proxies);
+var venue2 = leaf as VenueLeafNode ?? throw new InvalidOperationException("Subdivision requested by non-venueleaf");
+if (!venue2.IsRetired)
+result is AdmitResult.Subdivide);
+throw new InvalidOperationException("Unknown AdmitResult");
+return topResult!;
+foreach (var frame in stack)
+foreach (var proxy in frame.Proxies)
+proxy.Rollback();
+bool NeedsDeeper(Span<ISpatialObject> slice)
+foreach (var obj in slice)
+if (obj.PositionStackDepth > SpatialLattice.CurrentThreadLatticeDepth + 1)
+return true;
+return false;
+public override void PruneIfEmpty()
+if (Children.All(IsChildEmpty))
+if (this is IChildNode<OctetParentNode> child)
+var parent = child.Parent;
+int index = Array.IndexOf(parent.Children, this);
+if (index >= 0)
+parent.Children[index] = parent.CreateNewVenueNode((byte)index, Bounds.Min, Bounds.Max);
+parent.PruneIfEmpty();
+public void PruneChild(int index)  /// who calls this?
+var child = Children[index];
+if (IsChildEmpty(child))
+Children[index] = CreateNewVenueNode(index, child.Bounds.Min, child.Bounds.Max);
+private bool IsChildEmpty(IChildNode<OctetParentNode> child)
+return child switch
+VenueLeafNode leaf => leaf.Occupants.Count == 0,
+OctetParentNode parent => parent.Children.All(IsChildEmpty),
+SubLatticeBranchNode sub => GetTotalOccupantCount(sub.Sublattice.GetRootNode()) == 0,
+_ => false
+protected static int GetTotalOccupantCount(ISpatialNode node)
+return node switch
+VenueLeafNode leaf => leaf.Occupants.Count,
+OctetParentNode parent => parent.Children.Sum(GetTotalOccupantCount),
+SubLatticeBranchNode sub => GetTotalOccupantCount(sub.Sublattice.GetRootNode()),
+for (int i = 0; i < objs.Count; i++)
+var obj = objs[i];
+if (!Bounds.Contains(obj.LocalPosition)) throw new InvalidOperationException("Migrant has no home.");
+if (SelectChild(obj.LocalPosition) is not SelectChildResult result) throw new InvalidOperationException("Containment invariant violated");
+var idx = result.IndexInParent;
+buckets[idx] ??= new List<ISpatialObject>();
+buckets[idx].Add(obj);
+Children[i].MigrateInternal(buckets[i]);
+public class OctetRootNode(Region bounds, byte latticeDepth)
+public class SpatialLattice : SpatialLattice<OctetRootNode>
+public SpatialLattice() : base() { }
+public SpatialLattice(Region outerBounds, byte latticeDepth) : base(outerBounds, latticeDepth) { }
+public static bool EnablePruning { get; set; } = false;
+public interface ISpatialLattice : ISpatialNode
+ISpatialNode GetRootNode();
+AdmitResult AdmitForInsert(Span<ISpatialObject> buffer);
+ParentToSubLatticeTransform BoundsTransform { get; }
+IEnumerable<ISpatialObject> QueryWithinDistance(LongVector3 center, ulong radius);
+internal static class LatticeDepthContext
+[ThreadStatic] private static byte t_latticeDepth;
+public static byte CurrentDepth
+get => t_latticeDepth;
+set => t_latticeDepth = value;
+public class SpatialLattice<TRoot>
+public static byte CurrentThreadLatticeDepth => LatticeDepthContext.CurrentDepth;
+public ISpatialNode GetRootNode() => m_root;
+internal protected readonly TRoot m_root;
+public Region Bounds => m_root.Bounds;
+public ParentToSubLatticeTransform BoundsTransform { get; protected set; }
+public SpatialLattice() // for the rootiest of roots
+public SpatialLattice(Region outerBounds, byte latticeDepth)
+m_root = CreateRoot(LatticeUniverse.RootRegion, latticeDepth);
+m_root.OwningLattice = this;
+BoundsTransform = new ParentToSubLatticeTransform(outerBounds);
+protected virtual TRoot CreateRoot(Region bounds, byte depth)
+=> (TRoot)(IRootNode<OctetParentNode, OctetBranchNode, VenueLeafNode, TRoot>)new OctetRootNode(bounds, depth);
+public byte LatticeDepth => m_root.LatticeDepth;
+public static IDisposable PushLatticeDepth(byte depth)
+return new LatticeDepthScope(depth);
+private readonly byte m_previousDepth;
+public LatticeDepthScope(byte depth)
+m_previousDepth = LatticeDepthContext.CurrentDepth;
+LatticeDepthContext.CurrentDepth = depth;
+=> LatticeDepthContext.CurrentDepth = m_previousDepth;
+public AdmitResult InsertAsOne(List<ISpatialObject> objs)
+List<AdmitResult> results = [];
+var admitResult = Admit(obj, obj.LocalPosition);
+if (admitResult is AdmitResult.Created created)
+results.Add(admitResult);
+foreach (var result in results)
+if (result is AdmitResult.Created createdRollback)
+createdRollback.Proxy.Rollback();
+if (result is AdmitResult.Created created)
+created.Proxy.Commit();
+return AdmitResult.BulkCreate([.. results.Cast<AdmitResult.Created>().Select(r => r.Proxy)]);
+public AdmitResult Insert(List<ISpatialObject> objs)
+=> Insert(objs.ToArray());
+public AdmitResult Insert(ISpatialObject[] objs)
+var admitResult = Admit(objs);
+if (admitResult is AdmitResult.BulkCreated created)
+foreach (var proxy in created.Proxies)
+if (proxy.IsCommitted) throw new InvalidOperationException("Proxy is already committed during bulk insert commit.");
+proxy.Commit();
+public AdmitResult Insert(ISpatialObject obj)
+var admitResult = Admit(obj, obj.GetPositionAtDepth(LatticeDepthContext.CurrentDepth));
+public void Remove(ISpatialObject obj)
+var leaf = m_root.ResolveOccupyingLeaf(obj);
+if (leaf == null) return;
+leaf.Vacate(obj);
+if (SpatialLattice.EnablePruning) leaf.Parent.PruneIfEmpty();
+public void Migrate(IList<ISpatialObject> objs)
+var inner = BoundsTransform.OuterToInnerInsertion(obj.LocalPosition, obj.Guid);
+obj.AppendPosition(inner);
+m_root.Migrate(objs);
+public AdmitResult Admit(ISpatialObject obj, LongVector3 proposedPosition)
+return m_root.Admit(obj, proposedPosition);
+public AdmitResult Admit(Span<ISpatialObject> buffer)
+return m_root.Admit(buffer);
+return m_root.ResolveLeafFromOuterLattice(obj);
+public AdmitResult AdmitForInsert(Span<ISpatialObject> buffer)
+if (!obj.HasPositionAtDepth(LatticeDepth))
+var proposedPosition = obj.GetPositionAtDepth(LatticeDepth - 1);
+var framedPosition = BoundsTransform.OuterToInnerInsertion(proposedPosition, obj.Guid);
+obj.AppendPosition(framedPosition);
+return Admit(buffer);
+return m_root.ResolveOccupyingLeaf(obj);
+return m_root.ResolveLeaf(obj);
+public IEnumerable<ISpatialObject> QueryWithinDistance(LongVector3 center, ulong radius)
+SpatialLattice<TRoot>.QueryWithinDistanceRecursive(m_root, center, radius, results);
+private static void QueryWithinDistanceRecursive(ISpatialNode node, LongVector3 center, ulong radius, List<ISpatialObject> results)
+SpatialLattice<TRoot>.QueryWithinDistanceRecursive(child, center, radius, results);
+var innerSize = LatticeUniverse.RootRegion.Size;
+var outerSize = sub.Sublattice.BoundsTransform.OuterLatticeBounds.Size;
+var scale = innerSize.X / (double)outerSize.X;
+public interface ISpatialObject : ISync
+Guid Guid { get; }
+LongVector3 LocalPosition { get; }
+int PositionStackDepth { get; }
+IList<LongVector3> GetPositionStack();
+void SetPositionStack(IList<LongVector3> newStack);
+void AppendPosition(LongVector3 newPosition);
+void SetLocalPosition(LongVector3 newLocalPos);
+bool HasPositionAtDepth(int depth);
+LongVector3 GetPositionAtDepth(int depth);
+public interface ISpatialObjectProxy : ISpatialObject
+bool IsCommitted { get; }
+ISpatialObject OriginalObject { get; }
+VenueLeafNode TargetLeaf { get; set; }
+void Commit();
+void Rollback();
+public class SpatialObject(IList<LongVector3> initialPosition)
+public Guid Guid { get; } = Guid.NewGuid();
+internal protected ReaderWriterLockSlim Sync = new(LockRecursionPolicy.SupportsRecursion);
+IList<LongVector3> m_positionStack = [.. initialPosition];
+public IList<LongVector3> GetPositionStack()
+return [.. m_positionStack];
+public void AppendPosition(LongVector3 newPosition)
+m_positionStack.Add(newPosition);
+public void SetLocalPosition(LongVector3 newLocalPos)
+m_positionStack[^1] = newLocalPos;
+public void SetPositionStack(IList<LongVector3> newStack)
+m_positionStack = [.. newStack];
+public int PositionStackDepth
+return m_positionStack.Count;
+public bool HasPositionAtDepth(int depth)
+if (depth < 0) return false;
+return depth < m_positionStack.Count;
+public LongVector3 GetPositionAtDepth(int depth)
+if ((uint)depth >= (uint)m_positionStack.Count)
+throw new ArgumentOutOfRangeException(nameof(depth));
+return m_positionStack[depth];
+public LongVector3 LocalPosition
+return m_positionStack[^1];
+public class SpatialObjectProxy : SpatialObject, ISpatialObjectProxy
+private readonly ProxyCommitCoordinator<SpatialObject, SpatialObjectProxy> m_coordinator;
+public bool IsCommitted => m_coordinator.IsCommitted;
+public SpatialObject OriginalObject => m_coordinator.OriginalObject;
+ISpatialObject ISpatialObjectProxy.OriginalObject => OriginalObject;
+public VenueLeafNode TargetLeaf
+get => m_coordinator.TargetLeaf;
+set => m_coordinator.TargetLeaf = value;
+public VenueLeafNode? SourceLeaf { get; set; }
+public SpatialObjectProxy(SpatialObject originalObj, VenueLeafNode targetLeaf, LongVector3 proposedPosition)
+m_coordinator = new ProxyCommitCoordinator<SpatialObject, SpatialObjectProxy>(originalObj, targetLeaf);
+SetLocalPosition(proposedPosition);
+public virtual void Commit() => m_coordinator.Commit(oo => oo.SetPositionStack(GetPositionStack()), () => SetPositionStack([]), this);
+public void Rollback() => m_coordinator.Rollback(this);
+public class ProxyCommitCoordinator<TOriginal, TProxy>(TOriginal originalObject, VenueLeafNode targetLeaf, VenueLeafNode? sourceLeaf = null)
+public enum ProxyState { Uncommitted, Committed, RolledBack }
+private ProxyState m_state = ProxyState.Uncommitted;
+public TOriginal OriginalObject { get; } = originalObject;
+public VenueLeafNode TargetLeaf { get; set; } = targetLeaf;
+public VenueLeafNode? SourceLeaf { get; set; } = sourceLeaf;
+public bool IsCommitted => m_state == ProxyState.Committed;
+public ProxyState State => m_state;
+public void Commit(Action<TOriginal> transferState, Action clearProxyState, ISpatialObjectProxy proxy)
+if (m_state == ProxyState.Committed) throw new InvalidOperationException("Proxy already committed!");
+static int CompareBoundsMin(LongVector3 a, LongVector3 b)
+var c = a.X.CompareTo(b.X);
+if (c != 0) return c;
+c = a.Y.CompareTo(b.Y);
+return a.Z.CompareTo(b.Z);
+var target = TargetLeaf ?? throw new InvalidOperationException("TargetLeaf is null in ProxyCommitCoordinator.Commit.");
+var source = SourceLeaf;
+VenueLeafNode first = target;
+VenueLeafNode? second = source;
+if (second != null && CompareBoundsMin(first.Bounds.Min, second.Bounds.Min) > 0)
+first = target;
+second = source;
+var locks = new MultiSyncerScope();
+locks.Add(new SlimSyncer(((ISync)first).Sync, SlimSyncer.LockMode.Write, "ProxyCommitCoordinator.Commit: first"));
+if (second != null) locks.Add(new SlimSyncer(((ISync)second).Sync, SlimSyncer.LockMode.Write, "ProxyCommitCoordinator.Commit: second"));
+if (target.IsRetired || (source != null && source.IsRetired)) continue;
+source?.Vacate(OriginalObject);
+transferState(OriginalObject);
+target.Replace(proxy);
+clearProxyState();
+m_state = ProxyState.Committed;
+public void Rollback(ISpatialObjectProxy proxy)
+if (m_state != ProxyState.Uncommitted) return;
+TargetLeaf.Vacate(proxy);
+m_state = ProxyState.RolledBack;
+public readonly struct ByteVector3(byte x, byte y, byte z)
+public readonly byte X = x;
+public readonly byte Y = y;
+public readonly byte Z = z;
+public ByteVector3(byte xyz) : this(xyz, xyz, xyz) { }
+public ShortVector3 ToShort() => new(X, Y, Z);
+public IntVector3 ToInt() => new(X, Y, Z);
+public LongVector3 ToLong() => new(X, Y, Z);
+public static ByteVector3 operator +(ByteVector3 a, ByteVector3 b)
+=> new((byte)(a.X + b.X), (byte)(a.Y + b.Y), (byte)(a.Z + b.Z));
+public static ByteVector3 operator -(ByteVector3 a, ByteVector3 b)
+=> new((byte)(a.X - b.X), (byte)(a.Y - b.Y), (byte)(a.Z - b.Z));
+public static ByteVector3 operator *(ByteVector3 a, byte factor)
+=> new((byte)(a.X * factor), (byte)(a.Y * factor), (byte)(a.Z * factor));
+public static ByteVector3 operator /(ByteVector3 a, byte divisor)
+=> new((byte)(a.X / divisor), (byte)(a.Y / divisor), (byte)(a.Z / divisor));
+public bool IsZero => X == 0 && Y == 0 && Z == 0;
+public byte MaxComponentAbs()
+=> SystemMath.Max(X, SystemMath.Max(Y, Z));
+public int SumAbs()
+=> X + Y + Z;
+public override string ToString() => $"({X}, {Y}, {Z})";
+public override bool Equals(object? obj)
+=> obj is ByteVector3 o && this == o;
+public override int GetHashCode()
+=> HashCode.Combine(X, Y, Z);
+public static bool operator ==(ByteVector3 a, ByteVector3 b)
+=> a.X == b.X && a.Y == b.Y && a.Z == b.Z;
+public static bool operator !=(ByteVector3 a, ByteVector3 b)
+=> !(a == b);
+public static readonly ByteVector3 Zero = new(0);
+public readonly struct IntVector3(int x, int y, int z)
+public readonly int X = x;
+public readonly int Y = y;
+public readonly int Z = z;
+public IntVector3(int xyz) : this(xyz, xyz, xyz) { }
+public static LongVector3 operator +(IntVector3 velocity, LongVector3 position)
+=> new(position.X + velocity.X, position.Y + velocity.Y, position.Z + velocity.Z);
+public static IntVector3 operator +(IntVector3 a, IntVector3 b)
+=> new(a.X + b.X, a.Y + b.Y, a.Z + b.Z);
+public static IntVector3 operator -(IntVector3 a, IntVector3 b)
+=> new(a.X - b.X, a.Y - b.Y, a.Z - b.Z);
+public static IntVector3 operator *(IntVector3 a, int factor)
+=> new(a.X * factor, a.Y * factor, a.Z * factor);
+public static IntVector3 operator /(IntVector3 a, int divisor)
+=> new(a.X / divisor, a.Y / divisor, a.Z / divisor);
+public static IntVector3 operator -(IntVector3 a)
+=> new(-a.X, -a.Y, -a.Z);
+public IntVector3 ScaledBy(int numerator, int denominator)
+(int)((long)Z * numerator / denominator));
+public long MagnitudeSquared => (long)X * X + (long)Y * Y + (long)Z * Z;
+public int MaxComponentAbs()
+=> SystemMath.Max(SystemMath.Abs(X), SystemMath.Max(SystemMath.Abs(Y), SystemMath.Abs(Z)));
+=> SystemMath.Abs(X) + SystemMath.Abs(Y) + SystemMath.Abs(Z);
+=> obj is IntVector3 o && this == o;
+public static bool operator ==(IntVector3 a, IntVector3 b)
+public static bool operator !=(IntVector3 a, IntVector3 b)
+public static readonly IntVector3 Zero = new(0);
+public readonly struct UIntVector3(uint x, uint y, uint z)
+public readonly uint X = x;
+public readonly uint Y = y;
+public readonly uint Z = z;
+public UIntVector3(uint xyz) : this(xyz, xyz, xyz) { }
+public ULongVector3 ToULong() => new(X, Y, Z);
+public static UIntVector3 operator +(UIntVector3 a, UIntVector3 b)
+public static UIntVector3 operator -(UIntVector3 a, UIntVector3 b)
+public static UIntVector3 operator *(UIntVector3 a, uint factor)
+public static UIntVector3 operator /(UIntVector3 a, uint divisor)
+public static UIntVector3 operator +(LongVector3 position, UIntVector3 offset)
+=> new((uint)(position.X + offset.X), (uint)(position.Y + offset.Y), (uint)(position.Z + offset.Z));
+public ulong MagnitudeSquared => (ulong)X * X + (ulong)Y * Y + (ulong)Z * Z;
+public uint MaxComponentAbs()
+public uint SumAbs()
+=> obj is UIntVector3 o && this == o;
+public static bool operator ==(UIntVector3 a, UIntVector3 b)
+public static bool operator !=(UIntVector3 a, UIntVector3 b)
+public static readonly UIntVector3 Zero = new(0);
+public readonly struct LongVector3(long x, long y, long z)
+public readonly long X = x;
+public readonly long Y = y;
+public readonly long Z = z;
+public LongVector3(long xyz) : this(xyz, xyz, xyz) { }
+public ULongVector3 OffsetFrom(LongVector3 min)
+public long MaxComponentAbs()
+=> System.Math.Max(System.Math.Abs(X), System.Math.Max(System.Math.Abs(Y), System.Math.Abs(Z)));
+public BigInteger MagnitudeSquaredBig => (BigInteger)X * X + (BigInteger)Y * Y + (BigInteger)Z * Z;
+public long SumAbs()
+=> System.Math.Abs(X) + System.Math.Abs(Y) + System.Math.Abs(Z);
+=> obj is LongVector3 o && this == o;
+public static bool operator ==(LongVector3 a, LongVector3 b)
+public static bool operator !=(LongVector3 a, LongVector3 b)
+public static LongVector3 operator +(LongVector3 a, long b)
+=> new(a.X + b, a.Y + b, a.Z + b);
+public static LongVector3 operator +(LongVector3 a, LongVector3 b)
+public static LongVector3 operator -(LongVector3 a, LongVector3 b)
+public static LongVector3 operator *(LongVector3 a, long factor)
+public static LongVector3 operator /(LongVector3 a, long divisor)
+public static LongVector3 operator +(LongVector3 position, IntVector3 velocity)
+public static LongVector3 operator +(LongVector3 position, ShortVector3 velocity)
+public static long Midpoint(long min, long max)
+=> (min & max) + ((min ^ max) >> 1);
+public static LongVector3 Midpoint(LongVector3 min, LongVector3 max)
+internal int DistanceTo(LongVector3 other)
+long dx = X - other.X;
+long dy = Y - other.Y;
+long dz = Z - other.Z;
+return (int)System.Math.Sqrt(dx * dx + dy * dy + dz * dz);
+public static readonly LongVector3 Zero = new(0);
+public readonly struct ULongVector3(ulong x, ulong y, ulong z)
+public readonly ulong X = x;
+public readonly ulong Y = y;
+public readonly ulong Z = z;
+public ULongVector3(ulong xyz) : this(xyz, xyz, xyz) { }
+=> obj is ULongVector3 o && this == o;
+public static bool operator ==(ULongVector3 a, ULongVector3 b)
+public static bool operator !=(ULongVector3 a, ULongVector3 b)
+public static ULongVector3 operator +(ULongVector3 a, ULongVector3 b)
+public static ULongVector3 operator -(ULongVector3 a, ULongVector3 b)
+public static ULongVector3 operator *(ULongVector3 a, ulong factor)
+public static ULongVector3 operator /(ULongVector3 a, ulong divisor)
+public class LongVector3Comparer : IComparer<LongVector3>
+public int Compare(LongVector3 a, LongVector3 b)
+int cmp = a.X.CompareTo(b.X);
+if (cmp != 0) return cmp;
+cmp = a.Y.CompareTo(b.Y);
+readonly LongVector3 m_mid = midPoint;
+((a.Z >= m_mid.Z) ? 1 : 0));
+((b.Z >= m_mid.Z) ? 1 : 0));
+return xIdx.CompareTo(yIdx);
+public static class LatticeUniverse
+public const int RootBits = 63;
+public const long HalfExtent = 1L << RootBits - 1;
+public static readonly Region RootRegion =
+new(new LongVector3(-HalfExtent, -HalfExtent, -HalfExtent),
+new LongVector3(+HalfExtent, +HalfExtent, +HalfExtent));
+public interface ILatticeCoordinateTransform
+LongVector3 OuterToInnerCanonical(LongVector3 outerPosition);
+LongVector3 OuterToInnerInsertion(LongVector3 outerPosition, Guid guid);
+LongVector3 InnerToOuter(LongVector3 innerPosition);
+IntVector3 OuterToInnerVelocity(IntVector3 outerVelocity);
+IntVector3 InnerToOuterVelocity(IntVector3 innerVelocity);
+bool ContainsOuter(LongVector3 outerPosition);
+bool ContainsInner(LongVector3 innerPosition);
+public class ParentToSubLatticeTransform(Region outerBounds)
+public Region OuterLatticeBounds { get; } = outerBounds;
+public static Region InnerLatticeBounds => LatticeUniverse.RootRegion;
+public bool ContainsOuter(LongVector3 outerPosition)
+=> OuterLatticeBounds.Contains(outerPosition);
+public bool ContainsInner(LongVector3 innerPosition)
+=> InnerLatticeBounds.Contains(innerPosition);
+public IntVector3 OuterToInnerVelocity(IntVector3 outerVelocity)
+var innerSize = InnerLatticeBounds.Size;
+var outerSize = OuterLatticeBounds.Size;
+if (innerSize == outerSize)
+return outerVelocity;
+var scaleX = innerSize.X / outerSize.X;
+var scaleY = innerSize.Y / outerSize.Y;
+var scaleZ = innerSize.Z / outerSize.Z;
+return new IntVector3(
+(int)(outerVelocity.Z * (long)scaleZ));
+public IntVector3 InnerToOuterVelocity(IntVector3 innerVelocity)
+return innerVelocity;
+(int)(innerVelocity.Z / (long)scaleZ));
+public LongVector3 OuterToInnerInsertion(LongVector3 outer, Guid guid)
+if (!ContainsOuter(outer)) throw new ArgumentOutOfRangeException(nameof(outer));
+return outer;
+return outerSize.X == 1
+: OuterToInnerFromLarge(outer, guid.GetDiscriminator(), innerSize, outerSize);
+static ulong SplitMix64(ref ulong x)
+x += 0x9E3779B97F4A7C15UL;
+ulong z = x;
+z = (z ^ z >> 30) * 0xBF58476D1CE4E5B9UL;
+z = (z ^ z >> 27) * 0x94D049BB133111EBUL;
+return z ^ z >> 31;
+static LongVector3 OuterToInnerFromSizeOne(Guid g)
+Span<byte> bytes = stackalloc byte[16];
+g.TryWriteBytes(bytes);
+ulong s0 = BitConverter.ToUInt64(bytes[..8]);
+ulong s1 = BitConverter.ToUInt64(bytes[8..]);
+ulong state = s0 ^ s1 * 0x9E3779B97F4A7C15UL;
+long half = LatticeUniverse.HalfExtent;
+ulong r = SplitMix64(ref state);
+ulong u63 = r >> 1;
+return (long)u63 - half;
+return new LongVector3(NextCoord(), NextCoord(), NextCoord());
+public LongVector3 OuterToInnerFromLarge(LongVector3 outer, ulong discriminator, ULongVector3 innerSize, ULongVector3 outerSize)
+var outerOffset = outer.OffsetFrom(OuterLatticeBounds.Min);
+var baseX = (ulong)InnerLatticeBounds.Min.X + outerOffset.X * scaleX;
+var baseY = (ulong)InnerLatticeBounds.Min.Y + outerOffset.Y * scaleY;
+var baseZ = (ulong)InnerLatticeBounds.Min.Z + outerOffset.Z * scaleZ;
+var repX = baseX + discriminator % scaleX;
+var repY = baseY + (discriminator >> 21) % scaleY;
+var repZ = baseZ + (discriminator >> 42) % scaleZ;
+return new LongVector3(unchecked((long)repX), unchecked((long)repY), unchecked((long)repZ));
+public LongVector3 OuterToInnerCanonical(LongVector3 outerPosition)
+if (!ContainsOuter(outerPosition)) throw new ArgumentOutOfRangeException(nameof(outerPosition));
+if (OuterLatticeBounds.Size == InnerLatticeBounds.Size)
+return outerPosition;
+var outerOffset = outerPosition.OffsetFrom(OuterLatticeBounds.Min);
+return new LongVector3(
+InnerLatticeBounds.Min.Z + (long)(outerOffset.Z * (innerSize.Z / outerSize.Z)));
+public LongVector3 InnerToOuter(LongVector3 innerPosition)
+if (!ContainsInner(innerPosition)) throw new ArgumentOutOfRangeException(nameof(innerPosition));
+return innerPosition;
+var innerOffset = innerPosition.OffsetFrom(InnerLatticeBounds.Min);
+OuterLatticeBounds.Min.Z + (long)(innerOffset.Z / scaleZ));
+public readonly struct Region
+public Region(LongVector3 min, LongVector3 max)
+if (min.X >= max.X || min.Y >= max.Y || min.Z >= max.Z)
+throw new ArgumentException("Invalid region bounds for axis alignment");
+Min = min;
+Max = max;
+Mid = LongVector3.Midpoint(min, max);
+public LongVector3 Min { get; }
+public LongVector3 Max { get; }
+public LongVector3 Mid { get; }
+public ULongVector3 Size =>
+(ulong)(Max.Z - Min.Z));
+public bool Contains(LongVector3 position)
+=> position.X >= Min.X && position.X < Max.X
+&& position.Z >= Min.Z && position.Z < Max.Z;
+public bool IntersectsSphere_SimpleImpl(LongVector3 center, ulong radius)
+var closest = new LongVector3(
+System.Math.Max(Min.Z, System.Math.Min(center.Z, Max.Z)));
+var distSq = (closest - center).MagnitudeSquaredBig;
+return distSq <= (BigInteger)radius * radius;
+public override string ToString() => $"Min={Min}, Max={Max}";
+public static class GuidExtensions
+public static ulong GetDiscriminator(this Guid guid)
+guid.TryWriteBytes(bytes);
+return BitConverter.ToUInt64(bytes);
+public readonly struct ShortVector3(short x, short y, short z)
+public readonly short X = x;
+public readonly short Y = y;
+public readonly short Z = z;
+public ShortVector3(short xyz) : this(xyz, xyz, xyz) { }
+public static ShortVector3 operator +(ShortVector3 a, ShortVector3 b)
+=> new((short)(a.X + b.X), (short)(a.Y + b.Y), (short)(a.Z + b.Z));
+public static ShortVector3 operator -(ShortVector3 a, ShortVector3 b)
+=> new((short)(a.X - b.X), (short)(a.Y - b.Y), (short)(a.Z - b.Z));
+public static ShortVector3 operator *(ShortVector3 a, short factor)
+=> new((short)(a.X * factor), (short)(a.Y * factor), (short)(a.Z * factor));
+public static ShortVector3 operator /(ShortVector3 a, short divisor)
+=> new((short)(a.X / divisor), (short)(a.Y / divisor), (short)(a.Z / divisor));
+public static ShortVector3 operator -(ShortVector3 a)
+=> new((short)-a.X, (short)-a.Y, (short)-a.Z);
+public static LongVector3 operator +(ShortVector3 velocity, LongVector3 position)
+=> obj is ShortVector3 o && this == o;
+public static bool operator ==(ShortVector3 a, ShortVector3 b)
+public static bool operator !=(ShortVector3 a, ShortVector3 b)
+public static readonly ShortVector3 Zero = new(0);
+public static class SimulationPolicy
+public const int MinPerAxis = 10;
+public const int MinSum = 20;
+public static bool MeetsMovementThreshold(IntVector3 velocity)
+if (velocity.MaxComponentAbs() < MinPerAxis)
+return velocity.SumAbs() >= MinSum;
+public static IntVector3 EnforceMovementThreshold(IntVector3 velocity)
+return MeetsMovementThreshold(velocity)
+? velocity : IntVector3.Zero;
+public class SpatialTicker
+public static async Task TickParallelAsync(TickableSpatialLattice lattice, int maxThreads = -1)
+if (maxThreads <= 0) maxThreads = Environment.ProcessorCount;
+var root = lattice.GetRootNode() as TickableOctetParentNode;
+if (root == null) return;
+var children = root.Children;
+var tasks = new List<Task>();
+int threadsUsed = System.Math.Min(maxThreads, children.Length);
+var partitions = PartitionChildren(children, threadsUsed);
+foreach (var partition in partitions)
+tasks.Add(Task.Run(() =>
+foreach (var child in partition)
+if (child is ITickableChildNode tickableChild)
+tickableChild.Tick();
+await Task.WhenAll(tasks);
+public static void TickParallel(TickableSpatialLattice lattice, int maxThreads = -1)
+TickParallelAsync(lattice, maxThreads).Wait();
+private static List<List<IChildNode<OctetParentNode>>> PartitionChildren(IChildNode<OctetParentNode>[] children, int numPartitions)
+var partitions = new List<List<IChildNode<OctetParentNode>>>();
+for (int i = 0; i < numPartitions; i++)
+partitions.Add([]);
+for (int i = 0; i < children.Length; i++)
+partitions[i % numPartitions].Add(children[i]);
+return partitions;
+public interface ITickableSpatialNode : ISpatialNode
+void Tick();
+public interface ITickableChildNode
+public class TickableOctetParentNode(Region bounds)
+public override VenueLeafNode CreateNewVenueNode(int i, LongVector3 childMin, LongVector3 childMax)
+=> new TickableVenueLeafNode(new Region(childMin, childMax), this);
+public override IInternalChildNode CreateBranchNodeWithLeafs(
+var tickableParent = (TickableOctetParentNode)parent;
+var tickableLeaf = (TickableVenueLeafNode)subdividingLeaf;
+return branchOrSublattice
+? new TickableOctetBranchNode(tickableLeaf.Bounds, tickableParent, occupantsSnapshot)
+: new TickableSubLatticeBranchNode(tickableLeaf.Bounds, tickableParent, latticeDepth, occupantsSnapshot);
+protected ITickableChildNode GetTickableChild(int index)
+=> (ITickableChildNode)base.Children[index];
+public virtual void Tick()
+GetTickableChild(i).Tick();
+if (SpatialLattice.EnablePruning)
+PruneIfEmpty();
+public class TickableOctetBranchNode
+public TickableOctetBranchNode(Region bounds, TickableOctetParentNode parent, IList<ISpatialObject> migrants)
+public TickableOctetParentNode Parent { get; }
+TickableOctetParentNode IChildNode<TickableOctetParentNode>.Parent => Parent;
+OctetParentNode IChildNode<OctetParentNode>.Parent => Parent;
+public partial class TickableVenueLeafNode(Region bounds, TickableOctetParentNode parent)
+public partial void Tick();
+public override int Capacity => 64;
+internal List<ITickableObject> m_tickableObjects = [];
+TickableOctetParentNode IChildNode<TickableOctetParentNode>.Parent => (TickableOctetParentNode)Parent;
+protected override ISpatialObjectProxy CreateProxy<T>(T obj, LongVector3 proposedPosition)
+if (obj is TickableSpatialObject tickable)
+return new TickableSpatialObjectProxy(tickable, this, proposedPosition, tickable.GetOccupyingLeaf());
+return base.CreateProxy(obj, proposedPosition);
+base.Migrate(objs);
+if (obj is TickableSpatialObjectBase tickable)
+tickable.SetOccupyingLeaf(this);
+RegisterForTicks(tickable);
+public override void Replace(ISpatialObjectProxy proxy)
+if (proxy is ITickableObject tickableProxy)
+UnregisterForTicks(tickableProxy);
+if (proxy.OriginalObject is TickableSpatialObjectBase tickableOriginal)
+tickableOriginal.SetOccupyingLeaf(this);
+RegisterForTicks(tickableOriginal);
+base.Replace(proxy);
+public void RegisterForTicks(ITickableObject obj)
+if (!m_tickableObjects.Contains(obj))
+m_tickableObjects.Add(obj);
+public void UnregisterForTicks(ITickableObject obj)
+m_tickableObjects.Remove(obj);
+private void HandleTickResult(TickResult result)
+if (Bounds.Contains(result.Target))
+result.Object.SetLocalPosition(result.Target);
+HandleBoundaryCrossing(result.Object, result.Target);
+Vacate(result.Object);
+private void HandleBoundaryCrossing(SpatialObject obj, LongVector3 newPosition)
+var tickableObj = obj as TickableSpatialObjectBase;
+if (tickableObj != null) UnregisterForTicks(tickableObj);
+var currentParent = Parent;
+AdmitResult admitResult;
+admitResult = currentParent.Admit(obj, newPosition);
+if (admitResult is AdmitResult.Escalate)
+if (currentParent is IChildNode<TickableOctetParentNode> child)
+currentParent = child.Parent;
+if (tickableObj != null)
+RegisterForTicks(tickableObj);
+var sourceLeaf = this;
+var rawTarget = created.Proxy.TargetLeaf;
+if (rawTarget is not TickableVenueLeafNode targetLeaf || ReferenceEquals(targetLeaf, sourceLeaf))
+if (!ReferenceEquals(rawTarget, sourceLeaf))
+Vacate(obj);
+VenueLeafNode first = sourceLeaf;
+VenueLeafNode second = targetLeaf;
+if (CompareBoundsMin(sourceLeaf.Bounds.Min, targetLeaf.Bounds.Min) > 0)
+first = targetLeaf;
+second = sourceLeaf;
+if (sourceLeaf.IsRetired || targetLeaf.IsRetired)
+Thread.Yield();
+throw new InvalidOperationException("Escalate should have been handled in escalation loop");
+throw new InvalidOperationException($"Unexpected AdmitResult type: {admitResult.GetType().Name}");
+if (proxy is SpatialObjectProxy sp && obj is TickableSpatialObjectBase tickableOriginal)
+sp.SourceLeaf = tickableOriginal.GetOccupyingLeaf();
+public class TickableRootNode<TParent, TBranch, TVenue, TSelf>(Region bounds, byte latticeDepth)
+protected TickableRootNode(Region bounds)
+public class TickableRootNode :
+public TickableRootNode(Region bounds) : base(bounds) { }

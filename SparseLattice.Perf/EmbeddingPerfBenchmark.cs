@@ -11,7 +11,6 @@ using SparseLattice.Math;
 [Orderer(SummaryOrderPolicy.FastestToSlowest)]
 public class EmbeddingPerfBenchmarks
 {
-    // Small corpus to warm and measure
     readonly string[] m_sampleTexts = new[]
     {
         "public int Add(int a, int b) => a + b;",
@@ -21,7 +20,8 @@ public class EmbeddingPerfBenchmarks
     };
 
     TransformerEmbeddingSource? m_localSource;
-    OllamaEmbeddingSource? m_ollamaSource; // optional, from SparseLattice
+    LatticeEmbeddingSource? m_latticeSource;
+    OllamaEmbeddingSource? m_ollamaSource;
     HttpClient? m_ollamaHttpClient;
     string? m_ggufPath;
     string? m_ollamaBaseUrl;
@@ -32,55 +32,43 @@ public class EmbeddingPerfBenchmarks
     [GlobalSetup]
     public void Setup()
     {
-        // Resolve GGUF path: env then OllamaModelLocator
         m_ggufPath = Environment.GetEnvironmentVariable("EMBEDDING_GGUF_PATH");
         if (string.IsNullOrEmpty(m_ggufPath))
         {
             string? testData = GetTestDataEmbeddingsDir();
             if (testData != null)
             {
-                // First try manifest -> blob resolution using OllamaModelLocator
                 try
                 {
                     string? resolved = OllamaModelLocator.LocateGguf("nomic-embed-text", testData);
                     if (!string.IsNullOrEmpty(resolved) && File.Exists(resolved))
-                    {
                         m_ggufPath = resolved;
-                    }
                 }
-                catch
-                {
-                    // fall back to blob file search below
-                }
+                catch { }
 
                 if (string.IsNullOrEmpty(m_ggufPath))
                 {
-                    // Prefer raw sha256-* blobs copied from Ollama manifests
                     var shaFiles = Directory.GetFiles(testData, "sha256-*", SearchOption.TopDirectoryOnly);
                     if (shaFiles.Length > 0)
-                    {
                         m_ggufPath = shaFiles.OrderByDescending(f => new FileInfo(f).Length).First();
-                    }
                 }
             }
         }
 
         if (!string.IsNullOrEmpty(m_ggufPath) && File.Exists(m_ggufPath))
         {
-            m_localSource = TransformerEmbeddingSource.Load(m_ggufPath);
+            m_localSource   = TransformerEmbeddingSource.Load(m_ggufPath);
+            m_latticeSource = LatticeEmbeddingSource.Load(m_ggufPath);
         }
 
         m_ollamaBaseUrl = Environment.GetEnvironmentVariable("OLLAMA_BASE_URL") ?? "http://localhost:11434/";
-
-        // Optional: use built-in Ollama client if available (OllamaEmbeddingSource)
         try
         {
-            m_ollamaSource = new OllamaEmbeddingSource(m_ollamaBaseUrl, "nomic-embed-text");
+            m_ollamaSource    = new OllamaEmbeddingSource(m_ollamaBaseUrl, "nomic-embed-text");
             m_ollamaHttpClient = new HttpClient { BaseAddress = new Uri(m_ollamaBaseUrl) };
         }
         catch
         {
-            // If OllamaEmbeddingSource not usable, we fall back to raw HTTP client usage
             m_ollamaHttpClient = new HttpClient { BaseAddress = new Uri(m_ollamaBaseUrl) };
         }
     }
@@ -89,11 +77,11 @@ public class EmbeddingPerfBenchmarks
     public void Cleanup()
     {
         m_localSource?.Dispose();
+        m_latticeSource?.Dispose();
         m_ollamaSource?.Dispose();
         m_ollamaHttpClient?.Dispose();
     }
 
-    // Simple single-embed latency for local model
     [Benchmark(Baseline = true, Description = "Local Embed (single)")]
     public async Task<float[]> Local_Embed_Single()
     {
@@ -101,28 +89,20 @@ public class EmbeddingPerfBenchmarks
         return await m_localSource.EmbedAsync(m_sampleTexts[0]).ConfigureAwait(false);
     }
 
-    // Simple single-embed latency for Ollama via its HTTP API (if available)
     [Benchmark(Description = "Ollama Embed (HTTP)")]
     public async Task<float[]> Ollama_Embed_Single()
     {
         if (m_ollamaSource is not null)
-        {
             return await m_ollamaSource.EmbedAsync(m_sampleTexts[0]).ConfigureAwait(false);
-        }
 
-        // Fallback: call Ollama embedding endpoint (model name and endpoint may vary)
         if (m_ollamaHttpClient is null) throw new InvalidOperationException("Ollama client not configured.");
-        // The endpoint and payload below may need adapting to your running Ollama API.
         var payload = new { model = "nomic-embed-text", input = m_sampleTexts[0] };
         HttpResponseMessage resp = await m_ollamaHttpClient.PostAsJsonAsync("api/embed", payload).ConfigureAwait(false);
         resp.EnsureSuccessStatusCode();
-        // Expect JSON array of floats
         var json = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
-        float[] vec = JsonSerializer.Deserialize<float[]>(json) ?? Array.Empty<float>();
-        return vec;
+        return JsonSerializer.Deserialize<float[]>(json) ?? Array.Empty<float>();
     }
 
-    // Parallel throughput: issue many concurrent embed requests to local model
     [Benchmark(Description = "Local Embed (parallel)")]
     public async Task Local_Embed_Parallel()
     {
@@ -133,7 +113,6 @@ public class EmbeddingPerfBenchmarks
         await Task.WhenAll(tasks).ConfigureAwait(false);
     }
 
-    // Parallel throughput: issue many concurrent embed requests to Ollama
     [Benchmark(Description = "Ollama Embed (parallel)")]
     public async Task Ollama_Embed_Parallel()
     {
@@ -148,19 +127,16 @@ public class EmbeddingPerfBenchmarks
         await Task.WhenAll(tasks).ConfigureAwait(false);
     }
 
-    // Optional: measure lattice query throughput (single-threaded)
     [Benchmark(Description = "Lattice Query (KNN)")]
     public void Lattice_Query_Knn()
     {
         if (m_localSource is null) throw new InvalidOperationException("Local GGUF not found.");
 
-        // Build a small corpus (N ~ 2000) and index it once
         const int N = 2000;
         var embeddings = new List<float[]>(N);
         for (int i = 0; i < N; i++)
             embeddings.Add(m_localSource.EmbedAsync(m_sampleTexts[i % m_sampleTexts.Length]).GetAwaiter().GetResult());
 
-        // Quantize and build lattice (lightweight for bench)
         var occupants = embeddings.Select((v, i) =>
             new SparseOccupant<string>(EmbeddingAdapter.Quantize(v, new QuantizationOptions()), $"id{i}")
         ).ToArray();
@@ -168,17 +144,36 @@ public class EmbeddingPerfBenchmarks
         var lattice = new EmbeddingLattice<string>(occupants, new LatticeOptions { LeafThreshold = 16 });
         lattice.Freeze();
 
-        // Query many times sequentially
         for (int q = 0; q < 200; q++)
         {
-            var center = occupants[q].Position;
+            var center  = occupants[q].Position;
             var results = lattice.QueryKNearestL2(center, 5);
-            // keep results to avoid optimizing away
-            if (results.Count == 0) { /* noop */ }
+            if (results.Count == 0) { }
         }
     }
 
-    // Small helper: call Ollama embed endpoint via HTTP (fallback)
+    [Benchmark(Description = "Lattice Embed (single, SparseVector)")]
+    public SparseVector Lattice_Embed_Single_Sparse()
+    {
+        if (m_latticeSource is null) throw new InvalidOperationException("Lattice source not loaded.");
+        return m_latticeSource.EmbedSparse(m_sampleTexts[0]);
+    }
+
+    [Benchmark(Description = "Lattice Embed (single, float[])")]
+    public async Task<float[]> Lattice_Embed_Single_Float()
+    {
+        if (m_latticeSource is null) throw new InvalidOperationException("Lattice source not loaded.");
+        return await m_latticeSource.EmbedAsync(m_sampleTexts[0]).ConfigureAwait(false);
+    }
+
+    [Benchmark(Description = "Lattice Embed (parallel, SparseVector)")]
+    public void Lattice_Embed_Parallel_Sparse()
+    {
+        if (m_latticeSource is null) throw new InvalidOperationException("Lattice source not loaded.");
+        SparseVector[] results = m_latticeSource.EmbedSparseBatch(m_sampleTexts);
+        if (results.Length == 0) { }
+    }
+
     static async Task<float[]> OllamaEmbedViaHttp(HttpClient client, string text)
     {
         var payload = new { model = "nomic-embed-text", input = text };
@@ -190,11 +185,35 @@ public class EmbeddingPerfBenchmarks
 
     static string? GetTestDataEmbeddingsDir()
     {
-        string? dir = AppContext.BaseDirectory;
-        for (int depth = 0; depth < 8 && dir is not null; depth++)
+        // BenchmarkDotNet spawns a worker process in a temp dir — walk up from
+        // multiple candidate roots to find TestData/Embeddings wherever it lives.
+        var roots = new[]
+        {
+            AppContext.BaseDirectory,
+            Directory.GetCurrentDirectory(),
+            Path.GetDirectoryName(typeof(EmbeddingPerfBenchmarks).Assembly.Location),
+        };
+
+        foreach (string? root in roots)
+        {
+            if (string.IsNullOrEmpty(root)) continue;
+            string? found = WalkUpForEmbeddings(root);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    static string? WalkUpForEmbeddings(string startDir)
+    {
+        string? dir = startDir;
+        for (int depth = 0; depth < 12 && dir is not null; depth++)
         {
             string candidate = Path.Combine(dir, "TestData", "Embeddings");
             if (Directory.Exists(candidate)) return candidate;
+
+            string perfCandidate = Path.Combine(dir, "SparseLattice.Perf", "TestData", "Embeddings");
+            if (Directory.Exists(perfCandidate)) return perfCandidate;
+
             dir = Path.GetDirectoryName(dir);
         }
         return null;

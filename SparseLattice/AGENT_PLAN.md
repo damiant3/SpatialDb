@@ -1,3 +1,87 @@
+# AMENDMENT — Epic 5: Lattice-Based Embedding (applies to this document)
+
+> Added during performance investigation. The full `TransformerEmbeddingSource` forward pass
+> runs a 12-layer BERT in managed C# at ~2 seconds per embed — unusable for batch workloads.
+> Epic 5 introduces `LatticeEmbeddingSource`, which loads the GGUF token embedding table once,
+> quantizes it to `SparseVector`, and embeds new text via integer-domain token lookup + pooling.
+
+## What was built
+
+### `LatticeEmbeddingSource` (SparseLattice/Embedding/LatticeEmbeddingSource.cs)
+
+| Aspect | Detail |
+|---|---|
+| Purpose | GGUF-backed embedding source that produces `SparseVector` from text with no transformer forward pass |
+| Load-time work | Reads `token_embd.weight` + `token_types.weight` + `token_embd_norm.{weight,bias}` from GGUF; applies LayerNorm and L2-normalize per vocab row; quantizes each to `SparseVector`. Stores 30K pre-quantized vectors in a direct-lookup array. Does NOT read any transformer layer weights. |
+| Embed-time work | WordPiece tokenize → O(1) array lookup per token → integer accumulate → integer mean → L2 normalize in integer domain → build `SparseVector`. Zero matrix multiplications. Zero floats on the hot path. |
+| Interface | `IEmbeddingSource` (float[] compatibility) + `EmbedSparse(string)` + `EmbedSparseBatch(IReadOnlyList<string>)` |
+| Scale | Uses `GlobalScale = 1_000_000_000L` (fits in `long` when summing across ~512 tokens × 768 dims) |
+| Memory | ~30K × ~50 entries × 10 bytes ≈ ~15 MB (vs ~1 GB for full transformer weights) |
+
+### Performance harness updates (SparseLattice.Perf/Program.cs)
+
+| Mode | What it does |
+|---|---|
+| `--fast` (new default) | Loads `LatticeEmbeddingSource`, benchmarks `EmbedSparse` throughput |
+| `--local` | Existing full transformer path (for comparison) |
+| `--compare` | Runs both `--local` then `--fast` back-to-back |
+| `--lattice` | Unchanged: `DirectHashEmbeddingSource` for KNN-only benchmarking |
+| `--both` | Fast embed + lattice KNN |
+
+### Benchmark additions (EmbeddingPerfBenchmark.cs)
+
+- `Lattice_Embed_Single_Sparse` — measures `EmbedSparse` latency
+- `Lattice_Embed_Single_Float` — measures `EmbedAsync` (float[] interface)
+- `Lattice_Embed_Parallel_Sparse` — measures batch throughput
+
+### Tests (SparseLattice.Test/Embedding/LatticeEmbeddingSourceTests.cs)
+
+- 7 unit tests (using DirectHashEmbeddingSource as proxy — no GGUF needed)
+- 5 integration tests (require GGUF file, TestCategory="Integration")
+- Covers: determinism, different-input-different-output, batch count, sorted entries invariant, no-zero-entries invariant, float interface norm check
+
+### Prior fixes (Epic 4 continuation)
+
+- `RopeCache` — pre-computed sin/cos table eliminates per-call trig in `TransformerEmbeddingSource`
+- `MatMulGguf` — `Unsafe.ReadUnaligned<Vector<float>>` replaces per-iteration `new Vector<float>(array, offset)`
+- `MultiHeadAttention` — scores array hoisted outside head loop; loop order fixed for cache friendliness
+- `DirectHashEmbeddingSource` — text → `SparseVector` without floats (for `--lattice` mode)
+- `RunLatticeOnly` rewritten to use `DirectHashEmbeddingSource` (no GGUF dependency)
+
+## Expected performance characteristics
+
+| Path | Per-embed cost | Notes |
+|---|---|---|
+| `TransformerEmbeddingSource.EmbedAsync` | ~1–2 s | Full 12-layer BERT forward pass in managed C# |
+| `LatticeEmbeddingSource.EmbedSparse` | **~0.01–0.1 ms** (estimated) | Token lookup + integer pool + normalize |
+| `DirectHashEmbeddingSource.EmbedSparse` | ~0.001 ms | No model knowledge, hash-only |
+
+## Key design decisions
+
+- Token embeddings carry significant semantic signal even without transformer refinement. For RAG chunk retrieval (not fine-grained semantic similarity), token-pooled embeddings are a strong baseline.
+- Only `token_embd.weight`, `token_types.weight`, and `token_embd_norm` are loaded — transformer layer weights are never read. This cuts GGUF load from ~3s to ~0.5s and memory from ~1 GB to ~15 MB.
+- The quantization scale (`1e9`) is chosen so that summing 512 tokens × 768 dims stays within `long` range without overflow.
+- `ArrayPool<long>` is used for the per-embed accumulator to avoid GC pressure.
+- The `SparseVector` output is already in the lattice's native integer format — no float↔int conversion at query time.
+
+## Open items / future work
+
+1. **Recall validation**: Run the identity-of-function test comparing `LatticeEmbeddingSource` vs `TransformerEmbeddingSource` recall. Expected: lower recall (no contextual attention) but acceptable for code-chunk RAG.
+2. **Hybrid N-layer path**: Run only the first 1–3 transformer layers instead of all 12 for a quality/speed tradeoff. Wire via a `maxLayers` parameter on the existing `TransformerEmbeddingSource`.
+3. **Precomputed corpus cache**: For repeated benchmarks, serialize the `SparseVector[]` corpus to a binary file and reload without any GGUF access.
+4. **Streaming quantized matmul**: For scenarios requiring full-quality embeddings, implement block-level Q8/Q4 matmul that reads GGUF blocks on-the-fly without expanding entire tensors to `float[]`.
+
+## Files changed (SparseLattice and SparseLattice.Test only)
+
+- `SparseLattice/Embedding/LatticeEmbeddingSource.cs` — new file
+- `SparseLattice/Embedding/DirectHashEmbeddingSource.cs` — new file (Epic 4)
+- `SparseLattice/Gguf/TransformerEmbeddingSource.cs` — RopeCache, MatMulGguf SIMD, attention fix
+- `SparseLattice.Test/Embedding/LatticeEmbeddingSourceTests.cs` — new file
+- `SparseLattice.Perf/Program.cs` — fast mode, compare mode
+- `SparseLattice.Perf/EmbeddingPerfBenchmark.cs` — lattice embed benchmarks
+
+---
+
 # AMENDMENT — Agent Plan (applies to this document)
 
 > Note: The text that follows in this file (below this amendment) is archival. Treat the original plan as historical context. New guidance, corrections, and active directives must be added as amendment sections at the top of this document only. Do not modify the archival text except to append further amendments.

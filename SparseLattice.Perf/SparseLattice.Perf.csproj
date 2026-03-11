@@ -9,6 +9,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="tools\GenerateSamples\GenerateSamples.csproj" />
+    <Compile Remove="tools\**\*.cs" />
+    <None Include="tools\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
   </ItemGroup>
 

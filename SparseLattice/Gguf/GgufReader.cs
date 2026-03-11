@@ -36,6 +36,7 @@ public enum GgufDType : uint
     Q5_0 = 6,
     Q5_1 = 7,
     Q8_0 = 8,
+    BF16 = 30,
 }
 
 // ---------------------------------------------------------------------------
@@ -361,6 +362,9 @@ public sealed class GgufReader : IDisposable
             case GgufDType.Q4_0:
                 DequantizeQ4_0(m_stream, result);
                 break;
+            case GgufDType.BF16:
+                DequantizeBF16(m_stream, result);
+                break;
             default:
                 throw new NotSupportedException(
                     $"Dequantization of dtype {info.DType} is not yet implemented");
@@ -441,6 +445,32 @@ public sealed class GgufReader : IDisposable
                 int  hi     = (raw >> 4)   - 8;
                 dest[outIdx++] = scale * lo;
                 dest[outIdx++] = scale * hi;
+            }
+        }
+    }
+
+    // BF16: blocks of 32 elements. Layout per block: [f16 scale | 32 × bf16]
+    private static void DequantizeBF16(Stream s, float[] dest)
+    {
+        const int BlockElements = 32;
+        const int BlockBytes    = 2 + BlockElements * 2;   // 2-byte f16 scale + 32 bf16
+
+        int blocks  = dest.Length / BlockElements;
+        byte[] buf  = new byte[blocks * BlockBytes];
+        ReadExact(s, buf);
+
+        int outIdx = 0;
+        int inIdx  = 0;
+        for (int b = 0; b < blocks; b++)
+        {
+            float scale = HalfToFloat(BinaryPrimitives.ReadUInt16LittleEndian(buf.AsSpan(inIdx, 2)));
+            inIdx += 2;
+            for (int j = 0; j < BlockElements; j++)
+            {
+                ushort hf = BinaryPrimitives.ReadUInt16LittleEndian(buf.AsSpan(inIdx, 2));
+                float  v  = HalfToFloat(hf);
+                dest[outIdx++] = scale * v;
+                inIdx += 2;
             }
         }
     }
