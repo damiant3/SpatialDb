@@ -1,0 +1,238 @@
+public sealed class EmbeddingLattice<TPayload>
+public bool IsFrozen => m_frozen;
+public void Freeze()
+public List<SparseOccupant<TPayload>> QueryWithinDistanceL2(SparseVector center, BigInteger radiusSquared)
+private static ISparseNode FreezeNode(ISparseNode node)
+private static SparseTreeStats CollectStatsRecursive(ISparseNode node, int depth)
+private void QueryKNearestRecursiveL2(ISparseNode node, SparseVector center, int k, KnnHeap heap)
+private sealed class KnnHeap(int capacity)
+private void SiftUp(int index)
+private void SiftDown(int index)
+return result;
+public sealed class QuantizationOptions
+public static SparseVector Quantize(float[] embedding, QuantizationOptions? options = null)
+if (MathF.Abs(embedding[i]) < effectiveOptions.ZeroThreshold) continue;
+return new SparseVector(entries, embedding.Length);
+public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
+public static TransformerEmbeddingSource Load(string ggufPath, Action<int, int, string>? onProgress = null)
+public Task<float[]> EmbedAsync(string text, CancellationToken ct = default)
+private float[] Forward(string text)
+float[] x = BuildEmbeddings(tokenIds, sequenceLen);
+ApplyLayerNorm(x, sequenceLen, m_embdNormW, m_embdNormB);
+public interface IOptimizedPartitioner
+int PartitionInPlace(Span<SparseOccupant<string>> span, ushort splitDimension, long pivotValue);
+public static class EmbeddingAdapter
+public static LongVectorN QuantizeDense(float[] embedding, QuantizationOptions? options = null)
+public static float[] Dequantize(LongVectorN vector, QuantizationOptions? options = null)
+private static SparseEntry[] ApplySparsityBudget(SparseEntry[] entries, int budget)
+using SparseLattice.Embedding;
+using SparseLattice.Lattice;
+using SparseLattice.Math;
+public static class Program
+string mode = args.Length > 0 ? args[0].ToLowerInvariant() : "local";
+foreach (int concurrency in new[] { 1, 8, 32 })
+const int maxCorpus = 5000;
+var allEmbeddings = new List<float[]>(maxCorpus);
+allEmbeddings.Add(await src.EmbedAsync(samples[i % samples.Length]).ConfigureAwait(false));
+QuantizationOptions qo = new();
+var allOccupants = allEmbeddings.Select((v, i) => new SparseOccupant<string>(EmbeddingAdapter.Quantize(v, qo), $"id{i}")).ToArray();
+Console.WriteLine(new string('-', 65));
+EmbeddingLattice<string> lattice = new(occupants, new LatticeOptions { LeafThreshold = 16 });
+lattice.Freeze();
+int qCount = System.Math.Min(500, n);
+System.Array.Sort(latencies);
+double qps = qCount / swq.Elapsed.TotalSeconds;
+double avgMs = swq.Elapsed.TotalMilliseconds / qCount;
+Console.WriteLine($"{n,8}  {k,3}  {swBuild.Elapsed.TotalMilliseconds,10:F1}  {qps,10:F1}  {avgMs,10:F3}  {p99,8:F3}");
+public Task<float[][]> EmbedBatchAsync(IReadOnlyList<string> texts, CancellationToken ct = default)
+public void Dispose() => m_disposed = true;
+float[] pooled = MeanPool(x, sequenceLen);
+L2Normalize(pooled);
+int[] tokenIds = m_tokenizer.Encode(text, addSpecialTokens: true);
+int sequenceLen = tokenIds.Length;
+float[] x = new float[sequenceLen * m_nEmbd];
+for (int t = 0; t < sequenceLen; t++)
+Array.Copy(ffnOut, x, seqLen * embd);
+// Additional simple samples
+public int Add(int a, int b) => a + b;
+public string Greet(string name) => $"Hello, {name}!";
+public bool IsEven(int n) => n % 2 == 0;
+public double Sqrt(double x) => Math.Sqrt(x);
+public void Log(string msg) => Console.WriteLine(msg);
+public int Max(int a, int b) => a > b ? a : b;
+public string Reverse(string s) => new string(s.Reverse().ToArray());
+public int Factorial(int n) => n <= 1 ? 1 : n * Factorial(n - 1);
+public Task<T> AsTask<T>(T value) => Task.FromResult(value);
+public byte[] ToBytes(string s) => Encoding.UTF8.GetBytes(s);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

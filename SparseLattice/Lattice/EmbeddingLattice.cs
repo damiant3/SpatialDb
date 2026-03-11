@@ -338,7 +338,7 @@ public sealed class EmbeddingLattice<TPayload>
         {
             case SparseLeafNode<TPayload> leaf:
                 foreach (SparseOccupant<TPayload> occupant in leaf.Occupants)
-                    heap.TryInsert(occupant, center.DistanceSquaredL2(occupant.Position));
+                    heap.TryInsert(occupant, center.DistanceSquaredL2Fast(occupant.Position));
                 break;
 
             case FrozenBranchNode frozen:
@@ -358,9 +358,9 @@ public sealed class EmbeddingLattice<TPayload>
         ISparseNode? below, ISparseNode? above,
         SparseVector center, int k, KnnHeap heap)
     {
-        long centerVal = center.ValueAt(splitDimension);
+        long centerVal = center.ValueAtFast(splitDimension);
         ISparseNode? near = centerVal < splitValue ? below : above;
-        ISparseNode? far = centerVal < splitValue ? above : below;
+        ISparseNode? far  = centerVal < splitValue ? above : below;
 
         if (near is not null)
             QueryKNearestRecursiveL2(near, center, k, heap);
@@ -368,7 +368,7 @@ public sealed class EmbeddingLattice<TPayload>
         if (far is not null)
         {
             long diff = centerVal - splitValue;
-            BigInteger splitDistSquared = (BigInteger)diff * diff;
+            ulong splitDistSquared = (ulong)(diff * diff);
             if (!heap.IsFull || splitDistSquared <= heap.WorstDistance)
                 QueryKNearestRecursiveL2(far, center, k, heap);
         }
@@ -382,7 +382,7 @@ public sealed class EmbeddingLattice<TPayload>
         {
             case SparseLeafNode<TPayload> leaf:
                 foreach (SparseOccupant<TPayload> occupant in leaf.Occupants)
-                    heap.TryInsert(occupant, center.DistanceL1(occupant.Position));
+                    heap.TryInsert(occupant, center.DistanceL1Fast(occupant.Position));
                 break;
 
             case FrozenBranchNode frozen:
@@ -402,17 +402,18 @@ public sealed class EmbeddingLattice<TPayload>
         ISparseNode? below, ISparseNode? above,
         SparseVector center, int k, KnnHeap heap)
     {
-        long centerVal = center.ValueAt(splitDimension);
+        long centerVal = center.ValueAtFast(splitDimension);
         ISparseNode? near = centerVal < splitValue ? below : above;
-        ISparseNode? far = centerVal < splitValue ? above : below;
+        ISparseNode? far  = centerVal < splitValue ? above : below;
 
         if (near is not null)
             QueryKNearestRecursiveL1(near, center, k, heap);
 
         if (far is not null)
         {
-            BigInteger splitDist = BigInteger.Abs(centerVal - splitValue);
-            if (!heap.IsFull || splitDist <= heap.WorstDistance)
+            long splitDist = centerVal - splitValue;
+            ulong absSplitDist = (ulong)(splitDist < 0 ? -splitDist : splitDist);
+            if (!heap.IsFull || absSplitDist <= heap.WorstDistance)
                 QueryKNearestRecursiveL1(far, center, k, heap);
         }
     }
@@ -421,15 +422,15 @@ public sealed class EmbeddingLattice<TPayload>
 
     private sealed class KnnHeap(int capacity)
     {
-        private readonly (SparseOccupant<TPayload> occupant, BigInteger distance)[] m_heap
-            = new (SparseOccupant<TPayload>, BigInteger)[capacity];
+        private readonly (SparseOccupant<TPayload> occupant, ulong distance)[] m_heap
+            = new (SparseOccupant<TPayload>, ulong)[capacity];
 
         private int m_count;
 
         public bool IsFull => m_count == capacity;
-        public BigInteger WorstDistance => m_heap[0].distance;
+        public ulong WorstDistance => m_heap[0].distance;
 
-        public void TryInsert(SparseOccupant<TPayload> occupant, BigInteger distance)
+        public void TryInsert(SparseOccupant<TPayload> occupant, ulong distance)
         {
             if (m_count < capacity)
             {
@@ -449,7 +450,7 @@ public sealed class EmbeddingLattice<TPayload>
             // sort the backing array in ascending distance order then return occupants
             int count = m_count;
             System.Array.Sort(m_heap, 0, count,
-                Comparer<(SparseOccupant<TPayload>, BigInteger)>.Create(
+                Comparer<(SparseOccupant<TPayload>, ulong)>.Create(
                     (a, b) => a.Item2.CompareTo(b.Item2)));
             List<SparseOccupant<TPayload>> result = new(count);
             for (int i = 0; i < count; i++)

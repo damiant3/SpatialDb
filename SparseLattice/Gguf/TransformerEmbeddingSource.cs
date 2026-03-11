@@ -1,5 +1,7 @@
-﻿using System.Numerics;
+using System.Numerics;
 using SparseLattice.Embedding;
+using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using SystemMath = System.Math;
 //////////////////////////////////////////////////////////////
 namespace SparseLattice.Gguf;
@@ -81,7 +83,8 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
     // -----------------------------------------------------------------------
 
     /// <summary>Loads model weights from a GGUF file at <paramref name="ggufPath"/>.</summary>
-    public static TransformerEmbeddingSource Load(string ggufPath)
+    public static TransformerEmbeddingSource Load(string ggufPath,
+        Action<int, int, string>? onProgress = null)
     {
         using GgufReader reader = GgufReader.Open(ggufPath);
 
@@ -91,20 +94,21 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
             throw new NotSupportedException(
                 $"Architecture '{arch}' is not supported. Only 'nomic-bert' and 'bert' are implemented.");
 
-        return LoadFromReader(reader);
+        return LoadFromReader(reader, onProgress);
     }
 
     /// <summary>
     /// Resolves a model name via <see cref="OllamaModelLocator"/> in
     /// <paramref name="modelDir"/>, then loads the GGUF.
     /// </summary>
-    public static TransformerEmbeddingSource LoadFromModelDir(string modelName, string modelDir)
+    public static TransformerEmbeddingSource LoadFromModelDir(string modelName, string modelDir,
+        Action<int, int, string>? onProgress = null)
     {
         string? ggufPath = OllamaModelLocator.LocateGguf(modelName, modelDir);
         if (ggufPath is null)
             throw new FileNotFoundException(
                 $"No GGUF blob found for model '{modelName}' in '{modelDir}'.");
-        return Load(ggufPath);
+        return Load(ggufPath, onProgress);
     }
 
     // -----------------------------------------------------------------------
@@ -286,37 +290,125 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
         }
     }
 
-    // Apply RoPE (Rotary Position Embeddings) to q or k in-place.
-    // Uses GPT-J / half-half convention: pair x[i] with x[i + headDim/2].
-    private static void ApplyRope(float[] x, int seqLen, int embd, int nHeads, float freqBase)
+    // -----------------------------------------------------------------------
+    // RoPE sin/cos cache  (immutable after first use, safe for concurrent reads)
+    // -----------------------------------------------------------------------
+
+    private sealed class RopeCache
     {
-        int headDim = embd / nHeads;
+        // cos[t, i] and sin[t, i] for t in [0, maxSeqLen), i in [0, headDim/2)
+        public readonly float[] Cos;
+        public readonly float[] Sin;
+        public readonly int     MaxSeqLen;
+        public readonly int     HalfDim;
 
-        for (int t = 0; t < seqLen; t++)
+        public RopeCache(int maxSeqLen, int headDim, float freqBase)
         {
-            for (int h = 0; h < nHeads; h++)
+            MaxSeqLen = maxSeqLen;
+            HalfDim   = headDim / 2;
+            Cos = new float[maxSeqLen * HalfDim];
+            Sin = new float[maxSeqLen * HalfDim];
+            for (int t = 0; t < maxSeqLen; t++)
             {
-                int headBase = t * embd + h * headDim;
-
-                for (int i = 0; i < headDim / 2; i++)
+                for (int i = 0; i < HalfDim; i++)
                 {
                     float theta = (float)SystemMath.Pow(freqBase, -2.0 * i / headDim);
                     double angle = t * theta;
-                    float cos    = (float)SystemMath.Cos(angle);
-                    float sin    = (float)SystemMath.Sin(angle);
-
-                    float x0 = x[headBase + i];
-                    float x1 = x[headBase + i + headDim / 2];
-
-                    x[headBase + i]               = x0 * cos - x1 * sin;
-                    x[headBase + i + headDim / 2] = x0 * sin + x1 * cos;
+                    Cos[t * HalfDim + i] = (float)SystemMath.Cos(angle);
+                    Sin[t * HalfDim + i] = (float)SystemMath.Sin(angle);
                 }
             }
         }
     }
 
+    // Built lazily on first Forward() call; covers any sequence up to 512 tokens.
+    private RopeCache? m_ropeCache;
+    private const int  RopeMaxSeqLen = 512;
+
+    private RopeCache GetRopeCache()
+    {
+        if (m_ropeCache is not null) return m_ropeCache;
+        int headDim = m_nEmbd / m_nHeads;
+        m_ropeCache = new RopeCache(RopeMaxSeqLen, headDim, m_ropeFreqBase);
+        return m_ropeCache;
+    }
+
+    // Apply RoPE using the pre-computed sin/cos cache.
+    private void ApplyRope(float[] x, int seqLen, int embd, int nHeads, float freqBase)
+    {
+        RopeCache cache   = GetRopeCache();
+        int       headDim = embd / nHeads;
+        int       halfDim = headDim / 2;
+
+        for (int t = 0; t < seqLen; t++)
+        {
+            int cacheRow = t * halfDim;
+            for (int h = 0; h < nHeads; h++)
+            {
+                int headBase = t * embd + h * headDim;
+                for (int i = 0; i < halfDim; i++)
+                {
+                    float cos = cache.Cos[cacheRow + i];
+                    float sin = cache.Sin[cacheRow + i];
+                    float x0  = x[headBase + i];
+                    float x1  = x[headBase + i + halfDim];
+                    x[headBase + i]         = x0 * cos - x1 * sin;
+                    x[headBase + i + halfDim] = x0 * sin + x1 * cos;
+                }
+            }
+        }
+    }
+
+    // Multiply activation A [rowsA, nIn] by GGUF weight W stored column-major,
+    // producing C [rowsA, nOut].
+    // Uses Span<float> + MemoryMarshal to avoid per-iteration Vector<float> allocations.
+    private static float[] MatMulGguf(float[] a, int rowsA, int nIn, float[] w, int nOut)
+    {
+        float[] c      = new float[rowsA * nOut];
+        int     vecLen = Vector<float>.Count;
+
+        ReadOnlySpan<float> aSpan = a;
+        ReadOnlySpan<float> wSpan = w;
+
+        for (int row = 0; row < rowsA; row++)
+        {
+            int aBase = row * nIn;
+            ReadOnlySpan<float> aRow = aSpan.Slice(aBase, nIn);
+
+            for (int col = 0; col < nOut; col++)
+            {
+                int   wBase = col * nIn;
+                float sum   = 0f;
+                int   i     = 0;
+
+                ReadOnlySpan<float> wCol = wSpan.Slice(wBase, nIn);
+
+                // SIMD dot using ReadOnlySpan — no heap allocation per iteration
+                ref float aRef = ref MemoryMarshal.GetReference(aRow);
+                ref float wRef = ref MemoryMarshal.GetReference(wCol);
+
+                while (i <= nIn - vecLen)
+                {
+                    sum += Vector.Dot(
+                        Unsafe.ReadUnaligned<Vector<float>>(ref Unsafe.As<float, byte>(ref Unsafe.Add(ref aRef, i))),
+                        Unsafe.ReadUnaligned<Vector<float>>(ref Unsafe.As<float, byte>(ref Unsafe.Add(ref wRef, i))));
+                    i += vecLen;
+                }
+                while (i < nIn)
+                {
+                    sum += Unsafe.Add(ref aRef, i) * Unsafe.Add(ref wRef, i);
+                    i++;
+                }
+
+                c[row * nOut + col] = sum;
+            }
+        }
+
+        return c;
+    }
+
     // Multi-head scaled dot-product attention.
-    // q, k, v: [T, n_embd] (interleaved heads). Returns [T, n_embd].
+    // Fixed loop order: innermost loop over headDim is now contiguous on v.
     private static float[] MultiHeadAttention(
         float[] q, float[] k, float[] v,
         int seqLen, int embd, int nHeads)
@@ -324,33 +416,34 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
         int headDim = embd / nHeads;
         float scale = 1.0f / MathF.Sqrt(headDim);
         float[] output = new float[seqLen * embd];
+        float[] scores = new float[seqLen * seqLen];   // reuse across heads
 
         for (int h = 0; h < nHeads; h++)
         {
+            int headOffset = h * headDim;
+
             // scores[t, s] = scale * dot(q[t, h], k[s, h])
-            float[] scores = new float[seqLen * seqLen];
             for (int t = 0; t < seqLen; t++)
             {
-                int qBase = t * embd + h * headDim;
+                int qBase = t * embd + headOffset;
                 for (int s = 0; s < seqLen; s++)
                 {
-                    int kBase = s * embd + h * headDim;
-                    float dot = DotProduct(q, qBase, k, kBase, headDim);
-                    scores[t * seqLen + s] = dot * scale;
+                    scores[t * seqLen + s] = DotProduct(q, qBase, k, s * embd + headOffset, headDim) * scale;
                 }
             }
 
-            // Softmax over last dim (s) for each t
             Softmax(scores, seqLen);
 
             // Output[t, h] = sum_s scores[t,s] * v[s, h]
+            // Loop order: t → s → d  so the innermost stride over d is contiguous in both output and v
             for (int t = 0; t < seqLen; t++)
             {
-                int outBase = t * embd + h * headDim;
+                int outBase   = t * embd + headOffset;
+                int scoreBase = t * seqLen;
                 for (int s = 0; s < seqLen; s++)
                 {
-                    float w    = scores[t * seqLen + s];
-                    int vBase  = s * embd + h * headDim;
+                    float w   = scores[scoreBase + s];
+                    int vBase = s * embd + headOffset;
                     for (int d = 0; d < headDim; d++)
                         output[outBase + d] += w * v[vBase + d];
                 }
@@ -363,45 +456,6 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
     // -----------------------------------------------------------------------
     // Math primitives
     // -----------------------------------------------------------------------
-
-    // Multiply activation A [rowsA, nIn] by GGUF weight W stored column-major
-    // as flat[inputIdx + outputIdx * nIn], producing C [rowsA, nOut].
-    //
-    // GGUF ggml convention: shape[0] = nIn (fastest-varying / innermost dimension),
-    // shape[1] = nOut (slowest-varying). The flat byte layout therefore places all
-    // nIn input weights for output-neuron j at offset j * nIn — i.e., each output
-    // column is a contiguous run of nIn floats. This is the transpose of the usual
-    // row-major weight convention, so a plain row × row dot-product would be wrong.
-    //
-    // Correct access: W[inputIdx, outputIdx] = flat[inputIdx + outputIdx * nIn].
-    // We loop over output columns (j) in the outer loop and dot each activation row
-    // against the contiguous weight column — maximally cache-friendly for both A and W.
-    private static float[] MatMulGguf(float[] a, int rowsA, int nIn, float[] w, int nOut)
-    {
-        float[] c      = new float[rowsA * nOut];
-        int     vecLen = Vector<float>.Count;
-
-        for (int row = 0; row < rowsA; row++)
-        {
-            int aBase = row * nIn;
-            for (int col = 0; col < nOut; col++)
-            {
-                int   wBase = col * nIn;   // start of contiguous weight column in flat array
-                float sum   = 0f;
-                int   i     = 0;
-
-                for (; i <= nIn - vecLen; i += vecLen)
-                    sum += Vector.Dot(new Vector<float>(a, aBase + i),
-                                      new Vector<float>(w, wBase + i));
-                for (; i < nIn; i++)
-                    sum += a[aBase + i] * w[wBase + i];
-
-                c[row * nOut + col] = sum;
-            }
-        }
-
-        return c;
-    }
 
     // LayerNorm in-place over rows of x [T, n_embd].
     private static void ApplyLayerNorm(float[] x, int seqLen, float[] weight, float[] bias)
@@ -540,7 +594,8 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
     // Private — load weights from GgufReader
     // -----------------------------------------------------------------------
 
-    private static TransformerEmbeddingSource LoadFromReader(GgufReader reader)
+    private static TransformerEmbeddingSource LoadFromReader(GgufReader reader,
+        Action<int, int, string>? onProgress = null)
     {
         string arch        = reader.Architecture;
         int nEmbd          = reader.EmbeddingLength;
@@ -550,39 +605,63 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
         float ropeFreqBase = GetFloat(reader, $"{arch}.rope.freq_base", 10000f);
         float layerNormEps = GetFloat(reader, $"{arch}.attention.layer_norm_epsilon", 1e-12f);
 
-        // Token embeddings: stored [n_embd, vocab_size] in GGUF shape convention
-        // GGUF shape[0]=n_embd, shape[1]=vocab_size, so flat layout is
-        // [token0_dim0, token0_dim1, ..., token0_dim(n_embd-1), token1_dim0, ...]
-        // i.e. consecutive n_embd floats per token — exactly what we need for
-        // row lookup: tokenId * n_embd = start of embedding row.
-        float[] tokenEmbd = reader.ReadTensorF32("token_embd.weight");
+        // Total Report() calls: 4 shared + 7 per layer
+        int totalSteps = 4 + nLayers * 7;
+        int step = 0;
 
-        // Token type embedding: take only row 0 [n_embd] (all tokens are type 0)
-        // token_types.weight shape [nEmbd, 2]: ne[0]=nEmbd (fast), ne[1]=2 (slow).
-        // Flat layout: flat[dim + typeId * nEmbd].
-        // Type-0 vector occupies flat[0..nEmbd-1] — a direct slice.
+        void Report(string name)
+        {
+            step++;
+            onProgress?.Invoke(step, totalSteps, name);
+        }
+
+        float[] tokenEmbd = reader.ReadTensorF32("token_embd.weight");
+        Report("token_embd.weight");
+
         float[] tokenTypes    = reader.ReadTensorF32("token_types.weight");
         float[] tokenTypeRow0 = new float[nEmbd];
         Array.Copy(tokenTypes, 0, tokenTypeRow0, 0, nEmbd);
+        Report("token_types.weight");
 
         float[] embdNormW = reader.ReadTensorF32("token_embd_norm.weight");
+        Report("token_embd_norm.weight");
+
         float[] embdNormB = reader.ReadTensorF32("token_embd_norm.bias");
+        Report("token_embd_norm.bias");
 
         LayerWeights[] layers = new LayerWeights[nLayers];
         for (int i = 0; i < nLayers; i++)
         {
             string pfx = $"blk.{i}";
+
+            float[] attnQkv    = reader.ReadTensorF32($"{pfx}.attn_qkv.weight");
+            Report($"blk.{i} attn_qkv");
+            float[] attnOutput = reader.ReadTensorF32($"{pfx}.attn_output.weight");
+            Report($"blk.{i} attn_output");
+            float[] attnNormW  = reader.ReadTensorF32($"{pfx}.attn_output_norm.weight");
+            float[] attnNormB  = reader.ReadTensorF32($"{pfx}.attn_output_norm.bias");
+            Report($"blk.{i} attn_norm");
+            float[] ffnUp      = reader.ReadTensorF32($"{pfx}.ffn_up.weight");
+            Report($"blk.{i} ffn_up");
+            float[] ffnGate    = reader.ReadTensorF32($"{pfx}.ffn_gate.weight");
+            Report($"blk.{i} ffn_gate");
+            float[] ffnDown    = reader.ReadTensorF32($"{pfx}.ffn_down.weight");
+            Report($"blk.{i} ffn_down");
+            float[] layerNormW = reader.ReadTensorF32($"{pfx}.layer_output_norm.weight");
+            float[] layerNormB = reader.ReadTensorF32($"{pfx}.layer_output_norm.bias");
+            Report($"blk.{i} layer_norm  ({i + 1}/{nLayers})");
+
             layers[i] = new LayerWeights
             {
-                AttnQkv    = reader.ReadTensorF32($"{pfx}.attn_qkv.weight"),
-                AttnOutput = reader.ReadTensorF32($"{pfx}.attn_output.weight"),
-                AttnNormW  = reader.ReadTensorF32($"{pfx}.attn_output_norm.weight"),
-                AttnNormB  = reader.ReadTensorF32($"{pfx}.attn_output_norm.bias"),
-                FfnUp      = reader.ReadTensorF32($"{pfx}.ffn_up.weight"),
-                FfnGate    = reader.ReadTensorF32($"{pfx}.ffn_gate.weight"),
-                FfnDown    = reader.ReadTensorF32($"{pfx}.ffn_down.weight"),
-                LayerNormW = reader.ReadTensorF32($"{pfx}.layer_output_norm.weight"),
-                LayerNormB = reader.ReadTensorF32($"{pfx}.layer_output_norm.bias"),
+                AttnQkv    = attnQkv,
+                AttnOutput = attnOutput,
+                AttnNormW  = attnNormW,
+                AttnNormB  = attnNormB,
+                FfnUp      = ffnUp,
+                FfnGate    = ffnGate,
+                FfnDown    = ffnDown,
+                LayerNormW = layerNormW,
+                LayerNormB = layerNormB,
             };
         }
 
