@@ -85,10 +85,19 @@ public static class EmbeddingAdapter
     /// </summary>
     private static SparseEntry[] ApplySparsityBudget(SparseEntry[] entries, int budget)
     {
-        System.Array.Sort(entries, (a, b) => System.Math.Abs(b.Value).CompareTo(System.Math.Abs(a.Value)));
+        // Use unchecked abs via unsigned cast to avoid overflow on long.MinValue
+        static ulong AbsUnsigned(long v) => v < 0 ? (ulong)(-(v + 1)) + 1UL : (ulong)v;
+        System.Array.Sort(entries, (a, b) => AbsUnsigned(b.Value).CompareTo(AbsUnsigned(a.Value)));
         SparseEntry[] trimmed = new SparseEntry[budget];
         System.Array.Copy(entries, trimmed, budget);
         System.Array.Sort(trimmed, (a, b) => a.Dimension.CompareTo(b.Dimension));
         return trimmed;
     }
+
+    /// <summary>
+    /// Public entry point for out-of-class callers (e.g. LatticeEmbeddingSource pooling).
+    /// Delegates to <see cref="ApplySparsityBudget"/>.
+    /// </summary>
+    internal static SparseEntry[] TrimToBudget(SparseEntry[] entries, int budget)
+        => ApplySparsityBudget(entries, budget);
 }

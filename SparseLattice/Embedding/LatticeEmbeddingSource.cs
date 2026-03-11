@@ -23,6 +23,7 @@ public sealed class LatticeEmbeddingSource : IEmbeddingSource, IDisposable
     private readonly SparseVector[] m_tokenVectors;
     private readonly int m_embeddingDimensions;
     private readonly long m_scale;
+    private readonly int m_outputSparsityBudget;   // max nnz per output vector, 0 = no cap
     private bool m_disposed;
 
     public string ModelName { get; }
@@ -73,13 +74,15 @@ public sealed class LatticeEmbeddingSource : IEmbeddingSource, IDisposable
         WordPieceTokenizer tokenizer,
         SparseVector[] tokenVectors,
         int embeddingDimensions,
-        long scale)
+        long scale,
+        int outputSparsityBudget)
     {
         ModelName = modelName;
         m_tokenizer = tokenizer;
         m_tokenVectors = tokenVectors;
         m_embeddingDimensions = embeddingDimensions;
         m_scale = scale;
+        m_outputSparsityBudget = outputSparsityBudget;
     }
 
     // -----------------------------------------------------------------------
@@ -144,8 +147,6 @@ public sealed class LatticeEmbeddingSource : IEmbeddingSource, IDisposable
 
     private SparseVector PoolTokenVectors(int[] tokenIds)
     {
-        // Accumulate into a dense long[] then convert to sparse.
-        // For 768 dims this is 6 KB on the stack — acceptable.
         long[] accumulator = System.Buffers.ArrayPool<long>.Shared.Rent(m_embeddingDimensions);
         accumulator.AsSpan(0, m_embeddingDimensions).Clear();
 
@@ -168,12 +169,11 @@ public sealed class LatticeEmbeddingSource : IEmbeddingSource, IDisposable
             return new SparseVector([new SparseEntry(0, 1L)], m_embeddingDimensions);
         }
 
-        // Integer mean: divide by token count
+        // Integer mean
         for (int d = 0; d < m_embeddingDimensions; d++)
             accumulator[d] /= validTokenCount;
 
-        // L2 normalize in integer domain: scale so ||v||₂ ≈ m_scale
-        // Compute sum of squares, then scale each component.
+        // L2 normalize in integer domain
         double sumSquared = 0.0;
         for (int d = 0; d < m_embeddingDimensions; d++)
         {
@@ -189,11 +189,10 @@ public sealed class LatticeEmbeddingSource : IEmbeddingSource, IDisposable
                 accumulator[d] = (long)(accumulator[d] * scaleFactor);
         }
 
-        // Build sparse vector (skip zeros)
+        // Build sparse entries (skip zeros)
         int nnz = 0;
         for (int d = 0; d < m_embeddingDimensions; d++)
-            if (accumulator[d] != 0L)
-                nnz++;
+            if (accumulator[d] != 0L) nnz++;
 
         if (nnz == 0)
         {
@@ -208,6 +207,12 @@ public sealed class LatticeEmbeddingSource : IEmbeddingSource, IDisposable
                 entries[writeIndex++] = new SparseEntry((ushort)d, accumulator[d]);
 
         System.Buffers.ArrayPool<long>.Shared.Return(accumulator);
+
+        // Apply output budget: trim pooled vector to top-N dims by absolute value.
+        // This enforces the same sparsity on multi-token phrases as on single token rows.
+        if (m_outputSparsityBudget > 0 && entries.Length > m_outputSparsityBudget)
+            entries = EmbeddingAdapter.TrimToBudget(entries, m_outputSparsityBudget);
+
         return new SparseVector(entries, m_embeddingDimensions);
     }
 
@@ -225,10 +230,16 @@ public sealed class LatticeEmbeddingSource : IEmbeddingSource, IDisposable
 
         // Use a moderate scale that won't overflow when summing across ~50 tokens.
         // long.MaxValue / (768 dims × 512 tokens) ≈ 2.3e13, so 1e9 is safe.
+        // After L2 normalization every component sits near ±1/√d (≈ ±0.036 for d=768),
+        // so an absolute ZeroThreshold kills nothing useful. Instead, keep the top 25%
+        // of dimensions by absolute value per token — this gives ~75% sparsity while
+        // retaining enough discriminative signal to meet recall@10 ≥ 0.70.
+        // SparsityBudget is applied by EmbeddingAdapter.Quantize after threshold filtering.
         QuantizationOptions effectiveOptions = quantizationOptions ?? new QuantizationOptions
         {
-            ZeroThreshold = 0.005f,
-            GlobalScale = 1_000_000_000L,
+            ZeroThreshold  = 0f,
+            GlobalScale    = 1_000_000_000L,
+            SparsityBudget = System.Math.Max(1, embeddingDimensions / 4),  // top 25% ≈ 192/768
         };
 
         long scale = effectiveOptions.GlobalScale;
@@ -294,7 +305,8 @@ public sealed class LatticeEmbeddingSource : IEmbeddingSource, IDisposable
             tokenizer,
             tokenVectors,
             embeddingDimensions,
-            scale);
+            scale,
+            effectiveOptions.SparsityBudget ?? 0);
     }
 
     // -----------------------------------------------------------------------

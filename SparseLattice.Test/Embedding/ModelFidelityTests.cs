@@ -1,4 +1,4 @@
-﻿using SparseLattice.Embedding;
+using SparseLattice.Embedding;
 using SparseLattice.Gguf;
 using SparseLattice.Lattice;
 using SparseLattice.Math;
@@ -14,7 +14,7 @@ namespace SparseLattice.Test.Embedding;
 /// Ground truth: HuggingFace nomic-ai/nomic-embed-text-v1.5 running in float32.
 /// Our implementation matches at cosine ≥ 0.9999 on the same text.
 ///
-/// Ollama note: Ollama's WPM tokenizer does not lowercase input text, so mixed-case
+/// Ollama note: Olloma's WPM tokenizer does not lowercase input text, so mixed-case
 /// text (e.g. "public int Add(...)") produces different token IDs than HF/our impl.
 /// The Ollama comparison threshold (0.75) reflects this known divergence.
 /// </summary>
@@ -139,47 +139,58 @@ public sealed class ModelFidelityTests
         if (!TryResolvePrerequisites(out string? ggufPath, out string? ollamaUrl))
             return;
 
-        using TransformerEmbeddingSource local = TransformerEmbeddingSource.Load(ggufPath!);
-        using OllamaEmbeddingSource remote     = new(ollamaUrl!, s_ollamaModel);
+        // This test validates that the lattice's KNN traversal achieves the same
+        // results as brute-force KNN when both index and query use the SAME embedding
+        // source.  Previously the test mixed local (TransformerEmbeddingSource) index
+        // vectors against Ollama query vectors; because the two models produce vectors
+        // in different subspaces (mean cosine ~0.74, documented above), cross-model
+        // recall is not a meaningful correctness signal for the lattice implementation.
+        //
+        // We use Ollama for both sides so the test runs without needing the local
+        // GGUF forward pass, and because Ollama is already a prerequisite here.
+
+        using OllamaEmbeddingSource remote = new(ollamaUrl!, s_ollamaModel);
 
         List<(string text, string label)> corpus = BuildCodeSnippetCorpus();
 
-        QuantizationOptions quantOptions = new() { ZeroThreshold = 0.01f };
+        // Use SparsityBudget so quantized vectors are actually sparse — dense vectors
+        // trivially satisfy recall (every brute-force neighbour is also a lattice
+        // neighbour) so the test would not exercise the tree traversal meaningfully.
+        QuantizationOptions quantOptions = new()
+        {
+            ZeroThreshold  = 0f,
+            GlobalScale    = 1_000_000_000L,
+            SparsityBudget = 192,   // top 25% of 768 dims — same policy as LatticeEmbeddingSource
+        };
 
-        float[][] localEmbeddings  = await local.EmbedBatchAsync(corpus.ConvertAll(c => c.text)).ConfigureAwait(false);
         float[][] remoteEmbeddings = await remote.EmbedBatchAsync(corpus.ConvertAll(c => c.text)).ConfigureAwait(false);
 
-        List<SparseOccupant<string>> localCorpus  = [];
-        List<SparseOccupant<string>> remoteCorpus = [];
+        List<SparseOccupant<string>> sparseCorpus = [];
         for (int i = 0; i < corpus.Count; i++)
-        {
-            localCorpus.Add(new SparseOccupant<string>(
-                EmbeddingAdapter.Quantize(localEmbeddings[i],  quantOptions), corpus[i].label));
-            remoteCorpus.Add(new SparseOccupant<string>(
+            sparseCorpus.Add(new SparseOccupant<string>(
                 EmbeddingAdapter.Quantize(remoteEmbeddings[i], quantOptions), corpus[i].label));
-        }
 
         EmbeddingLattice<string> lattice = new(
-            localCorpus.ToArray(),
+            sparseCorpus.ToArray(),
             new LatticeOptions { LeafThreshold = SystemMath.Max(4, corpus.Count / 8) });
         lattice.Freeze();
 
-        int queryCount     = SystemMath.Min(s_topK, corpus.Count);
-        int truePositives  = 0;
-        int totalExpected  = queryCount * s_topK;
+        int queryCount    = SystemMath.Min(s_topK, corpus.Count);
+        int truePositives = 0;
+        int totalExpected = queryCount * s_topK;
 
         for (int q = 0; q < queryCount; q++)
         {
-            SparseVector queryVec = remoteCorpus[q].Position;
+            SparseVector queryVec = sparseCorpus[q].Position;
             IReadOnlyList<SparseOccupant<string>> latticeResults = lattice.QueryKNearestL2(queryVec, s_topK);
-            IReadOnlyList<SparseOccupant<string>> bruteResults   = BruteForceKnn(remoteCorpus, queryVec, s_topK);
+            IReadOnlyList<SparseOccupant<string>> bruteResults   = BruteForceKnn(sparseCorpus, queryVec, s_topK);
 
             HashSet<string> bruteLabels = new(bruteResults.Select(r => r.Payload!));
             truePositives += latticeResults.Count(r => bruteLabels.Contains(r.Payload!));
         }
 
         float recall = (float)truePositives / totalExpected;
-        Console.WriteLine($"[E5] Lattice recall@{s_topK} (local index / Ollama queries): {recall:F4}  (threshold ≥ {s_recallThreshold})");
+        Console.WriteLine($"[E5] Lattice recall@{s_topK} (same-model index+query, SparsityBudget=192): {recall:F4}  (threshold ≥ {s_recallThreshold})");
 
         Assert.IsTrue(recall >= s_recallThreshold,
             $"Lattice recall@{s_topK} = {recall:F4} is below the {s_recallThreshold} threshold.");

@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Text.Json;
 using SparseLattice.Gguf;
@@ -69,7 +69,7 @@ public static class Program
 
         // --- Load lattice source ---
         string? gguf = ResolveGguf();
-        if (gguf is null) { Console.WriteLine("GGUF not found — cannot run lattice side. Aborting."); return; }
+        if (gguf is null) { Console.WriteLine("GGUF not found â€” cannot run lattice side. Aborting."); return; }
 
         Console.Write("Loading LatticeEmbeddingSource... ");
         Stopwatch swLoad = Stopwatch.StartNew();
@@ -82,7 +82,7 @@ public static class Program
         bool ollamaUp = false;
         try { using var ping = await http.GetAsync("api/tags").ConfigureAwait(false); ollamaUp = ping.IsSuccessStatusCode; }
         catch { }
-        if (!ollamaUp) { Console.WriteLine($"Ollama not reachable at {ollamaBase} — aborting."); return; }
+        if (!ollamaUp) { Console.WriteLine($"Ollama not reachable at {ollamaBase} â€” aborting."); return; }
         Console.WriteLine($"Ollama at {ollamaBase}  model={model}\n");
 
         // ----------------------------------------------------------------
@@ -128,7 +128,7 @@ public static class Program
         double ollamaSingleOps = ollamaRuns / swO.Elapsed.TotalSeconds;
 
         // ================================================================
-        // Q2: Document ingestion — batch throughput
+        // Q2: Document ingestion â€” batch throughput
         //     Use case: vectorising a whole codebase / document corpus
         // ================================================================
         int[] batchSizes = { 10, 100, 500 };
@@ -145,7 +145,7 @@ public static class Program
             latticeBatchOps[bi] = n / sw.Elapsed.TotalSeconds;
         }
 
-        // Ollama batch — sequential (it has no native batch endpoint for multi-string)
+        // Ollama batch â€” sequential (it has no native batch endpoint for multi-string)
         double[] ollamaBatchOps  = new double[batchSizes.Length];
         double[] ollamaBatchSecs = new double[batchSizes.Length];
         for (int bi = 0; bi < batchSizes.Length; bi++)
@@ -162,7 +162,7 @@ public static class Program
         }
 
         // ================================================================
-        // Q3: Parallel embed — prompt pipeline throughput
+        // Q3: Parallel embed â€” prompt pipeline throughput
         //     Use case: embedding many chunks concurrently for a thinking model
         // ================================================================
         int[] concurrencies = { 1, 8, 32 };
@@ -195,50 +195,50 @@ public static class Program
 
         double su = ollamaSingleMs / latticeSingleMs;
 
-        Console.WriteLine("╔══════════════════════════════════════════════════════════════════════════╗");
-        Console.WriteLine("║     Q1: Single embedding latency  (prompt augmentation / RAG lookup)    ║");
-        Console.WriteLine("╠═══════════════════════════╦══════════════════╦══════════════════════════╣");
-        Console.WriteLine("║ Method                    ║    ms / embed    ║       embeds / sec       ║");
-        Console.WriteLine("╠═══════════════════════════╬══════════════════╬══════════════════════════╣");
-        Console.WriteLine($"║ Lattice (token lookup)    ║ {latticeSingleMs,14:F4}   ║ {latticeSingleOps,22:F0}   ║");
-        Console.WriteLine($"║ Ollama HTTP               ║ {ollamaSingleMs,14:F2}   ║ {ollamaSingleOps,22:F1}   ║");
-        Console.WriteLine("╠═══════════════════════════╬══════════════════╬══════════════════════════╣");
-        Console.WriteLine($"║ Lattice speedup           ║ {su,13:F0}×    ║                          ║");
-        Console.WriteLine("╚═══════════════════════════╩══════════════════╩══════════════════════════╝");
+        Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—");
+        Console.WriteLine("â•‘     Q1: Single embedding latency  (prompt augmentation / RAG lookup)    â•‘");
+        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
+        Console.WriteLine("â•‘ Method                    â•‘    ms / embed    â•‘       embeds / sec       â•‘");
+        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
+        Console.WriteLine($"â•‘ Lattice (token lookup)    â•‘ {latticeSingleMs,14:F4}   â•‘ {latticeSingleOps,22:F0}   â•‘");
+        Console.WriteLine($"â•‘ Ollama HTTP               â•‘ {ollamaSingleMs,14:F2}   â•‘ {ollamaSingleOps,22:F1}   â•‘");
+        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
+        Console.WriteLine($"â•‘ Lattice speedup           â•‘ {su,13:F0}Ã—    â•‘                          â•‘");
+        Console.WriteLine("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
 
         Console.WriteLine();
-        Console.WriteLine("╔══════════════════════════════════════════════════════════════════════════╗");
-        Console.WriteLine("║     Q2: Document ingestion throughput  (batch vectorisation)            ║");
-        Console.WriteLine("╠═══════════════════════════╦══════════╦══════════╦════════════╦══════════╣");
-        Console.WriteLine("║ Method                    ║  10 docs ║ 100 docs ║  500 docs  ║ 1000 docs║");
-        Console.WriteLine("╠═══════════════════════════╬══════════╬══════════╬════════════╬══════════╣");
+        Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—");
+        Console.WriteLine("â•‘     Q2: Document ingestion throughput  (batch vectorisation)            â•‘");
+        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•£");
+        Console.WriteLine("â•‘ Method                    â•‘  10 docs â•‘ 100 docs â•‘  500 docs  â•‘ 1000 docsâ•‘");
+        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•£");
 
         // Lattice 1000-doc extrapolated
         double l1000 = latticeBatchOps[2]; // 500-doc rate is representative
-        Console.WriteLine($"║ Lattice  (embeds/sec)     ║{latticeBatchOps[0],8:F0}  ║{latticeBatchOps[1],8:F0}  ║{latticeBatchOps[2],10:F0}  ║{l1000,8:F0}  ║");
+        Console.WriteLine($"â•‘ Lattice  (embeds/sec)     â•‘{latticeBatchOps[0],8:F0}  â•‘{latticeBatchOps[1],8:F0}  â•‘{latticeBatchOps[2],10:F0}  â•‘{l1000,8:F0}  â•‘");
         double o1000 = ollamaBatchOps[2];
-        Console.WriteLine($"║ Ollama   (embeds/sec)     ║{ollamaBatchOps[0],8:F1}  ║{ollamaBatchOps[1],8:F1}  ║{ollamaBatchOps[2],10:F1}  ║{o1000,8:F1}  ║");
-        Console.WriteLine("╠═══════════════════════════╬══════════╬══════════╬════════════╬══════════╣");
-        Console.WriteLine($"║ Lattice speedup           ║{latticeBatchOps[0]/ollamaBatchOps[0],7:F0}×  ║{latticeBatchOps[1]/ollamaBatchOps[1],7:F0}×  ║{latticeBatchOps[2]/ollamaBatchOps[2],9:F0}×  ║{l1000/o1000,7:F0}×  ║");
-        Console.WriteLine("╠═══════════════════════════╬══════════╩══════════╩════════════╩══════════╣");
+        Console.WriteLine($"â•‘ Ollama   (embeds/sec)     â•‘{ollamaBatchOps[0],8:F1}  â•‘{ollamaBatchOps[1],8:F1}  â•‘{ollamaBatchOps[2],10:F1}  â•‘{o1000,8:F1}  â•‘");
+        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•£");
+        Console.WriteLine($"â•‘ Lattice speedup           â•‘{latticeBatchOps[0]/ollamaBatchOps[0],7:F0}Ã—  â•‘{latticeBatchOps[1]/ollamaBatchOps[1],7:F0}Ã—  â•‘{latticeBatchOps[2]/ollamaBatchOps[2],9:F0}Ã—  â•‘{l1000/o1000,7:F0}Ã—  â•‘");
+        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•£");
 
         // Time to ingest 1000 docs
         double lattice1000secs = 1000.0 / l1000;
         double ollama1000secs  = 1000.0 / o1000;
-        Console.WriteLine($"║ Time to ingest 1000 docs  ║ Lattice: {lattice1000secs * 1000,7:F1} ms        Ollama: {ollama1000secs,6:F1} s        ║");
-        Console.WriteLine("╚═══════════════════════════╩════════════════════════════════════════════╝");
+        Console.WriteLine($"â•‘ Time to ingest 1000 docs  â•‘ Lattice: {lattice1000secs * 1000,7:F1} ms        Ollama: {ollama1000secs,6:F1} s        â•‘");
+        Console.WriteLine("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
 
         Console.WriteLine();
-        Console.WriteLine("╔══════════════════════════════════════════════════════════════════════════╗");
-        Console.WriteLine("║     Q3: Parallel prompt pipeline  (concurrent embed for thinking model) ║");
-        Console.WriteLine("╠═══════════════════════════╦══════════════╦══════════════╦═══════════════╣");
-        Console.WriteLine("║ Method                    ║   c=1        ║   c=8        ║   c=32        ║");
-        Console.WriteLine("╠═══════════════════════════╬══════════════╬══════════════╬═══════════════╣");
-        Console.WriteLine($"║ Lattice  (embeds/sec)     ║{latticePar[0],10:F0}    ║{latticePar[1],10:F0}    ║{latticePar[2],11:F0}    ║");
-        Console.WriteLine($"║ Ollama   (embeds/sec)     ║{ollamaPar[0],10:F1}    ║{ollamaPar[1],10:F1}    ║{ollamaPar[2],11:F1}    ║");
-        Console.WriteLine("╠═══════════════════════════╬══════════════╬══════════════╬═══════════════╣");
-        Console.WriteLine($"║ Lattice speedup           ║{latticePar[0]/ollamaPar[0],9:F0}×    ║{latticePar[1]/ollamaPar[1],9:F0}×    ║{latticePar[2]/ollamaPar[2],10:F0}×    ║");
-        Console.WriteLine("╚═══════════════════════════╩══════════════╩══════════════╩═══════════════╝");
+        Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—");
+        Console.WriteLine("â•‘     Q3: Parallel prompt pipeline  (concurrent embed for thinking model) â•‘");
+        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
+        Console.WriteLine("â•‘ Method                    â•‘   c=1        â•‘   c=8        â•‘   c=32        â•‘");
+        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
+        Console.WriteLine($"â•‘ Lattice  (embeds/sec)     â•‘{latticePar[0],10:F0}    â•‘{latticePar[1],10:F0}    â•‘{latticePar[2],11:F0}    â•‘");
+        Console.WriteLine($"â•‘ Ollama   (embeds/sec)     â•‘{ollamaPar[0],10:F1}    â•‘{ollamaPar[1],10:F1}    â•‘{ollamaPar[2],11:F1}    â•‘");
+        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
+        Console.WriteLine($"â•‘ Lattice speedup           â•‘{latticePar[0]/ollamaPar[0],9:F0}Ã—    â•‘{latticePar[1]/ollamaPar[1],9:F0}Ã—    â•‘{latticePar[2]/ollamaPar[2],10:F0}Ã—    â•‘");
+        Console.WriteLine("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
 
         Console.WriteLine();
         Console.WriteLine("Notes:");
@@ -255,7 +255,7 @@ public static class Program
     {
         Console.WriteLine("=== Local Embed Harness ===");
         string? gguf = ResolveGguf();
-        if (gguf is null) { Console.WriteLine("GGUF not found — skipping embed harness."); return; }
+        if (gguf is null) { Console.WriteLine("GGUF not found â€” skipping embed harness."); return; }
 
         using TransformerEmbeddingSource src = LoadWithProgress(gguf);
         string sample = "public int Add(int a, int b) => a + b;";
@@ -289,14 +289,14 @@ public static class Program
     }
 
     // -----------------------------------------------------------------------
-    // Fast embed harness — lattice-based token lookup (no transformer)
+    // Fast embed harness â€” lattice-based token lookup (no transformer)
     // -----------------------------------------------------------------------
 
     private static async Task RunFastEmbed()
     {
         Console.WriteLine("=== Lattice Embed Harness (token lookup, no transformer) ===");
         string? gguf = ResolveGguf();
-        if (gguf is null) { Console.WriteLine("GGUF not found — skipping fast embed harness."); return; }
+        if (gguf is null) { Console.WriteLine("GGUF not found â€” skipping fast embed harness."); return; }
 
         Console.Write("Loading token embeddings into lattice... ");
         Stopwatch swLoad = Stopwatch.StartNew();
@@ -342,7 +342,7 @@ public static class Program
     }
 
     // -----------------------------------------------------------------------
-    // Lattice KNN harness — focused, no embed cost, varied corpus sizes
+    // Lattice KNN harness â€” focused, no embed cost, varied corpus sizes
     // -----------------------------------------------------------------------
 
     private static Task RunLatticeOnly()
@@ -351,7 +351,7 @@ public static class Program
 
         string[] samples = LoadSamplesFromFile();
 
-        // Build SparseVectors directly from text — no floats, no GGUF, no model.
+        // Build SparseVectors directly from text â€” no floats, no GGUF, no model.
         // 768 dimensions matches nomic-embed-text for apples-to-apples lattice benchmarks.
         DirectHashEmbeddingSource hasher = new(dimensions: 768);
 
@@ -604,7 +604,7 @@ public static class Program
         int lastPct  = -1;
         Stopwatch sw = Stopwatch.StartNew();
         string shortName = Path.GetFileName(gguf);
-        if (shortName.Length > 14) shortName = shortName[..14] + "…";
+        if (shortName.Length > 14) shortName = shortName[..14] + "â€¦";
 
         Console.Write($"\nLoading {shortName}  [");
         Console.Write(new string(' ', barWidth));
@@ -668,7 +668,7 @@ public static class Program
         Console.WriteLine($"Size : {fileSize / 1024.0 / 1024.0:F1} MB");
         Console.WriteLine();
 
-        // 1. Raw sequential read — pure I/O, no parsing
+        // 1. Raw sequential read â€” pure I/O, no parsing
         {
             var sw = Stopwatch.StartNew();
             using var fs = new FileStream(gguf, FileMode.Open, FileAccess.Read,
@@ -682,7 +682,7 @@ public static class Program
                               $"{total / 1024.0 / 1024.0 / sw.Elapsed.TotalSeconds,6:F0} MB/s");
         }
 
-        // 2. GgufReader.Open — header + metadata + tensor table only (no tensor data)
+        // 2. GgufReader.Open â€” header + metadata + tensor table only (no tensor data)
         {
             var sw = Stopwatch.StartNew();
             using var reader = SparseLattice.Gguf.GgufReader.Open(gguf);
@@ -699,25 +699,114 @@ public static class Program
             sw.Stop();
             double mb = embd.Length * 4.0 / 1024 / 1024;
             Console.WriteLine($"ReadTensorF32 embd   : {sw.Elapsed.TotalMilliseconds,8:F1} ms   " +
-                              $"({mb:F0} MB float32, {reader.Tokens.Count}×{reader.EmbeddingLength} dequantized from F16)");
+                              $"({mb:F0} MB float32, {reader.Tokens.Count}Ã—{reader.EmbeddingLength} dequantized from F16)");
         }
 
-        // 4. Full LatticeEmbeddingSource.Load — everything including quantize loop
+        // 4. Full LatticeEmbeddingSource.Load â€” everything including quantize loop
+        GC.Collect(2, GCCollectionMode.Forced, blocking: true);
+        GC.WaitForPendingFinalizers();
+        GC.Collect(2, GCCollectionMode.Forced, blocking: true);
+        long heapBefore    = GC.GetTotalMemory(false);
+        long workingBefore = System.Diagnostics.Process.GetCurrentProcess().WorkingSet64;
+
+        LatticeEmbeddingSource src;
+        Stopwatch swLoad;
         {
-            var sw = Stopwatch.StartNew();
-            using var src = LatticeEmbeddingSource.Load(gguf);
-            sw.Stop();
-            Console.WriteLine($"LatticeEmbeddingSource.Load  : {sw.Elapsed.TotalMilliseconds,8:F1} ms   total");
+            swLoad = Stopwatch.StartNew();
+            src = LatticeEmbeddingSource.Load(gguf);
+            swLoad.Stop();
+        }
+
+        GC.Collect(2, GCCollectionMode.Forced, blocking: true);
+        GC.WaitForPendingFinalizers();
+        GC.Collect(2, GCCollectionMode.Forced, blocking: true);
+        long heapAfter    = GC.GetTotalMemory(false);
+        long workingAfter = System.Diagnostics.Process.GetCurrentProcess().WorkingSet64;
+
+        long heapDelta    = heapAfter    - heapBefore;
+        long workingDelta = workingAfter - workingBefore;
+
+        Console.WriteLine($"LatticeEmbeddingSource.Load  : {swLoad.Elapsed.TotalMilliseconds,8:F1} ms   total");
+        Console.WriteLine();
+
+        // ----------------------------------------------------------------
+        // Memory breakdown â€” show what's actually in the loaded structure
+        // ----------------------------------------------------------------
+        using (src)
+        {
+            int   vocabSize = 0;
+            long  totalEntries = 0;
+            int   minNnz = int.MaxValue, maxNnz = 0;
+            long  minVal = long.MaxValue, maxVal = long.MinValue;
+            int   fullyDense = 0;
+            int   actuallyEmpty = 0;
+            int   dims = src.Dimensions;
+
+            // Embed every vocab entry by probing via single-token encode
+            // Instead, embed the whole batch of samples to measure operational vectors
+            string[] samples = LoadSamplesFromFile();
+            var vectors = src.EmbedSparseBatch(samples.ToList());
+
+            foreach (var v in vectors)
+            {
+                vocabSize++;
+                totalEntries += v.NonzeroCount;
+                if (v.NonzeroCount < minNnz) minNnz = v.NonzeroCount;
+                if (v.NonzeroCount > maxNnz) maxNnz = v.NonzeroCount;
+                if (v.NonzeroCount == dims) fullyDense++;
+                if (v.NonzeroCount == 0)   actuallyEmpty++;
+                foreach (var e in v.Entries)
+                {
+                    if (e.Value < minVal) minVal = e.Value;
+                    if (e.Value > maxVal) maxVal = e.Value;
+                }
+            }
+
+            double avgNnz     = (double)totalEntries / vocabSize;
+            double sparsityPct = 100.0 * (1.0 - avgNnz / dims);
+
+            // SparseEntry = ushort(2) + long(8) = 10 bytes per entry
+            // SparseVector struct = array ref(8) + int TotalDimensions(4) = 12 bytes overhead
+            long entryBytes   = totalEntries * 10L;
+            long overheadBytes = vocabSize   * 12L;
+            long totalEstBytes = entryBytes + overheadBytes;
+
+            Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—");
+            Console.WriteLine("â•‘               Memory Diagnostics â€” LatticeEmbeddingSource           â•‘");
+            Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
+            Console.WriteLine($"â•‘  Dimensions (d)          : {dims,10}                                â•‘");
+            Console.WriteLine($"â•‘  Sample vectors measured : {vocabSize,10}                                â•‘");
+            Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
+            Console.WriteLine($"â•‘  Avg nnz per vector      : {avgNnz,10:F1}  / {dims}                    â•‘");
+            Console.WriteLine($"â•‘  Min nnz                 : {minNnz,10}                                â•‘");
+            Console.WriteLine($"â•‘  Max nnz                 : {maxNnz,10}                                â•‘");
+            Console.WriteLine($"â•‘  Fully dense vectors     : {fullyDense,10}  ({100.0*fullyDense/vocabSize:F1}% of sample)           â•‘");
+            Console.WriteLine($"â•‘  Sparsity                : {sparsityPct,10:F1}%                              â•‘");
+            Console.WriteLine($"â•‘  Value range             : [{minVal}, {maxVal}]");
+            Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
+            Console.WriteLine($"â•‘  Total SparseEntries     : {totalEntries,10:N0}  (ushort+long = 10 B each)    â•‘");
+            Console.WriteLine($"â•‘  Entry bytes             : {entryBytes/1024.0/1024.0,10:F2} MB                            â•‘");
+            Console.WriteLine($"â•‘  Vector overhead bytes   : {overheadBytes/1024.0/1024.0,10:F2} MB                            â•‘");
+            Console.WriteLine($"â•‘  Estimated total payload : {totalEstBytes/1024.0/1024.0,10:F2} MB  (entries + vector structs)  â•‘");
+            Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
+            Console.WriteLine($"â•‘  GC heap delta (managed) : {heapDelta/1024.0/1024.0,10:F2} MB                            â•‘");
+            Console.WriteLine($"â•‘  Working set delta       : {workingDelta/1024.0/1024.0,10:F2} MB  (includes unmanaged+JIT)  â•‘");
+            Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
+            // Comparison: equivalent float32 dense storage
+            long denseFloat32Bytes = (long)vocabSize * dims * 4;
+            Console.WriteLine($"â•‘  Dense float32 equiv     : {denseFloat32Bytes/1024.0/1024.0,10:F2} MB  ({vocabSize} Ã— {dims} Ã— 4 B)          â•‘");
+            Console.WriteLine($"â•‘  Compression vs dense    : {(totalEstBytes > 0 ? (double)denseFloat32Bytes/totalEstBytes : 0),10:F1}Ã—                              â•‘");
+            Console.WriteLine("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
             Console.WriteLine();
 
-            // Spot-check sparsity
-            string[] probes = { "public", "hello", "int", "return", "class" };
-            Console.WriteLine("Sparsity spot-check (nnz / dims):");
+            // Spot-check a few individual queries
+            Console.WriteLine("Spot-check individual embeddings (nnz / dims):");
+            string[] probes = { "public int Add(int a, int b) => a + b;", "return result;",
+                                "private readonly float[] m_weights;", "void Tick()", "class Program" };
             foreach (string text in probes)
             {
                 var v = src.EmbedSparse(text);
-                Console.WriteLine($"  \"{text,-12}\" → nnz={v.NonzeroCount,4} / {src.Dimensions}  " +
-                                  $"({100.0 * v.NonzeroCount / src.Dimensions:F1}% dense)");
+                Console.WriteLine($"  {v.NonzeroCount,4}/{dims}  ({100.0*v.NonzeroCount/dims:F1}%)  \"{(text.Length > 55 ? text[..52]+"..." : text)}\"");
             }
         }
     }
