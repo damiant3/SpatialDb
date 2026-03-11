@@ -4,23 +4,9 @@ using System.Numerics;
 ///////////////////////////////////////////////
 namespace SparseLattice.Test.Math;
 
-/// <summary>
-/// Tests for <see cref="IntegerMatMul"/> — the foundation of Epic 4.
-///
-/// These tests verify:
-/// 1. Correctness: integer matmul produces exact results for known inputs
-/// 2. Scale tracking: ScaledTensor exponents are computed algebraically
-/// 3. Quantization round-trip: float → quantize → matmul → dequantize ≈ float matmul
-/// 4. Overflow safety: Int128 accumulators handle worst-case products
-/// 5. Fidelity: integer matmul matches float matmul to quantifiable precision
-/// </summary>
 [TestClass]
 public sealed class IntegerMatMulTests
 {
-    // -----------------------------------------------------------------------
-    // 1. Exact correctness on small known inputs
-    // -----------------------------------------------------------------------
-
     [TestMethod]
     public void Unit_DotInt128_ExactResult()
     {
@@ -98,10 +84,6 @@ public sealed class IntegerMatMulTests
         Assert.AreEqual((Int128)92, result, "Offset should skip the 99s.");
     }
 
-    // -----------------------------------------------------------------------
-    // 2. Matrix multiplication correctness
-    // -----------------------------------------------------------------------
-
     [TestMethod]
     public void Unit_MatMul_Identity()
     {
@@ -176,10 +158,6 @@ public sealed class IntegerMatMulTests
         Assert.AreEqual(-11L, result[0]);
     }
 
-    // -----------------------------------------------------------------------
-    // 3. ScaledTensor: scale exponent tracking
-    // -----------------------------------------------------------------------
-
     [TestMethod]
     public void Unit_ScaledTensor_MatMul_ExponentTracking()
     {
@@ -219,10 +197,6 @@ public sealed class IntegerMatMulTests
         Assert.AreEqual(0L, shifted.Data[2]);         // 7 >> 3 = 0 (floor)
     }
 
-    // -----------------------------------------------------------------------
-    // 4. Quantization round-trip
-    // -----------------------------------------------------------------------
-
     [TestMethod]
     public void Unit_QuantizeFromFloat_RoundTrip()
     {
@@ -256,10 +230,6 @@ public sealed class IntegerMatMulTests
         Assert.AreNotEqual(qa.Data[0], qb.Data[0],
             "Quantization at 30 bits should distinguish values differing by ~1e-8.");
     }
-
-    // -----------------------------------------------------------------------
-    // 5. Fidelity: integer matmul vs float matmul
-    // -----------------------------------------------------------------------
 
     [TestMethod]
     public void Unit_MatMul_MatchesFloatMatMul_SmallMatrix()
@@ -364,10 +334,6 @@ public sealed class IntegerMatMulTests
         }
     }
 
-    // -----------------------------------------------------------------------
-    // 6. Overflow boundary tests
-    // -----------------------------------------------------------------------
-
     [TestMethod]
     public void Unit_DotInt128_WorstCase_768Dim_Scale30()
     {
@@ -419,10 +385,6 @@ public sealed class IntegerMatMulTests
         Assert.AreEqual((Int128)0, result,
             "Alternating +/- with equal magnitude over even count must sum to zero.");
     }
-
-    // -----------------------------------------------------------------------
-    // 7. Element-wise operations
-    // -----------------------------------------------------------------------
 
     [TestMethod]
     public void Unit_AddInPlace()

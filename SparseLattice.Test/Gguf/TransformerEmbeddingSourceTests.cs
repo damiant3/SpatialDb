@@ -1,4 +1,4 @@
-﻿using SparseLattice.Gguf;
+using SparseLattice.Gguf;
 //////////////////////////////////////////////////////////
 namespace SparseLattice.Test.Gguf;
 
@@ -362,7 +362,7 @@ public sealed class TransformerEmbeddingSourceTests
         Console.WriteLine($"[CS code]   final[:4] = [{string.Join(", ", codeResult.Take(4).Select(v => $"{v:F8}"))}]");
 
         // Print token IDs for the code text
-        var tokenizer = WordPieceTokenizer.FromGguf(SparseLattice.Gguf.GgufReader.Open(ggufPath));
+        WordPieceTokenizer tokenizer = WordPieceTokenizer.FromGguf(SparseLattice.Gguf.GgufReader.Open(ggufPath));
         int[] ids = tokenizer.Encode(codeText);
         Console.WriteLine($"[CS code] Token IDs ({ids.Length}): [{string.Join(", ", ids)}]");
     }

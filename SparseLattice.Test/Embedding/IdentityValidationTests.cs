@@ -241,7 +241,7 @@ public sealed class IdentityValidationTests
             // For each model, probe model info to see if it advertises embedding length
             try
             {
-                var payload = new { name = model };
+                object payload = new { name = model };
                 string payloadJson = System.Text.Json.JsonSerializer.Serialize(payload);
                 using StringContent sc = new(payloadJson, System.Text.Encoding.UTF8, "application/json");
                 HttpResponseMessage infoResp = await client.PostAsync(baseUrl.TrimEnd('/') + "/api/show", sc).ConfigureAwait(false);

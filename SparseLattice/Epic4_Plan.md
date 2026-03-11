@@ -46,6 +46,7 @@ dequantized and L2-normalized, matches the float path at cosine 1.000000.
 | Criterion | Target | Actual | Status |
 |---|---|---|---|
 | Cosine vs float32 | ≥ 0.95 | **1.000000** | ✅ |
+| Memory ≤ 2× float32 | ≤ 2.0× | **1.99×** (525 MB float, 1046 MB int64) | ✅ |
 | Determinism | bit-identical | **verified** | ✅ |
 | L2 norm | ≈ 1.0 | **1.000000** | ✅ |
 | Existing tests pass | 270+ | **327** | ✅ |

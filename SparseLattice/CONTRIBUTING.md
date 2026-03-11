@@ -1,4 +1,4 @@
-﻿root = true
+root = true
 
 [*.cs]
 charset = utf-8
@@ -34,14 +34,14 @@ dotnet_naming_rule.store_types_should_end_with_store.symbols = all_types
 - Prefer returning null/false or a concrete error result object for expected failure conditions. Reserve throwing exceptions for truly exceptional conditions (OOM, corrupted memory, catastrophic failures).
 - Do not add defensive fallback and excessive null-checking when the project is built with nullable enabled. If a parameter or field may be null, declare it as nullable in the API (e.g., `string?`) and handle it there. Otherwise assume non-null and allow natural exceptions at the point of use.
 - Do not re-throw different exceptions to intercept eventual null reference errors. Let the natural exception occur at the appropriate domain level.
-- Field naming convention: prefix instance fields with `m` (e.g., `m_names`), static fields with `s` (e.g., `s_singleton`), thread-static with `t` (e.g., `t_context`). Do not use bare `_` prefix.
+- Field naming convention: prefix instance fields with `m` (e.g., `m_names`), static fields with `s` (e.g., `s_singleton`), thread-static with `t` (e.g., `t_context`). Do not use bare `_` prefix. `const` fields are exempt from the `s_` prefix and should use PascalCase (e.g., `DefaultFracBits`), matching standard C# convention for compile-time constants.
 - Do not add `using` declarations that are provided by the project's implicit/global usings. Rely on the project's `ImplicitUsings` setting. When in doubt, perform a test build first without the using import.
 - Sort `using` statements into groups in this order: `System.*`, `Microsoft.*`, `OtherExternalPackageName.*`, `LocalVisualStudioCopilot.*` (or the app's root namespace). Within each group sort alphabetically.
 - Use file-scoped namespaces (e.g., `namespace LocalVisualStudioCopilot.Services.AI;`) for new files and update for consistency when editing existing files.
 - A single comment line consisting of a repeated comment character / between the usings/imports section and the file-scoped namespace declaration for readability.  This seperator should be the same number of characters as the namespace declaration on the following line.
 - Never use block comments `/* */` or `#regions`.
 - Use expressive names, never abbreviations or initialisms unless they are widely recognized (e.g., `Id`). Avoid generic names like `data`, `info`, `temp` in domain models.
-- Pay attention to runtimes... O(n^2) algorithms must include Slow in the method name and be highlighted if unavoidable.  For example "SortSlow()" if you must implement nested iterative loops like selection or insertion sorts.  Expect O(n log n) for sorting, O(log n) for searching.  Be judicious using hash tables.  Use ConcurrentDictionary in all scenarios, even when a HashSet or single threaded dictionary would work.
+- Pay attention to runtimes... O(n^2) algorithms must include Slow in the method name and be highlighted if unavoidable.  For example "SortSlow()" if you must implement nested iterative loops like selection or insertion sorts.  Expect O(n log n) for sorting, O(log n) for searching.  Be judicious using hash tables.  Use ConcurrentDictionary for shared/cached/long-lived dictionaries rather than plain Dictionary, even when current callers are single-threaded.  Method-local lookup tables and hot-path numerics are exempt — use the simplest collection that fits.
 
 These rules are requirements and stylistic / syntactic and sometimes architectural invariants, and should be followed closely when modifying or adding code. They will be enforced via user code reviews. Any conflict or significant vagueness or ambiguity discovered in these rules should be resolved immediatly in discussion with the user.  When discovered, please notify the user and propose a rule change that best resolves the conflict before continuing. In such cases, consider the nature of the other rules, and the potential impact on the overall codebase.  Think deeply about the best rule you can propose in one shot that the user can review and decide.
 

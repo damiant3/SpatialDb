@@ -2,13 +2,8 @@ using SparseLattice.Math;
 ///////////////////////////////////////////////
 namespace SparseLattice.Gguf;
 
-// Partial: weight types and GGUF loading
 public sealed partial class IntegerTransformerSource
 {
-    // -----------------------------------------------------------------------
-    // Quantized layer weights
-    // -----------------------------------------------------------------------
-
     internal sealed class IntegerLayerWeights
     {
         public required long[] AttnQkv     { get; init; }
@@ -21,10 +16,6 @@ public sealed partial class IntegerTransformerSource
         public required long[] LayerNormW  { get; init; }
         public required long[] LayerNormB  { get; init; }
     }
-
-    // -----------------------------------------------------------------------
-    // Construction
-    // -----------------------------------------------------------------------
 
     private IntegerTransformerSource(
         string modelName,
@@ -52,10 +43,6 @@ public sealed partial class IntegerTransformerSource
         m_scaleBits = scaleBits;
     }
 
-    // -----------------------------------------------------------------------
-    // Load from GGUF — quantize all weights to long[]
-    // -----------------------------------------------------------------------
-
     /// <summary>Loads model weights from a GGUF file, quantizing to integer.</summary>
     public static IntegerTransformerSource Load(string ggufPath, int scaleBits = 30,
         Action<int, int, string>? onProgress = null)
@@ -71,9 +58,7 @@ public sealed partial class IntegerTransformerSource
         return LoadFromReader(reader, scaleBits, onProgress);
     }
 
-    /// <summary>
-    /// Resolves a model name via <see cref="OllamaModelLocator"/>, then loads the GGUF.
-    /// </summary>
+    /// <summary>Resolves model via <see cref="OllamaModelLocator"/>, then loads.</summary>
     public static IntegerTransformerSource LoadFromModelDir(string modelName, string modelDir,
         int scaleBits = 30, Action<int, int, string>? onProgress = null)
     {
@@ -165,7 +150,6 @@ public sealed partial class IntegerTransformerSource
             scaleBits: scaleBits);
     }
 
-    /// <summary>Quantize float[] to long[] at the given scale.</summary>
     private static long[] Q(float[] source, int scaleBits)
         => IntegerMatMul.QuantizeFromFloat(source, scaleBits).Data;
 
