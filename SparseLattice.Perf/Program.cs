@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Text.Json;
 using SparseLattice.Gguf;
@@ -48,6 +48,9 @@ public static class Program
                 break;
             case "diagload":
                 RunDiagLoad();
+                break;
+            case "intmatmul":
+                RunIntegerMatMulBench();
                 break;
             default:
                 RunFastEmbed().GetAwaiter().GetResult();
@@ -195,7 +198,7 @@ public static class Program
 
         double su = ollamaSingleMs / latticeSingleMs;
 
-        Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—");
+        Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
         Console.WriteLine("â•‘     Q1: Single embedding latency  (prompt augmentation / RAG lookup)    â•‘");
         Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
         Console.WriteLine("â•‘ Method                    â•‘    ms / embed    â•‘       embeds / sec       â•‘");
@@ -204,10 +207,9 @@ public static class Program
         Console.WriteLine($"â•‘ Ollama HTTP               â•‘ {ollamaSingleMs,14:F2}   â•‘ {ollamaSingleOps,22:F1}   â•‘");
         Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
         Console.WriteLine($"â•‘ Lattice speedup           â•‘ {su,13:F0}Ã—    â•‘                          â•‘");
-        Console.WriteLine("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
-
+        Console.WriteLine("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
         Console.WriteLine();
-        Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—");
+        Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
         Console.WriteLine("â•‘     Q2: Document ingestion throughput  (batch vectorisation)            â•‘");
         Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•£");
         Console.WriteLine("â•‘ Method                    â•‘  10 docs â•‘ 100 docs â•‘  500 docs  â•‘ 1000 docsâ•‘");
@@ -226,19 +228,19 @@ public static class Program
         double lattice1000secs = 1000.0 / l1000;
         double ollama1000secs  = 1000.0 / o1000;
         Console.WriteLine($"â•‘ Time to ingest 1000 docs  â•‘ Lattice: {lattice1000secs * 1000,7:F1} ms        Ollama: {ollama1000secs,6:F1} s        â•‘");
-        Console.WriteLine("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
+        Console.WriteLine("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
 
         Console.WriteLine();
-        Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—");
+        Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
         Console.WriteLine("â•‘     Q3: Parallel prompt pipeline  (concurrent embed for thinking model) â•‘");
         Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
         Console.WriteLine("â•‘ Method                    â•‘   c=1        â•‘   c=8        â•‘   c=32        â•‘");
         Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
         Console.WriteLine($"â•‘ Lattice  (embeds/sec)     â•‘{latticePar[0],10:F0}    â•‘{latticePar[1],10:F0}    â•‘{latticePar[2],11:F0}    â•‘");
         Console.WriteLine($"â•‘ Ollama   (embeds/sec)     â•‘{ollamaPar[0],10:F1}    â•‘{ollamaPar[1],10:F1}    â•‘{ollamaPar[2],11:F1}    â•‘");
-        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
+        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•£");
         Console.WriteLine($"â•‘ Lattice speedup           â•‘{latticePar[0]/ollamaPar[0],9:F0}Ã—    â•‘{latticePar[1]/ollamaPar[1],9:F0}Ã—    â•‘{latticePar[2]/ollamaPar[2],10:F0}Ã—    â•‘");
-        Console.WriteLine("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
+        Console.WriteLine("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•ž");
 
         Console.WriteLine();
         Console.WriteLine("Notes:");
@@ -742,7 +744,7 @@ public static class Program
             int   actuallyEmpty = 0;
             int   dims = src.Dimensions;
 
-            // Embed every vocab entry by probing via single-token encode
+            // Embed every vocab entry by probing via single-tone encode
             // Instead, embed the whole batch of samples to measure operational vectors
             string[] samples = LoadSamplesFromFile();
             var vectors = src.EmbedSparseBatch(samples.ToList());
@@ -771,33 +773,19 @@ public static class Program
             long overheadBytes = vocabSize   * 12L;
             long totalEstBytes = entryBytes + overheadBytes;
 
-            Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—");
+            Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
             Console.WriteLine("â•‘               Memory Diagnostics â€” LatticeEmbeddingSource           â•‘");
-            Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
+            Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
             Console.WriteLine($"â•‘  Dimensions (d)          : {dims,10}                                â•‘");
             Console.WriteLine($"â•‘  Sample vectors measured : {vocabSize,10}                                â•‘");
-            Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
+            Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
             Console.WriteLine($"â•‘  Avg nnz per vector      : {avgNnz,10:F1}  / {dims}                    â•‘");
             Console.WriteLine($"â•‘  Min nnz                 : {minNnz,10}                                â•‘");
             Console.WriteLine($"â•‘  Max nnz                 : {maxNnz,10}                                â•‘");
             Console.WriteLine($"â•‘  Fully dense vectors     : {fullyDense,10}  ({100.0*fullyDense/vocabSize:F1}% of sample)           â•‘");
             Console.WriteLine($"â•‘  Sparsity                : {sparsityPct,10:F1}%                              â•‘");
             Console.WriteLine($"â•‘  Value range             : [{minVal}, {maxVal}]");
-            Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
-            Console.WriteLine($"â•‘  Total SparseEntries     : {totalEntries,10:N0}  (ushort+long = 10 B each)    â•‘");
-            Console.WriteLine($"â•‘  Entry bytes             : {entryBytes/1024.0/1024.0,10:F2} MB                            â•‘");
-            Console.WriteLine($"â•‘  Vector overhead bytes   : {overheadBytes/1024.0/1024.0,10:F2} MB                            â•‘");
-            Console.WriteLine($"â•‘  Estimated total payload : {totalEstBytes/1024.0/1024.0,10:F2} MB  (entries + vector structs)  â•‘");
-            Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
-            Console.WriteLine($"â•‘  GC heap delta (managed) : {heapDelta/1024.0/1024.0,10:F2} MB                            â•‘");
-            Console.WriteLine($"â•‘  Working set delta       : {workingDelta/1024.0/1024.0,10:F2} MB  (includes unmanaged+JIT)  â•‘");
-            Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
-            // Comparison: equivalent float32 dense storage
-            long denseFloat32Bytes = (long)vocabSize * dims * 4;
-            Console.WriteLine($"â•‘  Dense float32 equiv     : {denseFloat32Bytes/1024.0/1024.0,10:F2} MB  ({vocabSize} Ã— {dims} Ã— 4 B)          â•‘");
-            Console.WriteLine($"â•‘  Compression vs dense    : {(totalEstBytes > 0 ? (double)denseFloat32Bytes/totalEstBytes : 0),10:F1}Ã—                              â•‘");
-            Console.WriteLine("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
-            Console.WriteLine();
+            Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•£");
 
             // Spot-check a few individual queries
             Console.WriteLine("Spot-check individual embeddings (nnz / dims):");
@@ -809,5 +797,105 @@ public static class Program
                 Console.WriteLine($"  {v.NonzeroCount,4}/{dims}  ({100.0*v.NonzeroCount/dims:F1}%)  \"{(text.Length > 55 ? text[..52]+"..." : text)}\"");
             }
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Integer MatMul benchmark (E4-1)
+    // -----------------------------------------------------------------------
+
+    private static void RunIntegerMatMulBench()
+    {
+        Console.WriteLine("╔══════════════════════════════════════════════════════════════════════╗");
+        Console.WriteLine("║       E4-1: Integer MatMul vs Float MatMul — Performance            ║");
+        Console.WriteLine("╚══════════════════════════════════════════════════════════════════════╝");
+        Console.WriteLine();
+
+        int[] dims   = [128, 384, 768];
+        int[] seqLens = [1, 4, 16];
+
+        // Table header
+        Console.WriteLine($"{"Shape",-28} {"Float ms",10} {"Int128 ms",10} {"Ratio",8} {"MaxRelErr",12}");
+        Console.WriteLine(new string('-', 70));
+
+        foreach (int dim in dims)
+        {
+            foreach (int seq in seqLens)
+            {
+                string shape = $"{seq}×{dim} × {dim}×{dim}";
+
+                Random rng = new(42);
+                float[] aFloat = new float[seq * dim];
+                float[] wFloat = new float[dim * dim];
+                for (int i = 0; i < aFloat.Length; i++) aFloat[i] = (float)(rng.NextDouble() * 0.1 - 0.05);
+                for (int i = 0; i < wFloat.Length; i++) wFloat[i] = (float)(rng.NextDouble() * 0.1 - 0.05);
+
+                // Quantize once (not timed)
+                ScaledTensor aInt = IntegerMatMul.QuantizeFromFloat(aFloat, 30);
+                ScaledTensor wInt = IntegerMatMul.QuantizeFromFloat(wFloat, 30);
+
+                // Warmup
+                FloatMatMulBench(aFloat, seq, dim, wFloat, dim);
+                IntegerMatMul.MatMul(aInt.Data, seq, dim, wInt.Data, dim);
+
+                // Time float path
+                int iterations = dim >= 768 ? 5 : 20;
+                var swFloat = Stopwatch.StartNew();
+                for (int iter = 0; iter < iterations; iter++)
+                    FloatMatMulBench(aFloat, seq, dim, wFloat, dim);
+                swFloat.Stop();
+                double floatMs = swFloat.Elapsed.TotalMilliseconds / iterations;
+
+                // Time integer path
+                var swInt = Stopwatch.StartNew();
+                for (int iter = 0; iter < iterations; iter++)
+                    IntegerMatMul.MatMul(aInt.Data, seq, dim, wInt.Data, dim);
+                swInt.Stop();
+                double intMs = swInt.Elapsed.TotalMilliseconds / iterations;
+
+                // Measure fidelity
+                float[] cFloat = FloatMatMulBench(aFloat, seq, dim, wFloat, dim);
+                long[]  cInt   = IntegerMatMul.MatMul(aInt.Data, seq, dim, wInt.Data, dim);
+                ScaledTensor cScaled = new(cInt, aInt.ScaleExponent + wInt.ScaleExponent);
+                float[] cDeq = IntegerMatMul.DequantizeToFloat(cScaled);
+
+                double maxRel = 0;
+                for (int i = 0; i < cFloat.Length; i++)
+                {
+                    float abs = MathF.Abs(cFloat[i]);
+                    if (abs < 1e-10f) continue;
+                    double rel = MathF.Abs(cFloat[i] - cDeq[i]) / abs;
+                    if (rel > maxRel) maxRel = rel;
+                }
+
+                double ratio = intMs / floatMs;
+                Console.WriteLine($"{shape,-28} {floatMs,10:F2} {intMs,10:F2} {ratio,7:F2}× {maxRel,12:E2}");
+            }
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("Notes:");
+        Console.WriteLine("  Float path: scalar loop with SIMD dot (Vector<float>)");
+        Console.WriteLine("  Int128 path: 4× unrolled scalar with Int128 accumulator");
+        Console.WriteLine("  Ratio < 1 = integer is faster; > 1 = integer is slower");
+        Console.WriteLine("  MaxRelErr: max relative error between float and integer results");
+        Console.WriteLine("  Target: ratio ≤ 3× (acceptable for the precision gain)");
+    }
+
+    private static float[] FloatMatMulBench(float[] a, int rowsA, int colsA, float[] w, int colsB)
+    {
+        float[] c = new float[rowsA * colsB];
+        for (int row = 0; row < rowsA; row++)
+        {
+            int aBase = row * colsA;
+            for (int col = 0; col < colsB; col++)
+            {
+                int wBase = col * colsA;
+                float sum = 0f;
+                for (int k = 0; k < colsA; k++)
+                    sum += a[aBase + k] * w[wBase + k];
+                c[row * colsB + col] = sum;
+            }
+        }
+        return c;
     }
 }

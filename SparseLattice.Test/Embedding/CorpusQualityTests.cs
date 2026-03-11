@@ -29,10 +29,10 @@ namespace SparseLattice.Test.Embedding;
 [TestClass]
 public sealed class CorpusQualityTests
 {
-    private const int    k_topK             = 10;
-    private const float  k_cosineThreshold  = 0.60f;  // LatticeEmbed vs TransformerEmbed: minimum acceptable mean cosine
-    private const double k_recallThreshold  = 0.70;   // lattice recall@10 vs brute-force
-    private const double k_separationRatio  = 1.10;   // similar-pair distance must be this much smaller than dissimilar-pair distance
+    private const int    s_topK             = 10;
+    private const float  s_cosineThreshold  = 0.60f;  // LatticeEmbed vs TransformerEmbed: minimum acceptable mean cosine
+    private const double s_recallThreshold  = 0.70;   // lattice recall@10 vs brute-force
+    private const double s_separationRatio  = 1.10;   // similar-pair distance must be this much smaller than dissimilar-pair distance
 
     // -----------------------------------------------------------------------
     // Q1: Embedding fidelity — LatticeEmbeddingSource vs TransformerEmbeddingSource
@@ -84,7 +84,7 @@ public sealed class CorpusQualityTests
         Console.WriteLine($"[Q1] {"Mean cosine",-30} {meanCosine,10:F4}");
         Console.WriteLine($"[Q1] {"Min cosine",-30} {minCosine,10:F4}");
         Console.WriteLine($"[Q1] {"Max cosine",-30} {maxCosine,10:F4}");
-        Console.WriteLine($"[Q1] {"Threshold",-30} {k_cosineThreshold,10:F4}");
+        Console.WriteLine($"[Q1] {"Threshold",-30} {s_cosineThreshold,10:F4}");
         Console.WriteLine();
         Console.WriteLine($"[Q1] Distribution:");
         for (int d = 9; d >= 0; d--)
@@ -94,10 +94,10 @@ public sealed class CorpusQualityTests
             Console.WriteLine($"[Q1]   cosine [{lo:F1},{hi:F1})  count={decileCounts[d],4}  mean={decileSums[d]/decileCounts[d]:F4}");
         }
         Console.WriteLine();
-        Console.WriteLine($"[Q1] VERDICT: mean cosine = {meanCosine:F4}  (need ≥ {k_cosineThreshold:F2})  →  {(meanCosine >= k_cosineThreshold ? "PASS ✓" : "FAIL ✗")}");
+        Console.WriteLine($"[Q1] VERDICT: mean cosine = {meanCosine:F4}  (need ≥ {s_cosineThreshold:F2})  →  {(meanCosine >= s_cosineThreshold ? "PASS ✓" : "FAIL ✗")}");
         Console.WriteLine();
 
-        if (meanCosine < k_cosineThreshold)
+        if (meanCosine < s_cosineThreshold)
         {
             // Expected: token-lookup (no transformer layers) produces vectors in a different
             // subspace than the full 12-layer forward pass. This test documents the baseline
@@ -107,14 +107,14 @@ public sealed class CorpusQualityTests
             Console.WriteLine($"[Q1]           the transformer forward pass. This is the gap Epic 4 addresses.");
             Console.WriteLine($"[Q1]           Cosine = {meanCosine:F4} is the number IntegerTransformerSource must beat.");
             Assert.Inconclusive(
-                $"Baseline measurement: mean cosine = {meanCosine:F4} (below {k_cosineThreshold} threshold). " +
+                $"Baseline measurement: mean cosine = {meanCosine:F4} (below {s_cosineThreshold} threshold). " +
                 "This is expected for token-lookup vs full transformer. Epic 4 IntegerTransformerSource will close this gap.");
         }
         else
         {
             // If we ever get here, the lattice path has achieved transformer-level fidelity.
             // This is the Epic 4 success criterion.
-            Assert.IsTrue(meanCosine >= k_cosineThreshold,
+            Assert.IsTrue(meanCosine >= s_cosineThreshold,
                 $"Mean cosine between LatticeEmbeddingSource and TransformerEmbeddingSource is {meanCosine:F4}.");
         }
     }
@@ -223,13 +223,13 @@ public sealed class CorpusQualityTests
 
         Console.WriteLine($"[Q3] Mean similar dist²    : {meanSim:E3}");
         Console.WriteLine($"[Q3] Mean dissimilar dist² : {meanDisSim:E3}");
-        Console.WriteLine($"[Q3] Separation ratio      : {ratio:F2}×  (dissim/sim, need ≥ {k_separationRatio:F2})");
+        Console.WriteLine($"[Q3] Separation ratio      : {ratio:F2}×  (dissim/sim, need ≥ {s_separationRatio:F2})");
         Console.WriteLine($"[Q3] Pair wins             : {wins}/{similarPairs.Length}");
-        Console.WriteLine($"[Q3] VERDICT: ratio={ratio:F2}  →  {(ratio >= k_separationRatio ? "PASS ✓" : "FAIL ✗")}");
+        Console.WriteLine($"[Q3] VERDICT: ratio={ratio:F2}  →  {(ratio >= s_separationRatio ? "PASS ✓" : "FAIL ✗")}");
 
-        Assert.IsTrue(ratio >= k_separationRatio,
+        Assert.IsTrue(ratio >= s_separationRatio,
             $"Dissimilar pairs (ratio={ratio:F2}) are not sufficiently further apart than similar pairs. " +
-            $"Threshold: {k_separationRatio:F2}×. The embeddings may not encode semantic meaning.");
+            $"Threshold: {s_separationRatio:F2}×. The embeddings may not encode semantic meaning.");
     }
 
     // -----------------------------------------------------------------------
@@ -243,7 +243,7 @@ public sealed class CorpusQualityTests
 
         using LatticeEmbeddingSource src = LatticeEmbeddingSource.Load(gguf);
 
-        var occupants = new SparseOccupant<string>[n];
+        SparseOccupant<string>[] occupants = new SparseOccupant<string>[n];
         for (int i = 0; i < n; i++)
             occupants[i] = new SparseOccupant<string>(src.EmbedSparse(allLines[i]), allLines[i][..SystemMath.Min(30, allLines[i].Length)]);
 
@@ -257,7 +257,7 @@ public sealed class CorpusQualityTests
         int step       = n / queryCount;
 
         int    truePositives = 0;
-        int    totalExpected = queryCount * k_topK;
+        int    totalExpected = queryCount * s_topK;
         double minRecall = 1.0, maxRecall = 0.0;
 
         // Per-bucket recall distribution
@@ -268,10 +268,10 @@ public sealed class CorpusQualityTests
             int idx = (qi * step) % n;
             SparseVector query = occupants[idx].Position;
 
-            var latticeResults = lattice.QueryKNearestL2(query, k_topK);
-            var bruteResults   = RecallEvaluator.BruteForceKNearestL2(query, occupants, k_topK);
+            List<SparseOccupant<string>> latticeResults = lattice.QueryKNearestL2(query, s_topK);
+            List<SparseOccupant<string>> bruteResults   = RecallEvaluator.BruteForceKNearestL2(query, occupants, s_topK);
 
-            RecallResult r = RecallEvaluator.EvaluateQuery(bruteResults, latticeResults, k_topK);
+            RecallResult r = RecallEvaluator.EvaluateQuery(bruteResults, latticeResults, s_topK);
             truePositives += r.TruePositives;
             if (r.RecallAtK < minRecall) minRecall = r.RecallAtK;
             if (r.RecallAtK > maxRecall) maxRecall = r.RecallAtK;
@@ -280,7 +280,7 @@ public sealed class CorpusQualityTests
 
         double meanRecall = (double)truePositives / totalExpected;
 
-        Console.WriteLine($"[Q2] Recall@{k_topK} — {label}");
+        Console.WriteLine($"[Q2] Recall@{s_topK} — {label}");
         Console.WriteLine($"[Q2] Corpus: {n}  Queries: {queryCount}  SparsityBudget: {src.Dimensions/4}/{src.Dimensions}  LeafThreshold: {SystemMath.Max(8, n/32)}");
         Console.WriteLine();
         Console.WriteLine($"[Q2] {"Metric",-30} {"Value",10}");
@@ -288,7 +288,7 @@ public sealed class CorpusQualityTests
         Console.WriteLine($"[Q2] {"Mean recall@10",-30} {meanRecall,10:F4}");
         Console.WriteLine($"[Q2] {"Min recall@10",-30} {minRecall,10:F4}");
         Console.WriteLine($"[Q2] {"Max recall@10",-30} {maxRecall,10:F4}");
-        Console.WriteLine($"[Q2] {"Threshold",-30} {k_recallThreshold,10:F2}");
+        Console.WriteLine($"[Q2] {"Threshold",-30} {s_recallThreshold,10:F2}");
         Console.WriteLine();
         Console.WriteLine($"[Q2] Recall distribution ({queryCount} queries):");
         for (int b = 10; b >= 0; b--)
@@ -299,10 +299,10 @@ public sealed class CorpusQualityTests
             Console.WriteLine($"[Q2]   recall {(b == 10 ? "1.0  " : $"[{lo:F1},{lo+0.1f:F1})")}  {recallBuckets[b],4}  {bar}");
         }
         Console.WriteLine();
-        Console.WriteLine($"[Q2] VERDICT: recall@10 = {meanRecall:F4}  (need ≥ {k_recallThreshold:F2})  →  {(meanRecall >= k_recallThreshold ? "PASS ✓" : "FAIL ✗")}");
+        Console.WriteLine($"[Q2] VERDICT: recall@10 = {meanRecall:F4}  (need ≥ {s_recallThreshold:F2})  →  {(meanRecall >= s_recallThreshold ? "PASS ✓" : "FAIL ✗")}");
 
-        Assert.IsTrue(meanRecall >= k_recallThreshold,
-            $"Lattice recall@{k_topK} at {label} = {meanRecall:F4}, below threshold {k_recallThreshold}. " +
+        Assert.IsTrue(meanRecall >= s_recallThreshold,
+            $"Lattice recall@{s_topK} at {label} = {meanRecall:F4}, below threshold {s_recallThreshold}. " +
             "The KNN tree is failing to find ground-truth neighbours at this corpus size.");
     }
 
@@ -349,8 +349,8 @@ public sealed class CorpusQualityTests
         string? root = FindSolutionRoot();
         if (root is null) return FallbackSnippets();
 
-        var lines = new List<string>(maxLines + 50);
-        var seen  = new HashSet<string>(StringComparer.Ordinal);
+        List<string> lines = new(maxLines + 50);
+        HashSet<string> seen  = new(StringComparer.Ordinal);
 
         string[] roots =
         [
