@@ -229,40 +229,47 @@ public sealed class IntegerAttentionTests
     }
 
     [TestMethod]
-    public void Unit_IntegerFFN_SmallMatrix_DoesNotCrash()
+    public void Unit_GroupedQueryAttention_SmallMatrix_DoesNotCrash()
     {
-        int seqLen = 2;
-        int embd = 8;
-        int nFf = 16;
+        int seqLen = 3;
+        int qEmbd = 8;
+        int nHeads = 4;
+        int nKvHeads = 2;
+        int headDim = qEmbd / nHeads;
+        int kvDim = nKvHeads * headDim;
         int scaleBits = 20;
 
         Random rng = new(42);
-        long[] x = RandomLongs(rng, seqLen * embd, scaleBits);
-        long[] wGate = RandomLongs(rng, embd * nFf, scaleBits);
-        long[] wUp = RandomLongs(rng, embd * nFf, scaleBits);
-        long[] wDown = RandomLongs(rng, nFf * embd, scaleBits);
+        long[] q = RandomLongs(rng, seqLen * qEmbd, scaleBits);
+        long[] k = RandomLongs(rng, seqLen * kvDim, scaleBits);
+        long[] v = RandomLongs(rng, seqLen * kvDim, scaleBits);
 
-        long[] result = IntegerFFN.Apply(x, seqLen, embd, wGate, wUp, wDown, nFf, scaleBits);
+        long[] output = IntegerAttention.GroupedQueryAttention(
+            q, k, v, seqLen, qEmbd, kvDim, nHeads, nKvHeads, -scaleBits);
 
-        Assert.AreEqual(seqLen * embd, result.Length);
+        Assert.AreEqual(seqLen * qEmbd, output.Length);
+        Assert.IsTrue(output.Any(val => val != 0));
     }
 
     [TestMethod]
-    public void Unit_IntegerFFN_Deterministic()
+    public void Unit_GroupedQueryAttention_Deterministic()
     {
-        int seqLen = 2;
-        int embd = 8;
-        int nFf = 16;
+        int seqLen = 3;
+        int qEmbd = 8;
+        int nHeads = 4;
+        int nKvHeads = 2;
+        int kvDim = nKvHeads * (qEmbd / nHeads);
         int scaleBits = 20;
 
         Random rng = new(42);
-        long[] x = RandomLongs(rng, seqLen * embd, scaleBits);
-        long[] wGate = RandomLongs(rng, embd * nFf, scaleBits);
-        long[] wUp = RandomLongs(rng, embd * nFf, scaleBits);
-        long[] wDown = RandomLongs(rng, nFf * embd, scaleBits);
+        long[] q = RandomLongs(rng, seqLen * qEmbd, scaleBits);
+        long[] k = RandomLongs(rng, seqLen * kvDim, scaleBits);
+        long[] v = RandomLongs(rng, seqLen * kvDim, scaleBits);
 
-        long[] ref1 = IntegerFFN.Apply(x, seqLen, embd, wGate, wUp, wDown, nFf, scaleBits);
-        long[] ref2 = IntegerFFN.Apply(x, seqLen, embd, wGate, wUp, wDown, nFf, scaleBits);
+        long[] ref1 = IntegerAttention.GroupedQueryAttention(
+            q, k, v, seqLen, qEmbd, kvDim, nHeads, nKvHeads, -scaleBits);
+        long[] ref2 = IntegerAttention.GroupedQueryAttention(
+            q, k, v, seqLen, qEmbd, kvDim, nHeads, nKvHeads, -scaleBits);
 
         CollectionAssert.AreEqual(ref1, ref2);
     }

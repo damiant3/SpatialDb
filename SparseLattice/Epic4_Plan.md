@@ -11,6 +11,96 @@ This document covers all work from Epic 4 onward.
 
 ---
 
+## Checkpoint: E4-6 — Gemma3 Integer Encoder: GATE PASSED
+
+**Date:** Post-E4-5 cleanup
+**Tests:** 335 passing, 0 failing, 1 skipped — 336 total
+
+### What was built
+
+The integer math stack generalized from nomic-bert (BERT encoder) to Gemma3 (a
+completely different transformer architecture). This required:
+
+1. **RMS LayerNorm** — no mean subtraction, no bias. `x * weight / rms(x)` in Int128.
+2. **Grouped-Query Attention (GQA)** — 3 query heads sharing 1 KV head (head_count_kv=1).
+   K/V projections are [768→256] not [768→768].
+3. **Separate Q/K/V projections** — not fused QKV.
+4. **Per-head Q/K norms** — RMS norm applied independently to each head after projection.
+5. **Pre-norm architecture** — norm before attention/FFN, with post-norm after each.
+6. **BF16 dequantization fix** — corrected GgufReader to handle raw bfloat16 (not blocked).
+7. **BPE tokenizer** (vs WordPiece for BERT).
+
+### Architecture comparison
+
+| Feature | nomic-bert (E4-5) | embeddinggemma (E4-6) |
+|---|---|---|
+| Architecture | BERT | Gemma3 |
+| LayerNorm | Standard (mean + variance + bias) | RMS (no mean, no bias) |
+| Attention | MHA (12 heads, fused QKV) | GQA (3 Q heads, 1 KV head, separate Q/K/V) |
+| Q/K norms | None | Per-head RMS norm |
+| Norm placement | Post-norm | Pre-norm + post-norm |
+| Layers | 12 | 24 |
+| FFN | SiLU-gated | SiLU-gated (same) |
+| Tokenizer | WordPiece | BPE |
+| Weights | F32 | BF16 |
+| Vocab size | 30,522 | 262,144 |
+
+### Results
+
+| Criterion | Target | Actual | Status |
+|---|---|---|---|
+| Loads and embeds | No crash | ✅ | ✅ |
+| L2 norm | ≈ 1.0 | **1.000000** | ✅ |
+| Determinism | bit-identical | **verified** | ✅ |
+| Semantic coherence | separation > 0.05 | **0.059** | ✅ |
+| Existing tests pass | 328+ | **335** | ✅ |
+
+Semantic coherence (similar vs dissimilar pair cosines):
+- Similar pairs avg: **0.880** (code↔code, cat↔kitten, error↔error)
+- Dissimilar pairs avg: **0.822**
+- Separation: **0.059**
+
+### Bugs found and fixed
+
+| Bug | Impact | Fix |
+|---|---|---|
+| `DequantizeBF16` treated BF16 as blocked (scale + 32 values) | All BF16 tensors would produce garbage | Rewrote to raw 2-byte-per-element: `bits << 16` |
+| `ComputeByteCount` for BF16 fell through to `elements * 4` | Tensor offsets would be wrong for any model after BF16 tensors | Added `BF16 => elements * 2` |
+
+### Delivered
+
+| Item | File | Status |
+|---|---|---|
+| `IntegerGemmaSource` (main) | `SparseLattice/Gguf/IntegerGemmaSource.cs` | ✅ |
+| Loading + weight quantization | `SparseLattice/Gguf/IntegerGemmaSource.Loading.cs` | ✅ |
+| Forward pass internals | `SparseLattice/Gguf/IntegerGemmaSource.Forward.cs` | ✅ |
+| RMS LayerNorm | `SparseLattice/Math/IntegerLayerNorm.cs` | ✅ |
+| GQA attention | `SparseLattice/Math/IntegerAttention.cs` | ✅ |
+| IntegerFFN (extracted to own file) | `SparseLattice/Math/IntegerFFN.cs` | ✅ |
+| BF16 dequant fix | `SparseLattice/Gguf/GgufReader.cs` | ✅ |
+| 3 RMS norm tests | `SparseLattice.Test/Math/IntegerLayerNormTests.cs` | ✅ |
+| 2 GQA tests | `SparseLattice.Test/Math/IntegerAttentionTests.cs` | ✅ |
+| 3 Gemma integration tests | `SparseLattice.Test/Gguf/IntegerGemmaSourceTests.cs` | ✅ |
+| 1 BF16 dequant test | `SparseLattice.Test/Gguf/GgufProbeTests.cs` | ✅ |
+
+### What this means
+
+The integer math stack is **architecture-agnostic**. It handles:
+- Standard LayerNorm and RMS LayerNorm
+- Multi-head attention and grouped-query attention
+- Fused QKV and separate Q/K/V
+- Pre-norm and post-norm placement
+- Per-head Q/K normalization
+- WordPiece and BPE tokenization
+- F32 and BF16 weight formats
+
+Two completely different architectures (BERT, Gemma3) produce correct deterministic
+embeddings through the same integer math kernel stack.
+
+### Next: E4-7 (Lattice-Accelerated Generation) or quality benchmarking
+
+---
+
 ## Checkpoint: E4-5 — Integer Transformer Block: GATE PASSED
 
 **Date:** Post-E4-4

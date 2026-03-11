@@ -267,6 +267,93 @@ public sealed class IntegerLayerNormTests
                 $"x[{d}]={x[d]} should be a valid long.");
     }
 
+    [TestMethod]
+    public void Unit_RmsNorm_UniformInput_ScalesByWeight()
+    {
+        long scale = 1L << 20;
+        long[] x = [5 * scale, 5 * scale, 5 * scale, 5 * scale];
+        long[] weight = [scale, scale, scale, scale];
+
+        IntegerLayerNorm.RmsNormRow(x, 0, 4, weight, -20);
+
+        // rms of [5,5,5,5] = 5. Output = x/rms * weight = 5/5 * 1 = 1 in real terms
+        for (int d = 0; d < 4; d++)
+            Assert.IsTrue(System.Math.Abs(x[d] - scale) < scale / 100,
+                $"x[{d}]={x[d]}, expected ≈{scale}");
+    }
+
+    [TestMethod]
+    public void Unit_RmsNorm_Deterministic_100Runs()
+    {
+        const int embd = 128;
+        Random rng = new(42);
+        float[] xFloat = RandomFloats(rng, embd, -0.1f, 0.1f);
+        float[] wFloat = RandomFloats(rng, embd, 0.9f, 1.1f);
+
+        ScaledTensor wInt = IntegerMatMul.QuantizeFromFloat(wFloat, 30);
+
+        ScaledTensor xRef = IntegerMatMul.QuantizeFromFloat(xFloat, 30);
+        IntegerLayerNorm.RmsNormRow(xRef.Data, 0, embd, wInt.Data, xRef.ScaleExponent);
+
+        for (int run = 0; run < 100; run++)
+        {
+            ScaledTensor xTest = IntegerMatMul.QuantizeFromFloat(xFloat, 30);
+            IntegerLayerNorm.RmsNormRow(xTest.Data, 0, embd, wInt.Data, xTest.ScaleExponent);
+
+            for (int d = 0; d < embd; d++)
+                Assert.AreEqual(xRef.Data[d], xTest.Data[d],
+                    $"Run {run}, dim {d}: not bit-identical.");
+        }
+    }
+
+    [TestMethod]
+    public void Integration_RmsNorm_768Dim_MatchesFloat()
+    {
+        const int embd = 768;
+        const int scaleBits = 30;
+        Random rng = new(42);
+
+        float[] xFloat = RandomFloats(rng, embd, -0.1f, 0.1f);
+        float[] wFloat = RandomFloats(rng, embd, 0.9f, 1.1f);
+
+        float[] xFloatRef = (float[])xFloat.Clone();
+        FloatRmsNorm(xFloatRef, embd, wFloat);
+
+        ScaledTensor xInt = IntegerMatMul.QuantizeFromFloat(xFloat, scaleBits);
+        ScaledTensor wInt = IntegerMatMul.QuantizeFromFloat(wFloat, scaleBits);
+
+        IntegerLayerNorm.RmsNormRow(xInt.Data, 0, embd, wInt.Data, xInt.ScaleExponent);
+
+        float[] xIntDeq = IntegerMatMul.DequantizeToFloat(xInt);
+
+        double maxRelError = 0;
+        int count = 0;
+        for (int d = 0; d < embd; d++)
+        {
+            double abs = System.Math.Abs(xFloatRef[d]);
+            if (abs < 1e-6) continue;
+            double rel = System.Math.Abs(xFloatRef[d] - xIntDeq[d]) / abs;
+            if (rel > maxRelError) maxRelError = rel;
+            count++;
+        }
+
+        Console.WriteLine($"[E4-6] 768-dim RmsNorm max relative error: {maxRelError:E4} ({count} elements)");
+
+        Assert.IsTrue(maxRelError < 0.05,
+            $"RmsNorm max relative error {maxRelError:E4} exceeds 5%.");
+    }
+
+    private static void FloatRmsNorm(float[] x, int embd, float[] weight)
+    {
+        const float eps = 1e-6f;
+        float sumSq = 0f;
+        for (int d = 0; d < embd; d++)
+            sumSq += x[d] * x[d];
+        float rms = MathF.Sqrt(sumSq / embd + eps);
+        for (int d = 0; d < embd; d++)
+            x[d] = x[d] / rms * weight[d];
+    }
+
     private static void FloatLayerNorm(float[] x, int embd, float[] weight, float[] bias)
         => FloatLayerNormRow(x, 0, embd, weight, bias);
 

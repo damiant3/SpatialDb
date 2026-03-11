@@ -109,17 +109,17 @@ public sealed class GgufTensorInfo
 
     private static long ComputeByteCount(GgufDType dtype, long elements)
     {
-        // All quantized formats use 32-element blocks.
         return dtype switch
         {
             GgufDType.F32  => elements * 4,
             GgufDType.F16  => elements * 2,
-            GgufDType.Q8_0 => (elements / 32) * (2 + 32),       // 1×f16 scale + 32×i8
-            GgufDType.Q4_0 => (elements / 32) * (2 + 16),       // 1×f16 scale + 16 bytes (32 nibbles)
-            GgufDType.Q4_1 => (elements / 32) * (2 + 2 + 16),   // 2×f16 + 16 bytes
-            GgufDType.Q5_0 => (elements / 32) * (2 + 4 + 16),   // 1×f16 + 4-byte mask + 16 bytes
+            GgufDType.BF16 => elements * 2,
+            GgufDType.Q8_0 => (elements / 32) * (2 + 32),
+            GgufDType.Q4_0 => (elements / 32) * (2 + 16),
+            GgufDType.Q4_1 => (elements / 32) * (2 + 2 + 16),
+            GgufDType.Q5_0 => (elements / 32) * (2 + 4 + 16),
             GgufDType.Q5_1 => (elements / 32) * (2 + 2 + 4 + 16),
-            _              => elements * 4,  // fallback: treat as F32
+            _              => elements * 4,
         };
     }
 }
@@ -449,29 +449,18 @@ public sealed class GgufReader : IDisposable
         }
     }
 
-    // BF16: blocks of 32 elements. Layout per block: [f16 scale | 32 × bf16]
+    // BF16: bfloat16, 2 bytes per element. Upper 16 bits of IEEE float32
+    // (sign + 8-bit exponent + 7-bit mantissa). Shift left 16 to reconstruct float32.
     private static void DequantizeBF16(Stream s, float[] dest)
     {
-        const int BlockElements = 32;
-        const int BlockBytes    = 2 + BlockElements * 2;   // 2-byte f16 scale + 32 bf16
-
-        int blocks  = dest.Length / BlockElements;
-        byte[] buf  = new byte[blocks * BlockBytes];
+        byte[] buf = new byte[dest.Length * 2];
         ReadExact(s, buf);
 
-        int outIdx = 0;
-        int inIdx  = 0;
-        for (int b = 0; b < blocks; b++)
+        for (int i = 0; i < dest.Length; i++)
         {
-            float scale = HalfToFloat(BinaryPrimitives.ReadUInt16LittleEndian(buf.AsSpan(inIdx, 2)));
-            inIdx += 2;
-            for (int j = 0; j < BlockElements; j++)
-            {
-                ushort hf = BinaryPrimitives.ReadUInt16LittleEndian(buf.AsSpan(inIdx, 2));
-                float  v  = HalfToFloat(hf);
-                dest[outIdx++] = scale * v;
-                inIdx += 2;
-            }
+            ushort raw = BinaryPrimitives.ReadUInt16LittleEndian(buf.AsSpan(i * 2, 2));
+            int bits = raw << 16;
+            dest[i] = BitConverter.Int32BitsToSingle(bits);
         }
     }
 

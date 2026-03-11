@@ -61,6 +61,42 @@ public static class IntegerLayerNorm
     }
 
     /// <summary>
+    /// RMS LayerNorm in-place: <c>x[d] = x[d] * weight[d] / rms(x)</c>.
+    /// No mean subtraction, no bias. Used by Gemma/LLaMA architectures.
+    /// </summary>
+    public static void RmsNormInPlace(long[] x, int seqLen, int embd,
+        long[] weight, int scaleExponent)
+    {
+        for (int t = 0; t < seqLen; t++)
+            RmsNormRow(x, t * embd, embd, weight, scaleExponent);
+    }
+
+    /// <summary>RMS-normalizes a single row in-place.</summary>
+    public static void RmsNormRow(long[] x, int rowBase, int embd,
+        long[] weight, int scaleExponent)
+    {
+        Int128 sumSq = 0;
+        for (int d = 0; d < embd; d++)
+            sumSq += (Int128)x[rowBase + d] * x[rowBase + d];
+
+        Int128 meanSq = sumSq / embd;
+
+        if (meanSq <= 0)
+            return;
+
+        long rms = ISqrt128(meanSq);
+        if (rms == 0) rms = 1;
+
+        // x[d] at scale S, weight at scale S, rms at scale S
+        // → (x * weight) / rms at scale S
+        for (int d = 0; d < embd; d++)
+        {
+            Int128 product = (Int128)x[rowBase + d] * weight[d];
+            x[rowBase + d] = (long)(product / rms);
+        }
+    }
+
+    /// <summary>
     /// Floor integer square root for Int128 via Newton's method.
     /// Result satisfies <c>result² ≤ value &lt; (result+1)²</c>.
     /// </summary>
