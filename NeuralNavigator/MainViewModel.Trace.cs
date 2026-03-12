@@ -197,7 +197,7 @@ sealed partial class MainViewModel
             }
             colors.Add(TraceGradientColor(bestT));
         }
-        mesh.Colors = new Color4Collection(colors);
+        mesh.Colors = [.. colors];
 
         m_traceModel = new MeshGeometryModel3D
         {
