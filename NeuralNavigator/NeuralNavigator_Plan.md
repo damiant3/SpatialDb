@@ -9,11 +9,10 @@ SpatialGame, proven working in this solution).
 
 ---
 
-## Current State (v0.1 — Scaffolding)
+## Current State (v0.2 — Fly + Hover)
 
-The project builds and runs. It has:
-- WPF window with HelixToolkit 3D viewport
-- Dark theme UI with side panel for controls
+The project builds and runs. Implemented:
+- WPF window with HelixToolkit 3D viewport (dark theme, side panel)
 - Load GGUF model (file dialog, reads token_embd.weight)
 - Project embeddings to 3D (top-3 variance dimensions)
 - Render token embedding point cloud (colored spheres)
@@ -21,15 +20,28 @@ The project builds and runs. It has:
 - Show K nearest neighbors in the full embedding space
 - Highlight selected token and neighbors
 - Color modes: by token ID (golden angle hue), magnitude, first-char cluster
+- **Phase 1: WASD fly-through camera** (FlyCamera.cs)
+  - WASD movement in camera's local horizontal frame
+  - Right-click drag for mouse look (yaw/pitch)
+  - Scroll wheel adjusts move speed (0.1–50x range)
+  - Space=up, Ctrl=down (world-space vertical)
+  - Smooth per-frame updates via CompositionTarget.Rendering
+  - Click viewport to focus for keyboard input
+- **Phase 2: Hover QuickInfo + Double-click select**
+  - Mouse hover ray-casts into 3D point cloud (TokenSpatialIndex)
+  - Floating tooltip shows token text and ID on hover
+  - Double-click a token to select it (shows neighbors, highlights)
 
 ---
 
 ## Phased Roadmap
 
-### Phase 1: Make It Navigable (Video Game Controls)
+### Phase 1: Make It Navigable (Video Game Controls) ✅
 
-The viewport currently uses HelixToolkit's built-in trackball rotation.
-That's fine for orbiting, but the user wants **WASD fly-through** like a game.
+Implemented in `FlyCamera.cs`. WASD + mouse look + scroll speed + Space/Ctrl vertical.
+Per-frame updates via `CompositionTarget.Rendering`. Right-click-drag for look, left-click
+to focus viewport for keyboard. All built-in Viewport3DX camera manipulation left at
+defaults (FlyCamera captures its own events via Preview handlers).
 
 **Requirements:**
 - WASD keys move the camera forward/back/strafe in the camera's local frame
@@ -45,7 +57,12 @@ That's fine for orbiting, but the user wants **WASD fly-through** like a game.
 - Accumulate velocity from held keys, apply to camera position each frame
 - Mouse delta → yaw/pitch rotation of camera look direction
 
-### Phase 2: Hover QuickInfo
+### Phase 2: Hover QuickInfo ✅
+
+Implemented via `TokenSpatialIndex.cs` ray-cast and `FlyCamera.HoverMove`/`DoubleClick`
+events. Manual perspective ray construction from screen coords → camera FOV → 3D ray.
+Brute-force nearest-point-to-ray over visible tokens (O(n), n ≤ 50K). Tooltip bound to
+`HasHoverText`. Double-click selects token and shows neighbors.
 
 When the mouse hovers over a token sphere in the viewport:
 - Show a floating tooltip with the token text, ID, magnitude
@@ -63,7 +80,12 @@ needs to map back from triangle index → token index. Options:
 distance to ray. Works with any number of visible tokens and doesn't require per-token
 scene objects.
 
-### Phase 3: Context Menu and Cross-Dimension Navigation
+### Phase 3: Context Menu and Cross-Dimension Navigation ✅
+
+Implemented via `FlyCamera.RightClick` event (fires on right-button-up when no drag
+occurred) and programmatic WPF `ContextMenu` in `MainViewModel.ShowContextMenu()。
+Four context menu actions: See Neighbors, Show in Other Dimensions (cycles projection),
+Find Cluster (adaptive radius search), Compare To (two-token analogy with vector line).
 
 Right-click a token → context menu:
 - "See neighbors" — already built, just expose it here

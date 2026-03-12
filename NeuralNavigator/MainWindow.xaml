@@ -10,6 +10,11 @@
         Width="1440" Height="900"
         WindowState="Maximized"
         Background="#1e1e1e">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </Window.Resources>
+
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="300" />
@@ -100,7 +105,10 @@
                     <TextBlock Text="Navigation" Foreground="#569cd6" FontWeight="Bold"
                                Margin="0,16,0,4" />
                     <TextBlock Foreground="#6a9955" TextWrapping="Wrap" FontSize="11"
-                               Text="WASD: Fly  |  Mouse: Look&#x0a;Scroll: Speed  |  Space: Up  |  Ctrl: Down&#x0a;Double-click: Select token" />
+                               Text="WASD: Fly  |  Mouse: Look&#x0a;Scroll: Speed  |  Space: Up  |  Ctrl: Down&#x0a;Double-click: Select  |  Home: Reset view" />
+
+                    <Button Content="Reset View (Home)" Command="{Binding ResetViewCommand}"
+                            Margin="0,8,0,0" Padding="8,4" />
                 </StackPanel>
             </ScrollViewer>
         </Border>
@@ -116,15 +124,16 @@
             EnableSwapChainRendering="True"
             EffectsManager="{Binding EffectsManager}"
             Camera="{Binding Camera}"
-            CameraRotationMode="Trackball"
-            EnableRotation="False"
-            EnablePan="False"
-            EnableZoom="False"
-            EnableChangeFieldOfView="False"
             ShowCameraInfo="True"
             IsShadowMappingEnabled="False"
             Focusable="True"
-            FXAALevel="Low">
+            FXAALevel="Low"
+            IsRotationEnabled="False"
+            IsPanEnabled="False"
+            IsZoomEnabled="False"
+            IsMoveEnabled="False"
+            IsChangeFieldOfViewEnabled="False"
+            IsInertiaEnabled="False">
             <ht:AmbientLight3D Color="#404040" />
             <ht:DirectionalLight3D Color="White" Direction="0,-1,-1" />
             <ht:DirectionalLight3D Color="#606060" Direction="0,1,1" />
@@ -139,12 +148,9 @@
                 HorizontalAlignment="Left"
                 VerticalAlignment="Top"
                 Margin="20,20,0,0"
-                Visibility="Collapsed">
+                IsHitTestVisible="False"
+                Visibility="{Binding HasHoverText, Converter={StaticResource BoolToVis}}">
             <TextBlock Text="{Binding HoverText}" Foreground="#d4d4d4" FontSize="14" />
         </Border>
     </Grid>
-
-    <Window.Resources>
-        <BooleanToVisibilityConverter x:Key="BoolToVis" />
-    </Window.Resources>
 </Window>

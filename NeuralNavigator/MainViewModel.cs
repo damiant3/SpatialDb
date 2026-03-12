@@ -35,6 +35,9 @@ sealed class MainViewModel : ViewModelBase, IDisposable
     Vector3[]? m_projected;
     MeshGeometryModel3D? m_pointCloudModel;
     MeshGeometryModel3D? m_highlightModel;
+    MeshGeometryModel3D? m_vectorLineModel;
+    int m_selectedTokenIdx = -1;
+    int m_compareTokenIdx = -1;
 
     string m_statusText = "No model loaded. Click 'Load Model...' to begin.";
     string m_searchText = "";
@@ -54,7 +57,12 @@ sealed class MainViewModel : ViewModelBase, IDisposable
     public string SearchText { get => m_searchText; set => SetField(ref m_searchText, value); }
     public string SelectedTokenText { get => m_selectedTokenText; set => SetField(ref m_selectedTokenText, value); }
     public string SelectedTokenId { get => m_selectedTokenId; set => SetField(ref m_selectedTokenId, value); }
-    public string HoverText { get => m_hoverText; set => SetField(ref m_hoverText, value); }
+    public string HoverText
+    {
+        get => m_hoverText;
+        set { SetField(ref m_hoverText, value); OnPropertyChanged(nameof(HasHoverText)); }
+    }
+    public bool HasHoverText => m_hoverText.Length > 0;
     public bool HasSelection { get => m_hasSelection; set => SetField(ref m_hasSelection, value); }
     public double PointSize { get => m_pointSize; set { if (SetField(ref m_pointSize, value)) RebuildPointCloud(); } }
     public double VisibleTokenCount { get => m_visibleTokenCount; set { if (SetField(ref m_visibleTokenCount, value)) RebuildPointCloud(); } }
@@ -84,6 +92,11 @@ sealed class MainViewModel : ViewModelBase, IDisposable
 
     public ICommand LoadModelCommand { get; }
     public ICommand SearchCommand { get; }
+    public ICommand ResetViewCommand { get; }
+    public ICommand ContextSeeNeighborsCommand { get; }
+    public ICommand ContextShowDimsCommand { get; }
+    public ICommand ContextFindClusterCommand { get; }
+    public ICommand ContextCompareToCommand { get; }
 
     public MainViewModel(Viewport3DX viewport)
     {
@@ -101,9 +114,18 @@ sealed class MainViewModel : ViewModelBase, IDisposable
         };
         Camera = camera;
         m_flyCamera = new FlyCamera(viewport, camera);
+        m_flyCamera.HoverMove += OnHoverMove;
+        m_flyCamera.DoubleClick += OnDoubleClick;
+        m_flyCamera.RightClick += OnRightClick;
+        m_flyCamera.ResetView += ResetView;
 
         LoadModelCommand = new RelayCommand(_ => LoadModel());
         SearchCommand = new RelayCommand(_ => SearchToken(), _ => m_tokenLabels is not null);
+        ResetViewCommand = new RelayCommand(_ => ResetView());
+        ContextSeeNeighborsCommand = new RelayCommand(_ => ContextSeeNeighbors(), _ => m_selectedTokenIdx >= 0);
+        ContextShowDimsCommand = new RelayCommand(_ => ContextShowInOtherDims(), _ => m_selectedTokenIdx >= 0);
+        ContextFindClusterCommand = new RelayCommand(_ => ContextFindCluster(), _ => m_selectedTokenIdx >= 0);
+        ContextCompareToCommand = new RelayCommand(_ => ContextCompareTo(), _ => m_selectedTokenIdx >= 0);
     }
 
     // ------------------------------------------------------------------
@@ -433,6 +455,7 @@ sealed class MainViewModel : ViewModelBase, IDisposable
             Vector3 pos = m_projected[foundIdx];
             cam.Position = new Point3D(pos.X, pos.Y, pos.Z + 30);
             cam.LookDirection = new Vector3D(0, 0, -30);
+            m_flyCamera?.SyncFromCamera();
         }
     }
 
@@ -443,6 +466,8 @@ sealed class MainViewModel : ViewModelBase, IDisposable
         SelectedTokenText = $"\"{m_tokenLabels[tokenIdx]}\"";
         SelectedTokenId = $"ID: {tokenIdx}";
         HasSelection = true;
+
+        m_selectedTokenIdx = tokenIdx;
 
         // Find K nearest neighbors by L2 distance in the full embedding space
         FindNeighbors(tokenIdx, 16);
@@ -519,8 +544,413 @@ sealed class MainViewModel : ViewModelBase, IDisposable
     }
 
     // ------------------------------------------------------------------
+    // Hover and double-click hit testing
+    // ------------------------------------------------------------------
+
+    void OnHoverMove(Point screenPos)
+    {
+        int idx = HitTestTokenAtScreen(screenPos);
+        if (idx < 0)
+        {
+            HoverText = "";
+            return;
+        }
+        string label = m_tokenLabels![idx];
+        HoverText = $"\"{label}\"  (ID {idx})";
+    }
+
+    void OnDoubleClick(Point screenPos)
+    {
+        int idx = HitTestTokenAtScreen(screenPos);
+        if (idx >= 0)
+            SelectToken(idx);
+    }
+
+    void OnRightClick(Point screenPos)
+    {
+        int idx = HitTestTokenAtScreen(screenPos);
+        if (idx >= 0)
+        {
+            SelectToken(idx);
+            ShowContextMenu(screenPos);
+        }
+    }
+
+    void ShowContextMenu(Point screenPos)
+    {
+        if (m_viewport is null) return;
+
+        var menu = new System.Windows.Controls.ContextMenu
+        {
+            Style = null,
+            Background = new System.Windows.Media.SolidColorBrush(
+                (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#252526")!),
+            Foreground = new System.Windows.Media.SolidColorBrush(
+                (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#d4d4d4")!),
+            BorderBrush = new System.Windows.Media.SolidColorBrush(
+                (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#3e3e42")!),
+        };
+
+        var seeNeighbors = new System.Windows.Controls.MenuItem { Header = "See Neighbors", Command = ContextSeeNeighborsCommand };
+        var showDims = new System.Windows.Controls.MenuItem { Header = "Show in Other Dimensions", Command = ContextShowDimsCommand };
+        var findCluster = new System.Windows.Controls.MenuItem { Header = "Find Cluster (radius)", Command = ContextFindClusterCommand };
+        var compareTo = new System.Windows.Controls.MenuItem { Header = m_compareTokenIdx >= 0 && m_compareTokenIdx != m_selectedTokenIdx
+            ? $"Compare to \"{m_tokenLabels?[m_compareTokenIdx] ?? "?"}\"..."
+            : "Mark for Compare", Command = ContextCompareToCommand };
+
+        menu.Items.Add(seeNeighbors);
+        menu.Items.Add(showDims);
+        menu.Items.Add(findCluster);
+        menu.Items.Add(new System.Windows.Controls.Separator());
+        menu.Items.Add(compareTo);
+
+        menu.PlacementTarget = m_viewport;
+        menu.IsOpen = true;
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 3: Context menu actions
+    // ------------------------------------------------------------------
+
+    void ContextSeeNeighbors()
+    {
+        if (m_selectedTokenIdx >= 0)
+            SelectToken(m_selectedTokenIdx);
+    }
+
+    void ContextShowInOtherDims()
+    {
+        if (m_embeddings is null || m_selectedTokenIdx < 0) return;
+
+        // Cycle to next projection mode
+        int current = Array.IndexOf(ProjectionModes, m_selectedProjection);
+        int next = (current + 1) % ProjectionModes.Length;
+        SelectedProjection = ProjectionModes[next];
+
+        StatusText += $"\nProjection → {SelectedProjection}";
+    }
+
+    void ContextFindCluster()
+    {
+        if (m_embeddings is null || m_tokenLabels is null || m_selectedTokenIdx < 0 || m_projected is null) return;
+
+        // Find all tokens within a radius in the full embedding space
+        // Radius = mean distance of the top-8 neighbors (adaptive)
+        float radius = ComputeAdaptiveRadius(m_selectedTokenIdx, 8);
+
+        int baseA = m_selectedTokenIdx * m_dims;
+        List<(int idx, float dist)> cluster = [];
+
+        for (int i = 0; i < m_vocabSize; i++)
+        {
+            if (i == m_selectedTokenIdx) continue;
+            int baseB = i * m_dims;
+            float sum = 0f;
+            for (int d = 0; d < m_dims; d++)
+            {
+                float diff = m_embeddings[baseA + d] - m_embeddings[baseB + d];
+                sum += diff * diff;
+            }
+            float dist = MathF.Sqrt(sum);
+            if (dist <= radius)
+                cluster.Add((i, dist));
+        }
+
+        cluster.Sort((a, b) => a.dist.CompareTo(b.dist));
+
+        Neighbors.Clear();
+        int shown = Math.Min(cluster.Count, 50);
+        for (int i = 0; i < shown; i++)
+            Neighbors.Add(new NeighborInfo(m_tokenLabels[cluster[i].idx], cluster[i].idx, cluster[i].dist));
+
+        HighlightCluster(m_selectedTokenIdx, cluster.Select(c => c.idx).Take(shown).ToList());
+
+        StatusText += $"\nCluster: {cluster.Count} tokens within radius {radius:F2}";
+    }
+
+    float ComputeAdaptiveRadius(int tokenIdx, int k)
+    {
+        if (m_embeddings is null) return 1f;
+
+        int baseA = tokenIdx * m_dims;
+        float[] dists = new float[m_vocabSize];
+        for (int i = 0; i < m_vocabSize; i++)
+        {
+            if (i == tokenIdx) { dists[i] = float.MaxValue; continue; }
+            int baseB = i * m_dims;
+            float sum = 0f;
+            for (int d = 0; d < m_dims; d++)
+            {
+                float diff = m_embeddings[baseA + d] - m_embeddings[baseB + d];
+                sum += diff * diff;
+            }
+            dists[i] = MathF.Sqrt(sum);
+        }
+
+        Array.Sort(dists);
+        float meanDist = 0f;
+        for (int i = 0; i < k && i < dists.Length; i++)
+            meanDist += dists[i];
+        return (meanDist / k) * 2f; // 2x the mean K-neighbor distance
+    }
+
+    void HighlightCluster(int centerIdx, List<int> memberIndices)
+    {
+        if (m_viewport is null || m_projected is null) return;
+
+        if (m_highlightModel is not null)
+        {
+            m_viewport.Items.Remove(m_highlightModel);
+            m_highlightModel.Dispose();
+        }
+
+        MeshBuilder builder = new();
+        float radius = (float)m_pointSize * 0.3f;
+
+        // Center token in bright yellow
+        builder.AddSphere(m_projected[centerIdx], radius, 8, 8);
+
+        // Cluster members in green
+        foreach (int idx in memberIndices)
+        {
+            if (idx < m_projected.Length)
+                builder.AddSphere(m_projected[idx], radius * 0.6f, 6, 6);
+        }
+
+        m_highlightModel = new MeshGeometryModel3D
+        {
+            Geometry = builder.ToMeshGeometry3D(),
+            Material = new PhongMaterial
+            {
+                DiffuseColor = new Color4(0.2f, 1f, 0.3f, 1f),
+                EmissiveColor = new Color4(0f, 0.3f, 0f, 0f),
+            },
+        };
+
+        m_viewport.Items.Add(m_highlightModel);
+    }
+
+    void ContextCompareTo()
+    {
+        if (m_embeddings is null || m_tokenLabels is null || m_projected is null || m_selectedTokenIdx < 0) return;
+
+        if (m_compareTokenIdx < 0 || m_compareTokenIdx == m_selectedTokenIdx)
+        {
+            // Mark current selection as the "compare from" token
+            m_compareTokenIdx = m_selectedTokenIdx;
+            StatusText += $"\nMarked \"{m_tokenLabels[m_compareTokenIdx]}\" for comparison. Right-click another token → Compare.";
+            return;
+        }
+
+        // We have two tokens: m_compareTokenIdx (A) and m_selectedTokenIdx (B)
+        int idxA = m_compareTokenIdx;
+        int idxB = m_selectedTokenIdx;
+
+        // Compute the direction vector A → B in the full embedding space
+        int baseA = idxA * m_dims;
+        int baseB = idxB * m_dims;
+        float[] direction = new float[m_dims];
+        for (int d = 0; d < m_dims; d++)
+            direction[d] = m_embeddings[baseB + d] - m_embeddings[baseA + d];
+
+        // Find tokens that lie along this direction (dot product with direction / magnitude)
+        float dirMag = 0f;
+        for (int d = 0; d < m_dims; d++)
+            dirMag += direction[d] * direction[d];
+        dirMag = MathF.Sqrt(dirMag);
+        if (dirMag < 1e-8f) return;
+
+        // Normalize direction
+        for (int d = 0; d < m_dims; d++)
+            direction[d] /= dirMag;
+
+        // For each token, compute how well it aligns with the A→B direction
+        // (project token-A vector onto direction, find tokens near the B endpoint)
+        float[] midpoint = new float[m_dims];
+        for (int d = 0; d < m_dims; d++)
+            midpoint[d] = (m_embeddings[baseA + d] + m_embeddings[baseB + d]) / 2f;
+
+        List<(int idx, float alignment, float dist)> candidates = [];
+        for (int i = 0; i < m_vocabSize; i++)
+        {
+            if (i == idxA || i == idxB) continue;
+            int bi = i * m_dims;
+
+            // Vector from A to token i
+            float dot = 0f;
+            float distSq = 0f;
+            for (int d = 0; d < m_dims; d++)
+            {
+                float diff = m_embeddings[bi + d] - m_embeddings[baseA + d];
+                dot += diff * direction[d];
+                distSq += diff * diff;
+            }
+            float dist = MathF.Sqrt(distSq);
+
+            // Cosine alignment with the direction
+            float cosine = dist > 1e-8f ? dot / dist : 0f;
+
+            // We want tokens near the B endpoint (projection close to dirMag)
+            // and well-aligned with the direction
+            if (cosine > 0.5f && MathF.Abs(dot - dirMag) < dirMag * 0.5f)
+                candidates.Add((i, cosine, MathF.Abs(dot - dirMag)));
+        }
+
+        candidates.Sort((a, b) => a.dist.CompareTo(b.dist));
+
+        Neighbors.Clear();
+        Neighbors.Add(new NeighborInfo($"[A] {m_tokenLabels[idxA]}", idxA, 0f));
+        Neighbors.Add(new NeighborInfo($"[B] {m_tokenLabels[idxB]}", idxB, dirMag));
+
+        int shown = Math.Min(candidates.Count, 20);
+        for (int i = 0; i < shown; i++)
+        {
+            var c = candidates[i];
+            Neighbors.Add(new NeighborInfo(m_tokenLabels[c.idx], c.idx, c.dist));
+        }
+
+        // Draw a line from A to B in 3D space
+        DrawVectorLine(idxA, idxB);
+
+        // Highlight both tokens and the analogous results
+        HighlightComparison(idxA, idxB, candidates.Take(shown).Select(c => c.idx).ToList());
+
+        StatusText += $"\nCompare: \"{m_tokenLabels[idxA]}\" → \"{m_tokenLabels[idxB]}\" " +
+                      $"(distance {dirMag:F2}, {candidates.Count} aligned tokens)";
+
+        // Reset compare token for next use
+        m_compareTokenIdx = -1;
+    }
+
+    void DrawVectorLine(int idxA, int idxB)
+    {
+        if (m_viewport is null || m_projected is null) return;
+
+        ClearVectorLine();
+
+        Vector3 posA = m_projected[idxA];
+        Vector3 posB = m_projected[idxB];
+        float tubeRadius = (float)m_pointSize * 0.05f;
+
+        MeshBuilder builder = new();
+        builder.AddCylinder(posA, posB, tubeRadius, 6);
+
+        // Arrowhead at B: a larger sphere to indicate direction
+        builder.AddSphere(posB, tubeRadius * 4f, 6, 6);
+
+        m_vectorLineModel = new MeshGeometryModel3D
+        {
+            Geometry = builder.ToMeshGeometry3D(),
+            Material = new PhongMaterial
+            {
+                DiffuseColor = new Color4(1f, 0.5f, 0f, 1f),
+                EmissiveColor = new Color4(0.3f, 0.1f, 0f, 0f),
+            },
+        };
+
+        m_viewport.Items.Add(m_vectorLineModel);
+    }
+
+    void ClearVectorLine()
+    {
+        if (m_vectorLineModel is not null && m_viewport is not null)
+        {
+            m_viewport.Items.Remove(m_vectorLineModel);
+            m_vectorLineModel.Dispose();
+            m_vectorLineModel = null;
+        }
+    }
+
+    void HighlightComparison(int idxA, int idxB, List<int> analogous)
+    {
+        if (m_viewport is null || m_projected is null) return;
+
+        if (m_highlightModel is not null)
+        {
+            m_viewport.Items.Remove(m_highlightModel);
+            m_highlightModel.Dispose();
+        }
+
+        MeshBuilder builder = new();
+        float radius = (float)m_pointSize * 0.3f;
+
+        // Token A in red
+        builder.AddSphere(m_projected[idxA], radius, 8, 8);
+        // Token B in blue
+        builder.AddSphere(m_projected[idxB], radius, 8, 8);
+
+        // Analogous tokens in purple
+        foreach (int idx in analogous)
+        {
+            if (idx < m_projected.Length)
+                builder.AddSphere(m_projected[idx], radius * 0.6f, 6, 6);
+        }
+
+        m_highlightModel = new MeshGeometryModel3D
+        {
+            Geometry = builder.ToMeshGeometry3D(),
+            Material = new PhongMaterial
+            {
+                DiffuseColor = new Color4(0.8f, 0.3f, 1f, 1f),
+                EmissiveColor = new Color4(0.2f, 0.05f, 0.3f, 0f),
+            },
+        };
+
+        m_viewport.Items.Add(m_highlightModel);
+    }
+
+    int HitTestTokenAtScreen(Point screenPos)
+    {
+        if (m_projected is null || m_tokenLabels is null || m_viewport is null)
+            return -1;
+        if (Camera is not PerspectiveCamera cam)
+            return -1;
+
+        Point3D camPos = cam.Position;
+        Vector3D lookDir = cam.LookDirection;
+        Vector3D upDir = cam.UpDirection;
+
+        double fovRad = cam.FieldOfView * (Math.PI / 180.0);
+        double aspect = m_viewport.ActualWidth / Math.Max(m_viewport.ActualHeight, 1);
+
+        Vector3D rightDir = Vector3D.CrossProduct(lookDir, upDir);
+        rightDir.Normalize();
+        Vector3D trueUp = Vector3D.CrossProduct(rightDir, lookDir);
+        trueUp.Normalize();
+        Vector3D fwd = lookDir;
+        fwd.Normalize();
+
+        double halfH = Math.Tan(fovRad / 2.0);
+        double halfW = halfH * aspect;
+
+        double nx = (screenPos.X / m_viewport.ActualWidth) * 2.0 - 1.0;
+        double ny = 1.0 - (screenPos.Y / m_viewport.ActualHeight) * 2.0;
+
+        Vector3D rayDir = fwd + rightDir * (nx * halfW) + trueUp * (ny * halfH);
+        rayDir.Normalize();
+
+        Vector3 origin = new((float)camPos.X, (float)camPos.Y, (float)camPos.Z);
+        Vector3 direction = new((float)rayDir.X, (float)rayDir.Y, (float)rayDir.Z);
+
+        int count = Math.Min((int)m_visibleTokenCount, m_projected.Length);
+        float hitRadius = (float)m_pointSize * 0.5f;
+        return TokenSpatialIndex.FindNearestToRay(m_projected, count, origin, direction, hitRadius);
+    }
+
+    // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
+
+    void ResetView()
+    {
+        if (Camera is PerspectiveCamera cam)
+        {
+            cam.Position = new Point3D(0, 0, 200);
+            cam.LookDirection = new Vector3D(0, 0, -200);
+            cam.UpDirection = new Vector3D(0, 1, 0);
+            m_flyCamera?.SyncFromCamera();
+        }
+    }
 
     static string? FindTestDataDir()
     {
@@ -539,6 +969,7 @@ sealed class MainViewModel : ViewModelBase, IDisposable
         m_flyCamera?.Dispose();
         m_pointCloudModel?.Dispose();
         m_highlightModel?.Dispose();
+        m_vectorLineModel?.Dispose();
         m_reader?.Dispose();
         (EffectsManager as IDisposable)?.Dispose();
     }
