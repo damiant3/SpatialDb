@@ -1,0 +1,16 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║       SparseLattice — Integer Causal Server (Ollama-compatible)      ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+Model:   gemma3
+Ollama:  D:\AI\OllamaModels
+Port:    11435
+Lattice: disabled
+
+Loading model... Loading model... 20/626 (blk.1 attn_q_norm)    Loading model... 40/626 (blk.2 ffn_down)    Loading model... 60/626 (blk.4 attn_k_norm)    Loading model... 80/626 (blk.5 post_ffw_norm (6/48))    Loading model... 100/626 (blk.7 attn_output)    Loading model... 120/626 (blk.9 attn_norm)    Loading model... 140/626 (blk.10 post_attn_norm)    Loading model... 160/626 (blk.12 attn_q)    Loading model... 180/626 (blk.13 ffn_norm)    Loading model... 200/626 (blk.15 attn_k)    Loading model... 220/626 (blk.16 ffn_gate)    Loading model... 240/626 (blk.18 attn_v)    Loading model... 260/626 (blk.19 ffn_up)    Loading model... 280/626 (blk.21 attn_q_norm)    Loading model... 300/626 (blk.22 ffn_down)    Loading model... 320/626 (blk.24 attn_k_norm)    Loading model... 340/626 (blk.25 post_ffw_norm (26/48))    Loading model... 360/626 (blk.27 attn_output)    Loading model... 380/626 (blk.29 attn_norm)    Loading model... 400/626 (blk.30 post_attn_norm)    Loading model... 420/626 (blk.32 attn_q)    Loading model... 440/626 (blk.33 ffn_norm)    Loading model... 460/626 (blk.35 attn_k)    Loading model... 480/626 (blk.36 ffn_gate)    Loading model... 500/626 (blk.38 attn_v)    Loading model... 520/626 (blk.39 ffn_up)    Loading model... 540/626 (blk.41 attn_q_norm)    Loading model... 560/626 (blk.42 ffn_down)    Loading model... 580/626 (blk.44 attn_k_norm)    Loading model... 600/626 (blk.45 post_ffw_norm (46/48))    Loading model... 620/626 (blk.47 attn_output)    Loading model... 626/626 (blk.47 post_ffw_norm (48/48))    Model loaded in 92.7s — sha256-e8ad13eff07a78d89926e9e8b882317d082ef5bf9768ad7b50fcdbbcd63748de, 3840d, 48 layers, 262145 vocab
+
+Listening on http://localhost:11435/
+Point LVSCP or curl at this endpoint. Press Ctrl+C to stop.
+
+[20:12:02] Generate: "Hi" (max=1, stream=False)
+[20:12:16]   → 2 tokens in 14.2s (0.14 tok/s)

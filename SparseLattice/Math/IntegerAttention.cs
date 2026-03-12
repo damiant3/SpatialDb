@@ -158,40 +158,65 @@ public static class IntegerAttention
         long sqrtHeadDim = IntegerLayerNorm.ISqrt64(headDim);
         if (sqrtHeadDim == 0) sqrtHeadDim = 1;
 
-        for (int h = 0; h < nHeads; h++)
+        // Parallelize across heads when there are enough to benefit.
+        // Each head writes to a non-overlapping slice of the output array.
+        if (nHeads >= 4)
         {
-            int kvHead = h / headsPerKv;
-            int qOffset = h * headDim;
-            int kvOffset = kvHead * kvHeadDim;
-
-            for (int t = 0; t < seqLen; t++)
+            Parallel.For(0, nHeads, h =>
             {
-                int qBase = t * qEmbd + qOffset;
-                for (int s = 0; s < seqLen; s++)
-                {
-                    Int128 rawDot = IntegerMatMul.DotInt128(q, qBase, k, s * kvDim + kvOffset, headDim);
-                    scores[t * seqLen + s] = (long)(rawDot >> scoreShift) / sqrtHeadDim;
-                }
-            }
-
-            for (int t = 0; t < seqLen; t++)
-                IntegerTranscendentals.FixedSoftmax(scores, t * seqLen, seqLen, fracBits);
-
-            for (int t = 0; t < seqLen; t++)
+                NonCausalHeadAttention(q, k, v, output, seqLen, qEmbd, kvDim,
+                    h, headDim, kvHeadDim, headsPerKv, scoreShift, sqrtHeadDim, fracBits);
+            });
+        }
+        else
+        {
+            for (int h = 0; h < nHeads; h++)
             {
-                int outBase = t * qEmbd + qOffset;
-                int scoreBase = t * seqLen;
-                for (int s = 0; s < seqLen; s++)
-                {
-                    long w = scores[scoreBase + s];
-                    int vBase = s * kvDim + kvOffset;
-                    for (int d = 0; d < headDim; d++)
-                        output[outBase + d] += (long)(((Int128)w * v[vBase + d]) >> fracBits);
-                }
+                NonCausalHeadAttention(q, k, v, output, seqLen, qEmbd, kvDim,
+                    h, headDim, kvHeadDim, headsPerKv, scoreShift, sqrtHeadDim, fracBits);
             }
         }
 
         return output;
+    }
+
+    private static void NonCausalHeadAttention(
+        long[] q, long[] k, long[] v, long[] output,
+        int seqLen, int qEmbd, int kvDim,
+        int h, int headDim, int kvHeadDim, int headsPerKv,
+        int scoreShift, long sqrtHeadDim, int fracBits)
+    {
+        int kvHead = h / headsPerKv;
+        int qOffset = h * headDim;
+        int kvOffset = kvHead * kvHeadDim;
+
+        long[] scores = new long[seqLen * seqLen];
+
+        for (int t = 0; t < seqLen; t++)
+        {
+            int qBase = t * qEmbd + qOffset;
+            for (int s = 0; s < seqLen; s++)
+            {
+                Int128 rawDot = IntegerMatMul.DotInt128(q, qBase, k, s * kvDim + kvOffset, headDim);
+                scores[t * seqLen + s] = (long)(rawDot >> scoreShift) / sqrtHeadDim;
+            }
+        }
+
+        for (int t = 0; t < seqLen; t++)
+            IntegerTranscendentals.FixedSoftmax(scores, t * seqLen, seqLen, fracBits);
+
+        for (int t = 0; t < seqLen; t++)
+        {
+            int outBase = t * qEmbd + qOffset;
+            int scoreBase = t * seqLen;
+            for (int s = 0; s < seqLen; s++)
+            {
+                long w = scores[scoreBase + s];
+                int vBase = s * kvDim + kvOffset;
+                for (int d = 0; d < headDim; d++)
+                    output[outBase + d] += (long)(((Int128)w * v[vBase + d]) >> fracBits);
+            }
+        }
     }
 
     /// <summary>
@@ -209,7 +234,6 @@ public static class IntegerAttention
         int kvHeadDim = kvDim / nKvHeads;
         int headsPerKv = nHeads / nKvHeads;
         long[] output = new long[seqLen * qEmbd];
-        long[] scores = new long[seqLen * seqLen];
 
         int absScale = System.Math.Abs(scaleExponent);
         int scoreShift = 2 * absScale - fracBits;
@@ -218,44 +242,70 @@ public static class IntegerAttention
 
         long maskValue = -(1L << (fracBits - 1));
 
-        for (int h = 0; h < nHeads; h++)
+        // Parallelize across heads when there are enough to benefit.
+        // Each head writes to a non-overlapping slice of the output array.
+        if (nHeads >= 4)
         {
-            int kvHead = h / headsPerKv;
-            int qOffset = h * headDim;
-            int kvOffset = kvHead * kvHeadDim;
-
-            for (int t = 0; t < seqLen; t++)
+            Parallel.For(0, nHeads, h =>
             {
-                int qBase = t * qEmbd + qOffset;
-                for (int s = 0; s < seqLen; s++)
-                {
-                    if (s > t)
-                    {
-                        scores[t * seqLen + s] = maskValue;
-                        continue;
-                    }
-                    Int128 rawDot = IntegerMatMul.DotInt128(q, qBase, k, s * kvDim + kvOffset, headDim);
-                    scores[t * seqLen + s] = (long)(rawDot >> scoreShift) / sqrtHeadDim;
-                }
-            }
-
-            for (int t = 0; t < seqLen; t++)
-                IntegerTranscendentals.FixedSoftmax(scores, t * seqLen, seqLen, fracBits);
-
-            for (int t = 0; t < seqLen; t++)
+                CausalHeadAttention(q, k, v, output, seqLen, qEmbd, kvDim,
+                    h, headDim, kvHeadDim, headsPerKv, scoreShift, sqrtHeadDim, maskValue, fracBits);
+            });
+        }
+        else
+        {
+            for (int h = 0; h < nHeads; h++)
             {
-                int outBase = t * qEmbd + qOffset;
-                int scoreBase = t * seqLen;
-                for (int s = 0; s < seqLen; s++)
-                {
-                    long w = scores[scoreBase + s];
-                    int vBase = s * kvDim + kvOffset;
-                    for (int d = 0; d < headDim; d++)
-                        output[outBase + d] += (long)(((Int128)w * v[vBase + d]) >> fracBits);
-                }
+                CausalHeadAttention(q, k, v, output, seqLen, qEmbd, kvDim,
+                    h, headDim, kvHeadDim, headsPerKv, scoreShift, sqrtHeadDim, maskValue, fracBits);
             }
         }
 
         return output;
+    }
+
+    private static void CausalHeadAttention(
+        long[] q, long[] k, long[] v, long[] output,
+        int seqLen, int qEmbd, int kvDim,
+        int h, int headDim, int kvHeadDim, int headsPerKv,
+        int scoreShift, long sqrtHeadDim, long maskValue, int fracBits)
+    {
+        int kvHead = h / headsPerKv;
+        int qOffset = h * headDim;
+        int kvOffset = kvHead * kvHeadDim;
+
+        // Thread-local scores buffer — avoids contention on shared array.
+        long[] scores = new long[seqLen * seqLen];
+
+        for (int t = 0; t < seqLen; t++)
+        {
+            int qBase = t * qEmbd + qOffset;
+            for (int s = 0; s < seqLen; s++)
+            {
+                if (s > t)
+                {
+                    scores[t * seqLen + s] = maskValue;
+                    continue;
+                }
+                Int128 rawDot = IntegerMatMul.DotInt128(q, qBase, k, s * kvDim + kvOffset, headDim);
+                scores[t * seqLen + s] = (long)(rawDot >> scoreShift) / sqrtHeadDim;
+            }
+        }
+
+        for (int t = 0; t < seqLen; t++)
+            IntegerTranscendentals.FixedSoftmax(scores, t * seqLen, seqLen, fracBits);
+
+        for (int t = 0; t < seqLen; t++)
+        {
+            int outBase = t * qEmbd + qOffset;
+            int scoreBase = t * seqLen;
+            for (int s = 0; s < seqLen; s++)
+            {
+                long w = scores[scoreBase + s];
+                int vBase = s * kvDim + kvOffset;
+                for (int d = 0; d < headDim; d++)
+                    output[outBase + d] += (long)(((Int128)w * v[vBase + d]) >> fracBits);
+            }
+        }
     }
 }

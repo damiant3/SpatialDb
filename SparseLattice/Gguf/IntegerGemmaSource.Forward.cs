@@ -33,6 +33,7 @@ public sealed partial class IntegerGemmaSource
         IntegerAttention.IntegerRoPECache ropeCache)
     {
         int embd = m_nEmbd;
+        int qDim = m_qDim;
         int total = seqLen * embd;
 
         long[] residual = new long[total];
@@ -40,9 +41,9 @@ public sealed partial class IntegerGemmaSource
 
         IntegerLayerNorm.RmsNormInPlace(x, seqLen, embd, layer.AttnNormW, -m_scaleBits);
 
-        long[] q = IntegerMatMul.MatMul(x, seqLen, embd, layer.AttnQ, embd, m_scaleBits);
-        long[] k = IntegerMatMul.MatMul(x, seqLen, embd, layer.AttnK, m_kvDim, m_scaleBits);
-        long[] v = IntegerMatMul.MatMul(x, seqLen, embd, layer.AttnV, m_kvDim, m_scaleBits);
+        long[] q = IntegerMatMul.MatMul(x, seqLen, embd, layer.AttnQ, qDim, m_scaleBits, m_scaleBits);
+        long[] k = IntegerMatMul.MatMul(x, seqLen, embd, layer.AttnK, m_kvDim, m_scaleBits, m_scaleBits);
+        long[] v = IntegerMatMul.MatMul(x, seqLen, embd, layer.AttnV, m_kvDim, m_scaleBits, m_scaleBits);
 
         RmsNormPerHead(q, seqLen, m_nHeads, m_headDim, layer.AttnQNormW, -m_scaleBits);
         RmsNormPerHead(k, seqLen, m_nKvHeads, m_headDim, layer.AttnKNormW, -m_scaleBits);
@@ -50,9 +51,9 @@ public sealed partial class IntegerGemmaSource
         ApplyRoPEGqa(q, k, seqLen, ropeCache);
 
         long[] attnOut = IntegerAttention.GroupedQueryAttention(
-            q, k, v, seqLen, embd, m_kvDim, m_nHeads, m_nKvHeads, -m_scaleBits);
+            q, k, v, seqLen, qDim, m_kvDim, m_nHeads, m_nKvHeads, -m_scaleBits);
 
-        long[] projected = IntegerMatMul.MatMul(attnOut, seqLen, embd, layer.AttnOutput, embd, m_scaleBits);
+        long[] projected = IntegerMatMul.MatMul(attnOut, seqLen, qDim, layer.AttnOutput, embd, m_scaleBits, m_scaleBits);
 
         IntegerLayerNorm.RmsNormInPlace(projected, seqLen, embd, layer.PostAttnNormW, -m_scaleBits);
 
@@ -79,7 +80,7 @@ public sealed partial class IntegerGemmaSource
     private void ApplyRoPEGqa(long[] q, long[] k, int seqLen,
         IntegerAttention.IntegerRoPECache cache)
     {
-        IntegerAttention.ApplyRoPE(q, seqLen, m_nEmbd, m_nHeads, cache);
+        IntegerAttention.ApplyRoPE(q, seqLen, m_qDim, m_nHeads, cache);
         IntegerAttention.ApplyRoPE(k, seqLen, m_kvDim, m_nKvHeads, cache);
     }
 

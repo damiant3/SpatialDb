@@ -112,12 +112,46 @@ public sealed class VocabLattice
     {
         int bestId = 0;
         float bestScore = float.NegativeInfinity;
+
+        int maxVocab = outputEmbeddings.Length / dims;
+        if (vocabSize > maxVocab)
+            vocabSize = maxVocab;
+
         for (int tokenId = 0; tokenId < vocabSize; tokenId++)
         {
             int rowBase = tokenId * dims;
             float dot = 0f;
             for (int d = 0; d < dims; d++)
                 dot += hiddenState[d] * outputEmbeddings[rowBase + d];
+            if (dot > bestScore)
+            {
+                bestScore = dot;
+                bestId = tokenId;
+            }
+        }
+        return bestId;
+    }
+
+    /// <summary>
+    /// Half-precision overload: avoids expanding the full embedding table to float[].
+    /// Each Half is promoted to float on-the-fly for the dot product.
+    /// </summary>
+    public static int ArgmaxBruteForce(float[] hiddenState, Half[] outputEmbeddings, int vocabSize, int dims)
+    {
+        int bestId = 0;
+        float bestScore = float.NegativeInfinity;
+
+        // Clamp vocabSize to actual embedding table size to avoid OOB
+        int maxVocab = outputEmbeddings.Length / dims;
+        if (vocabSize > maxVocab)
+            vocabSize = maxVocab;
+
+        for (int tokenId = 0; tokenId < vocabSize; tokenId++)
+        {
+            int rowBase = tokenId * dims;
+            float dot = 0f;
+            for (int d = 0; d < dims; d++)
+                dot += hiddenState[d] * (float)outputEmbeddings[rowBase + d];
             if (dot > bestScore)
             {
                 bestScore = dot;

@@ -6,19 +6,26 @@ public sealed partial class IntegerGemmaSource
 {
     internal sealed class GemmaLayerWeights
     {
+        // Norm weights stay as long[] — they're tiny (embd or headDim sized)
+        // and used directly in integer RmsNorm arithmetic.
         public required long[] AttnNormW      { get; init; }
-        public required long[] AttnQ          { get; init; }
-        public required long[] AttnK          { get; init; }
-        public required long[] AttnV          { get; init; }
         public required long[] AttnQNormW     { get; init; }
         public required long[] AttnKNormW     { get; init; }
-        public required long[] AttnOutput     { get; init; }
         public required long[] PostAttnNormW  { get; init; }
         public required long[] FfnNormW       { get; init; }
-        public required long[] FfnGate        { get; init; }
-        public required long[] FfnUp          { get; init; }
-        public required long[] FfnDown        { get; init; }
         public required long[] PostFfwNormW   { get; init; }
+
+        // Projection weights stored as Half[] — 2 bytes/element vs 8 bytes for long[].
+        // Quantized to int64 on-the-fly during MatMul dot products.
+        // Half (IEEE 754 half-precision) has 10-bit mantissa — sufficient for weights
+        // that are already 4-6 bit quantized in the GGUF.
+        public required Half[] AttnQ          { get; init; }
+        public required Half[] AttnK          { get; init; }
+        public required Half[] AttnV          { get; init; }
+        public required Half[] AttnOutput     { get; init; }
+        public required Half[] FfnGate        { get; init; }
+        public required Half[] FfnUp          { get; init; }
+        public required Half[] FfnDown        { get; init; }
     }
 
     private IntegerGemmaSource(
@@ -40,6 +47,7 @@ public sealed partial class IntegerGemmaSource
         m_nHeads = nHeads;
         m_nKvHeads = nKvHeads;
         m_headDim = headDim;
+        m_qDim = nHeads * headDim;
         m_kvDim = nKvHeads * headDim;
         m_nFf = nFf;
         m_ropeFreqBase = ropeFreqBase;
@@ -100,27 +108,27 @@ public sealed partial class IntegerGemmaSource
 
             long[] attnNormW     = Q(reader.ReadTensorF32($"{pfx}.attn_norm.weight"), scaleBits);
             Report($"blk.{i} attn_norm");
-            long[] attnQ         = Q(reader.ReadTensorF32($"{pfx}.attn_q.weight"), scaleBits);
+            Half[] attnQ         = ToHalf(reader.ReadTensorF32($"{pfx}.attn_q.weight"));
             Report($"blk.{i} attn_q");
-            long[] attnK         = Q(reader.ReadTensorF32($"{pfx}.attn_k.weight"), scaleBits);
+            Half[] attnK         = ToHalf(reader.ReadTensorF32($"{pfx}.attn_k.weight"));
             Report($"blk.{i} attn_k");
-            long[] attnV         = Q(reader.ReadTensorF32($"{pfx}.attn_v.weight"), scaleBits);
+            Half[] attnV         = ToHalf(reader.ReadTensorF32($"{pfx}.attn_v.weight"));
             Report($"blk.{i} attn_v");
             long[] attnQNormW    = Q(reader.ReadTensorF32($"{pfx}.attn_q_norm.weight"), scaleBits);
             Report($"blk.{i} attn_q_norm");
             long[] attnKNormW    = Q(reader.ReadTensorF32($"{pfx}.attn_k_norm.weight"), scaleBits);
             Report($"blk.{i} attn_k_norm");
-            long[] attnOutput    = Q(reader.ReadTensorF32($"{pfx}.attn_output.weight"), scaleBits);
+            Half[] attnOutput    = ToHalf(reader.ReadTensorF32($"{pfx}.attn_output.weight"));
             Report($"blk.{i} attn_output");
             long[] postAttnNormW = Q(reader.ReadTensorF32($"{pfx}.post_attention_norm.weight"), scaleBits);
             Report($"blk.{i} post_attn_norm");
             long[] ffnNormW      = Q(reader.ReadTensorF32($"{pfx}.ffn_norm.weight"), scaleBits);
             Report($"blk.{i} ffn_norm");
-            long[] ffnGate       = Q(reader.ReadTensorF32($"{pfx}.ffn_gate.weight"), scaleBits);
+            Half[] ffnGate       = ToHalf(reader.ReadTensorF32($"{pfx}.ffn_gate.weight"));
             Report($"blk.{i} ffn_gate");
-            long[] ffnUp         = Q(reader.ReadTensorF32($"{pfx}.ffn_up.weight"), scaleBits);
+            Half[] ffnUp         = ToHalf(reader.ReadTensorF32($"{pfx}.ffn_up.weight"));
             Report($"blk.{i} ffn_up");
-            long[] ffnDown       = Q(reader.ReadTensorF32($"{pfx}.ffn_down.weight"), scaleBits);
+            Half[] ffnDown       = ToHalf(reader.ReadTensorF32($"{pfx}.ffn_down.weight"));
             Report($"blk.{i} ffn_down");
             long[] postFfwNormW  = Q(reader.ReadTensorF32($"{pfx}.post_ffw_norm.weight"), scaleBits);
             Report($"blk.{i} post_ffw_norm ({i + 1}/{nLayers})");
@@ -163,6 +171,14 @@ public sealed partial class IntegerGemmaSource
 
     private static long[] Q(float[] source, int scaleBits)
         => IntegerMatMul.QuantizeFromFloat(source, scaleBits).Data;
+
+    private static Half[] ToHalf(float[] source)
+    {
+        Half[] result = new Half[source.Length];
+        for (int i = 0; i < source.Length; i++)
+            result[i] = (Half)source[i];
+        return result;
+    }
 
     private static float GetFloat(GgufReader reader, string key, float defaultValue)
     {

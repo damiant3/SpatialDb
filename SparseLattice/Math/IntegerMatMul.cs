@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
 ///////////////////////////////////////////////
 namespace SparseLattice.Math;
 
@@ -55,6 +56,7 @@ public static class IntegerMatMul
     /// <summary>
     /// Multiplies row-major A [rowsA × colsA] by column-major W [colsB × colsA],
     /// producing row-major C [rowsA × colsB] with Int128 accumulation.
+    /// Parallelizes across output columns for large matrices.
     /// </summary>
     public static long[] MatMul(
         long[] a, int rowsA, int colsA,
@@ -63,15 +65,34 @@ public static class IntegerMatMul
     {
         long[] c = new long[rowsA * colsB];
 
-        for (int row = 0; row < rowsA; row++)
+        // Parallelize when there's enough work to justify thread overhead.
+        // Threshold: at least 256 columns and inner dimension ≥ 256.
+        if (colsB >= 256 && colsA >= 256)
         {
-            int aBase = row * colsA;
-            for (int col = 0; col < colsB; col++)
+            Parallel.For(0, colsB, col =>
             {
-                Int128 acc = DotInt128(a, aBase, w, col * colsA, colsA);
-                c[row * colsB + col] = resultShift > 0
-                    ? (long)(acc >> resultShift)
-                    : (long)acc;
+                int wBase = col * colsA;
+                for (int row = 0; row < rowsA; row++)
+                {
+                    Int128 acc = DotInt128(a, row * colsA, w, wBase, colsA);
+                    c[row * colsB + col] = resultShift > 0
+                        ? (long)(acc >> resultShift)
+                        : (long)acc;
+                }
+            });
+        }
+        else
+        {
+            for (int row = 0; row < rowsA; row++)
+            {
+                int aBase = row * colsA;
+                for (int col = 0; col < colsB; col++)
+                {
+                    Int128 acc = DotInt128(a, aBase, w, col * colsA, colsA);
+                    c[row * colsB + col] = resultShift > 0
+                        ? (long)(acc >> resultShift)
+                        : (long)acc;
+                }
             }
         }
 
@@ -117,6 +138,97 @@ public static class IntegerMatMul
     }
 
     /// <summary>
+    /// Mixed-precision matmul: int64 activations × float32 weights.
+    /// Weights are quantized to int64 on-the-fly during each dot product,
+    /// avoiding the need to store the full weight matrix as int64 (saves 4× memory).
+    /// </summary>
+    public static long[] MatMul(
+        long[] a, int rowsA, int colsA,
+        float[] wFloat, int colsB,
+        int scaleBits,
+        int resultShift = 0)
+    {
+        long[] c = new long[rowsA * colsB];
+        double scale = 1L << scaleBits;
+
+        if (colsB >= 256 && colsA >= 256)
+        {
+            Parallel.For(0, colsB, col =>
+            {
+                int wBase = col * colsA;
+                for (int row = 0; row < rowsA; row++)
+                {
+                    Int128 acc = DotInt128Mixed(a, row * colsA, wFloat, wBase, colsA, scale);
+                    c[row * colsB + col] = resultShift > 0
+                        ? (long)(acc >> resultShift)
+                        : (long)acc;
+                }
+            });
+        }
+        else
+        {
+            for (int row = 0; row < rowsA; row++)
+            {
+                int aBase = row * colsA;
+                for (int col = 0; col < colsB; col++)
+                {
+                    Int128 acc = DotInt128Mixed(a, aBase, wFloat, col * colsA, colsA, scale);
+                    c[row * colsB + col] = resultShift > 0
+                        ? (long)(acc >> resultShift)
+                        : (long)acc;
+                }
+            }
+        }
+
+        return c;
+    }
+
+    /// <summary>
+    /// Mixed-precision matmul: int64 activations × Half weights.
+    /// Weights stored as Half (2 bytes each) for 4× memory savings vs int64.
+    /// </summary>
+    public static long[] MatMul(
+        long[] a, int rowsA, int colsA,
+        Half[] wHalf, int colsB,
+        int scaleBits,
+        int resultShift = 0)
+    {
+        long[] c = new long[rowsA * colsB];
+        double scale = 1L << scaleBits;
+
+        if (colsB >= 256 && colsA >= 256)
+        {
+            Parallel.For(0, colsB, col =>
+            {
+                int wBase = col * colsA;
+                for (int row = 0; row < rowsA; row++)
+                {
+                    Int128 acc = DotInt128Mixed(a, row * colsA, wHalf, wBase, colsA, scale);
+                    c[row * colsB + col] = resultShift > 0
+                        ? (long)(acc >> resultShift)
+                        : (long)acc;
+                }
+            });
+        }
+        else
+        {
+            for (int row = 0; row < rowsA; row++)
+            {
+                int aBase = row * colsA;
+                for (int col = 0; col < colsB; col++)
+                {
+                    Int128 acc = DotInt128Mixed(a, aBase, wHalf, col * colsA, colsA, scale);
+                    c[row * colsB + col] = resultShift > 0
+                        ? (long)(acc >> resultShift)
+                        : (long)acc;
+                }
+            }
+        }
+
+        return c;
+    }
+
+    /// <summary>
     /// Exact dot product via Int128 accumulation with 4× unroll.
     /// Each long×long product is a single x64 <c>mul</c> into rdx:rax.
     /// </summary>
@@ -137,6 +249,59 @@ public static class IntegerMatMul
         while (i < length)
         {
             acc += (Int128)a[aOffset + i] * b[bOffset + i];
+            i++;
+        }
+
+        return acc;
+    }
+
+    /// <summary>
+    /// Mixed dot product: int64 activations × float weights quantized on-the-fly.
+    /// 4× unroll for throughput.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Int128 DotInt128Mixed(long[] a, int aOffset, float[] b, int bOffset, int length, double scale)
+    {
+        Int128 acc = 0;
+        int i = 0;
+        int limit4 = length - 3;
+        while (i < limit4)
+        {
+            acc += (Int128)a[aOffset + i]     * (long)(b[bOffset + i]     * scale);
+            acc += (Int128)a[aOffset + i + 1] * (long)(b[bOffset + i + 1] * scale);
+            acc += (Int128)a[aOffset + i + 2] * (long)(b[bOffset + i + 2] * scale);
+            acc += (Int128)a[aOffset + i + 3] * (long)(b[bOffset + i + 3] * scale);
+            i += 4;
+        }
+        while (i < length)
+        {
+            acc += (Int128)a[aOffset + i] * (long)(b[bOffset + i] * scale);
+            i++;
+        }
+
+        return acc;
+    }
+
+    /// <summary>
+    /// Mixed dot product: int64 activations × Half weights quantized on-the-fly.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Int128 DotInt128Mixed(long[] a, int aOffset, Half[] b, int bOffset, int length, double scale)
+    {
+        Int128 acc = 0;
+        int i = 0;
+        int limit4 = length - 3;
+        while (i < limit4)
+        {
+            acc += (Int128)a[aOffset + i]     * (long)((float)b[bOffset + i]     * scale);
+            acc += (Int128)a[aOffset + i + 1] * (long)((float)b[bOffset + i + 1] * scale);
+            acc += (Int128)a[aOffset + i + 2] * (long)((float)b[bOffset + i + 2] * scale);
+            acc += (Int128)a[aOffset + i + 3] * (long)((float)b[bOffset + i + 3] * scale);
+            i += 4;
+        }
+        while (i < length)
+        {
+            acc += (Int128)a[aOffset + i] * (long)((float)b[bOffset + i] * scale);
             i++;
         }
 

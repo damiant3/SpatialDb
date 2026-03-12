@@ -36,6 +36,12 @@ public enum GgufDType : uint
     Q5_0 = 6,
     Q5_1 = 7,
     Q8_0 = 8,
+    Q2_K = 10,
+    Q3_K = 11,
+    Q4_K = 12,
+    Q5_K = 13,
+    Q6_K = 14,
+    Q8_K = 15,
     BF16 = 30,
     MXFP4 = 39,
 }
@@ -120,6 +126,13 @@ public sealed class GgufTensorInfo
             GgufDType.Q4_1 => (elements / 32) * (2 + 2 + 16),
             GgufDType.Q5_0 => (elements / 32) * (2 + 4 + 16),
             GgufDType.Q5_1 => (elements / 32) * (2 + 2 + 4 + 16),
+            // K-quant super-blocks of 256 elements
+            GgufDType.Q2_K => (elements / 256) * (2 + 2 + 256 / 16 + 256 / 4),    // 256: d(f16)+dmin(f16)+scales(16)+qs(64) = 84
+            GgufDType.Q3_K => (elements / 256) * (2 + 256 / 8 + 256 / 4 + 12),    // 256: d(f16)+hmask(32)+qs(64)+scales(12) = 110
+            GgufDType.Q4_K => (elements / 256) * (2 + 2 + 12 + 256 / 2),           // 256: d(f16)+dmin(f16)+scales(12)+qs(128) = 144
+            GgufDType.Q5_K => (elements / 256) * (2 + 2 + 12 + 256 / 2 + 256 / 8),// 256: d(f16)+dmin(f16)+scales(12)+qs(128)+qh(32) = 176
+            GgufDType.Q6_K => (elements / 256) * (2 + 256 / 2 + 256 / 4 + 256 / 16),// 256: d(f16)+ql(128)+qh(64)+scales(16) = 210
+            GgufDType.Q8_K => (elements / 256) * (4 + 256 + 16 * 2),               // 256: d(f32)+qs(256)+bsums(16*2) = 292
             GgufDType.MXFP4 => (elements / 32) * 17,
             _              => elements * 4,
         };
@@ -371,6 +384,24 @@ public sealed class GgufReader : IDisposable
             case GgufDType.MXFP4:
                 DequantizeMXFP4(m_stream, result);
                 break;
+            case GgufDType.Q2_K:
+                DequantizeQ2K(m_stream, result);
+                break;
+            case GgufDType.Q3_K:
+                DequantizeQ3K(m_stream, result);
+                break;
+            case GgufDType.Q4_K:
+                DequantizeQ4K(m_stream, result);
+                break;
+            case GgufDType.Q5_K:
+                DequantizeQ5K(m_stream, result);
+                break;
+            case GgufDType.Q6_K:
+                DequantizeQ6K(m_stream, result);
+                break;
+            case GgufDType.Q8_K:
+                DequantizeQ8K(m_stream, result);
+                break;
             default:
                 throw new NotSupportedException(
                     $"Dequantization of dtype {info.DType} is not yet implemented");
@@ -501,6 +532,259 @@ public sealed class GgufReader : IDisposable
                 dest[outIdx++] = s_mxfp4E2M1[lo] * sharedScale;
                 dest[outIdx++] = s_mxfp4E2M1[hi] * sharedScale;
             }
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // K-quant dequantisation (super-blocks of 256 elements)
+    // Reference: ggml-quants.c from ggml/llama.cpp
+    // -----------------------------------------------------------------------
+
+    // Q2_K: super-block of 256 elements.
+    // Layout: d (f16, 2B) + dmin (f16, 2B) + scales (16B) + qs (64B) = 84 bytes
+    // Each of 16 sub-groups of 16 elements has a 4-bit scale and 4-bit min packed into scales[].
+    // Each element is 2 bits in qs[].
+    private static void DequantizeQ2K(Stream s, float[] dest)
+    {
+        const int SuperBlockElements = 256;
+        const int BlockBytes = 2 + 2 + 16 + 64;  // 84
+
+        int superBlocks = dest.Length / SuperBlockElements;
+        byte[] buf = new byte[superBlocks * BlockBytes];
+        ReadExact(s, buf);
+
+        int outIdx = 0;
+        int inIdx = 0;
+        for (int sb = 0; sb < superBlocks; sb++)
+        {
+            float d    = HalfToFloat(BinaryPrimitives.ReadUInt16LittleEndian(buf.AsSpan(inIdx, 2)));
+            float dmin = HalfToFloat(BinaryPrimitives.ReadUInt16LittleEndian(buf.AsSpan(inIdx + 2, 2)));
+            int scalesOff = inIdx + 4;
+            int qsOff     = inIdx + 4 + 16;
+            inIdx += BlockBytes;
+
+            for (int j = 0; j < 256; j++)
+            {
+                int group = j / 16;
+                byte scByte = buf[scalesOff + group];
+                int sc  = scByte & 0x0F;
+                int m   = scByte >> 4;
+                int qByte = buf[qsOff + j / 4];
+                int shift = (j % 4) * 2;
+                int q = (qByte >> shift) & 3;
+                dest[outIdx++] = d * sc * q - dmin * m;
+            }
+        }
+    }
+
+    // Q3_K: super-block of 256 elements.
+    // Layout: hmask (32B) + qs (64B) + scales (12B) + d (f16, 2B) = 110 bytes
+    // Each element is 3 bits: low 2 bits in qs[], high bit in hmask[].
+    // 16 groups of 16 elements, each with a 6-bit scale (packed in 12 bytes).
+    // Matches ggml dequantize_row_q3_K.
+    private static void DequantizeQ3K(Stream s, float[] dest)
+    {
+        const int SuperBlockElements = 256;
+        const int BlockBytes = 32 + 64 + 12 + 2;  // 110
+
+        int superBlocks = dest.Length / SuperBlockElements;
+        byte[] buf = new byte[superBlocks * BlockBytes];
+        ReadExact(s, buf);
+
+        int outIdx = 0;
+        int inIdx = 0;
+        Span<int> scales = stackalloc int[16];
+        for (int sb = 0; sb < superBlocks; sb++)
+        {
+            int hmaskOff  = inIdx;
+            int qsOff     = inIdx + 32;
+            int scalesOff = inIdx + 32 + 64;
+            float d = HalfToFloat(BinaryPrimitives.ReadUInt16LittleEndian(
+                buf.AsSpan(inIdx + 32 + 64 + 12, 2)));
+            inIdx += BlockBytes;
+
+            // Unpack 16 × 6-bit scales from 12 bytes (ggml packing):
+            //   groups 0..7:  low 4 bits from scales[j] & 0x0F
+            //   groups 8..15: low 4 bits from scales[j-8] >> 4
+            //   high 2 bits for group j: from scales[8 + j/4], bits (2*(j%4))..(2*(j%4)+1)
+            for (int j = 0; j < 16; j++)
+            {
+                int low4 = (j < 8)
+                    ? (buf[scalesOff + j] & 0x0F)
+                    : (buf[scalesOff + j - 8] >> 4);
+                int high2 = (buf[scalesOff + 8 + j / 4] >> (2 * (j % 4))) & 3;
+                scales[j] = (low4 | (high2 << 4)) - 32;
+            }
+
+            for (int j = 0; j < 256; j++)
+            {
+                int group = j / 16;
+                int qByte = buf[qsOff + j / 4];
+                int shift = (j % 4) * 2;
+                int qLow = (qByte >> shift) & 3;
+                int hBit = (buf[hmaskOff + j / 8] >> (j % 8)) & 1;
+                int q = qLow | (hBit << 2);  // 3-bit value 0..7, centered at 4
+                dest[outIdx++] = d * scales[group] * (q - 4);
+            }
+        }
+    }
+
+    // Q4_K: super-block of 256 elements.
+    // Layout: d (f16, 2B) + dmin (f16, 2B) + scales (12B) + qs (128B) = 144 bytes
+    // Each element is 4 bits in qs[].
+    // 8 sub-blocks of 32 elements, each with 6-bit scale and 6-bit min packed in 12 bytes.
+    private static void DequantizeQ4K(Stream s, float[] dest)
+    {
+        const int SuperBlockElements = 256;
+        const int BlockBytes = 2 + 2 + 12 + 128;  // 144
+
+        int superBlocks = dest.Length / SuperBlockElements;
+        byte[] buf = new byte[superBlocks * BlockBytes];
+        ReadExact(s, buf);
+
+        int outIdx = 0;
+        int inIdx = 0;
+        Span<byte> sc = stackalloc byte[8];
+        Span<byte> m  = stackalloc byte[8];
+        for (int sb = 0; sb < superBlocks; sb++)
+        {
+            float d    = HalfToFloat(BinaryPrimitives.ReadUInt16LittleEndian(buf.AsSpan(inIdx, 2)));
+            float dmin = HalfToFloat(BinaryPrimitives.ReadUInt16LittleEndian(buf.AsSpan(inIdx + 2, 2)));
+            int scalesOff = inIdx + 4;
+            int qsOff     = inIdx + 4 + 12;
+            inIdx += BlockBytes;
+
+            UnpackQ4KScales(buf.AsSpan(scalesOff, 12), sc, m);
+
+            for (int j = 0; j < 256; j++)
+            {
+                int subBlock = j / 32;
+                int qByte = buf[qsOff + j / 2];
+                int q = (j % 2 == 0) ? (qByte & 0x0F) : (qByte >> 4);
+                dest[outIdx++] = d * sc[subBlock] * q - dmin * m[subBlock];
+            }
+        }
+    }
+
+    // Unpack 8 × 6-bit scales and 8 × 6-bit mins from 12 bytes (Q4_K / Q5_K format).
+    // Matches ggml get_scale_min_k4().
+    //   For sub-blocks 0..3: sc[j] = raw[j] & 63;  m[j] = raw[j+4] & 63
+    //   For sub-blocks 4..7: sc[j] = (raw[j+4] & 0x0F) | ((raw[j-4] >> 6) << 4)
+    //                        m[j]  = (raw[j+4] >> 4)    | ((raw[j]   >> 6) << 4)
+    private static void UnpackQ4KScales(ReadOnlySpan<byte> raw, Span<byte> sc, Span<byte> m)
+    {
+        for (int j = 0; j < 4; j++)
+        {
+            sc[j] = (byte)(raw[j] & 63);
+            m[j]  = (byte)(raw[j + 4] & 63);
+        }
+        for (int j = 4; j < 8; j++)
+        {
+            sc[j] = (byte)((raw[j + 4] & 0x0F) | ((raw[j - 4] >> 6) << 4));
+            m[j]  = (byte)((raw[j + 4] >> 4) | ((raw[j] >> 6) << 4));
+        }
+    }
+
+    // Q5_K: super-block of 256 elements.
+    // Layout: d (f16, 2B) + dmin (f16, 2B) + scales (12B) + qh (32B) + qs (128B) = 176 bytes
+    // Each element is 5 bits: low 4 bits in qs[], high bit in qh[].
+    private static void DequantizeQ5K(Stream s, float[] dest)
+    {
+        const int SuperBlockElements = 256;
+        const int BlockBytes = 2 + 2 + 12 + 32 + 128;  // 176
+
+        int superBlocks = dest.Length / SuperBlockElements;
+        byte[] buf = new byte[superBlocks * BlockBytes];
+        ReadExact(s, buf);
+
+        int outIdx = 0;
+        int inIdx = 0;
+        Span<byte> sc = stackalloc byte[8];
+        Span<byte> m  = stackalloc byte[8];
+        for (int sb = 0; sb < superBlocks; sb++)
+        {
+            float d    = HalfToFloat(BinaryPrimitives.ReadUInt16LittleEndian(buf.AsSpan(inIdx, 2)));
+            float dmin = HalfToFloat(BinaryPrimitives.ReadUInt16LittleEndian(buf.AsSpan(inIdx + 2, 2)));
+            int scalesOff = inIdx + 4;
+            int qhOff     = inIdx + 4 + 12;
+            int qsOff     = inIdx + 4 + 12 + 32;
+            inIdx += BlockBytes;
+
+            UnpackQ4KScales(buf.AsSpan(scalesOff, 12), sc, m);
+
+            for (int j = 0; j < 256; j++)
+            {
+                int subBlock = j / 32;
+                int qByte = buf[qsOff + j / 2];
+                int qLow = (j % 2 == 0) ? (qByte & 0x0F) : (qByte >> 4);
+                int hBit = (buf[qhOff + j / 8] >> (j % 8)) & 1;
+                int q = qLow | (hBit << 4);  // 5-bit value
+                dest[outIdx++] = d * sc[subBlock] * q - dmin * m[subBlock];
+            }
+        }
+    }
+
+    // Q6_K: super-block of 256 elements.
+    // Layout: ql (128B) + qh (64B) + scales (16B) + d (f16, 2B) = 210 bytes
+    // Each element is 6 bits: low 4 bits in ql[], high 2 bits in qh[].
+    // 16 sub-blocks of 16 elements, each with an 8-bit signed scale.
+    private static void DequantizeQ6K(Stream s, float[] dest)
+    {
+        const int SuperBlockElements = 256;
+        const int BlockBytes = 128 + 64 + 16 + 2;  // 210
+
+        int superBlocks = dest.Length / SuperBlockElements;
+        byte[] buf = new byte[superBlocks * BlockBytes];
+        ReadExact(s, buf);
+
+        int outIdx = 0;
+        int inIdx = 0;
+        for (int sb = 0; sb < superBlocks; sb++)
+        {
+            int qlOff     = inIdx;
+            int qhOff     = inIdx + 128;
+            int scalesOff = inIdx + 128 + 64;
+            float d = HalfToFloat(BinaryPrimitives.ReadUInt16LittleEndian(
+                buf.AsSpan(inIdx + 128 + 64 + 16, 2)));
+            inIdx += BlockBytes;
+
+            for (int j = 0; j < 256; j++)
+            {
+                int group = j / 16;
+                sbyte sc = (sbyte)buf[scalesOff + group];
+                int qlByte = buf[qlOff + j / 2];
+                int qLow = (j % 2 == 0) ? (qlByte & 0x0F) : (qlByte >> 4);
+                int qhByte = buf[qhOff + j / 4];
+                int shift = (j % 4) * 2;
+                int qHigh = (qhByte >> shift) & 3;
+                int q = qLow | (qHigh << 4);  // 6-bit value 0..63, centered at 32
+                dest[outIdx++] = d * sc * (q - 32);
+            }
+        }
+    }
+
+    // Q8_K: super-block of 256 elements.
+    // Layout: d (f32, 4B) + qs (256B, int8) + bsums (32B, 16×int16) = 292 bytes
+    // Simple: each element is an int8 scaled by d.
+    private static void DequantizeQ8K(Stream s, float[] dest)
+    {
+        const int SuperBlockElements = 256;
+        const int BlockBytes = 4 + 256 + 32;  // 292
+
+        int superBlocks = dest.Length / SuperBlockElements;
+        byte[] buf = new byte[superBlocks * BlockBytes];
+        ReadExact(s, buf);
+
+        int outIdx = 0;
+        int inIdx = 0;
+        for (int sb = 0; sb < superBlocks; sb++)
+        {
+            float d = BitConverter.ToSingle(buf, inIdx);
+            int qsOff = inIdx + 4;
+            inIdx += BlockBytes;
+
+            for (int j = 0; j < 256; j++)
+                dest[outIdx++] = d * (sbyte)buf[qsOff + j];
         }
     }
 

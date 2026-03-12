@@ -8,6 +8,7 @@ public sealed partial class IntegerCausalSource
     {
         int embd = m_nEmbd;
         long[] x = new long[seqLen * embd];
+        double quantScale = System.Math.Pow(2.0, m_scaleBits);
 
         for (int t = 0; t < seqLen; t++)
         {
@@ -15,10 +16,11 @@ public sealed partial class IntegerCausalSource
             int srcBase = tokenId * embd;
             int dstBase = t * embd;
 
-            if (tokenId < 0 || srcBase + embd > m_tokenEmbeddings.Length)
+            if (tokenId < 0 || srcBase + embd > m_tokenEmbeddingsHalf.Length)
                 srcBase = m_tokenizer.UnkTokenId * embd;
 
-            Array.Copy(m_tokenEmbeddings, srcBase, x, dstBase, embd);
+            for (int d = 0; d < embd; d++)
+                x[dstBase + d] = (long)((float)m_tokenEmbeddingsHalf[srcBase + d] * quantScale);
         }
 
         long sqrtEmbd = IntegerLayerNorm.ISqrt64(embd);
@@ -32,6 +34,7 @@ public sealed partial class IntegerCausalSource
         IntegerAttention.IntegerRoPECache ropeCache)
     {
         int embd = m_nEmbd;
+        int qDim = m_qDim;   // nHeads * headDim — may differ from embd
         int total = seqLen * embd;
 
         long[] residual = new long[total];
@@ -39,9 +42,22 @@ public sealed partial class IntegerCausalSource
 
         IntegerLayerNorm.RmsNormInPlace(x, seqLen, embd, layer.AttnNormW, -m_scaleBits);
 
-        long[] q = IntegerMatMul.MatMul(x, seqLen, embd, layer.AttnQ, embd, m_scaleBits);
-        long[] k = IntegerMatMul.MatMul(x, seqLen, embd, layer.AttnK, m_kvDim, m_scaleBits);
-        long[] v = IntegerMatMul.MatMul(x, seqLen, embd, layer.AttnV, m_kvDim, m_scaleBits);
+        // Q, K, V projections are independent — parallelize for large models.
+        // Q output dim is qDim (nHeads*headDim), not embd.
+        long[] q = null!, k = null!, v = null!;
+        if (embd >= 1024)
+        {
+            Parallel.Invoke(
+                () => q = IntegerMatMul.MatMul(x, seqLen, embd, layer.AttnQ, qDim, m_scaleBits, m_scaleBits),
+                () => k = IntegerMatMul.MatMul(x, seqLen, embd, layer.AttnK, m_kvDim, m_scaleBits, m_scaleBits),
+                () => v = IntegerMatMul.MatMul(x, seqLen, embd, layer.AttnV, m_kvDim, m_scaleBits, m_scaleBits));
+        }
+        else
+        {
+            q = IntegerMatMul.MatMul(x, seqLen, embd, layer.AttnQ, qDim, m_scaleBits, m_scaleBits);
+            k = IntegerMatMul.MatMul(x, seqLen, embd, layer.AttnK, m_kvDim, m_scaleBits, m_scaleBits);
+            v = IntegerMatMul.MatMul(x, seqLen, embd, layer.AttnV, m_kvDim, m_scaleBits, m_scaleBits);
+        }
 
         RmsNormPerHead(q, seqLen, m_nHeads, m_headDim, layer.AttnQNormW, -m_scaleBits);
         RmsNormPerHead(k, seqLen, m_nKvHeads, m_headDim, layer.AttnKNormW, -m_scaleBits);
@@ -49,9 +65,10 @@ public sealed partial class IntegerCausalSource
         ApplyRoPEGqa(q, k, seqLen, ropeCache);
 
         long[] attnOut = IntegerAttention.CausalGroupedQueryAttention(
-            q, k, v, seqLen, embd, m_kvDim, m_nHeads, m_nKvHeads, -m_scaleBits);
+            q, k, v, seqLen, qDim, m_kvDim, m_nHeads, m_nKvHeads, -m_scaleBits);
 
-        long[] projected = IntegerMatMul.MatMul(attnOut, seqLen, embd, layer.AttnOutput, embd, m_scaleBits);
+        // Output projection: [seqLen, qDim] → [seqLen, embd]
+        long[] projected = IntegerMatMul.MatMul(attnOut, seqLen, qDim, layer.AttnOutput, embd, m_scaleBits, m_scaleBits);
 
         IntegerLayerNorm.RmsNormInPlace(projected, seqLen, embd, layer.PostAttnNormW, -m_scaleBits);
 
@@ -75,7 +92,7 @@ public sealed partial class IntegerCausalSource
     private void ApplyRoPEGqa(long[] q, long[] k, int seqLen,
         IntegerAttention.IntegerRoPECache cache)
     {
-        IntegerAttention.ApplyRoPE(q, seqLen, m_nEmbd, m_nHeads, cache);
+        IntegerAttention.ApplyRoPE(q, seqLen, m_qDim, m_nHeads, cache);
         IntegerAttention.ApplyRoPE(k, seqLen, m_kvDim, m_nKvHeads, cache);
     }
 

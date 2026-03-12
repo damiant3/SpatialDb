@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using SparseLattice.Gguf;
@@ -14,6 +15,8 @@ using SparseLattice.Math;
 ///   dotnet run -c Release -- both           run fast embed + lattice KNN
 ///   dotnet run -c Release -- bench          run full BenchmarkDotNet suite
 ///   dotnet run -c Release -- vs            head-to-head: lattice inference vs Ollama HTTP
+///   dotnet run -c Release -- serve          Ollama-compatible HTTP server backed by IntegerCausalSource
+///   dotnet run -c Release -- quality        E4-8 determinism + quality benchmark
 ///   dotnet run -c Release               (default: fast)
 /// </summary>
 public static class Program
@@ -54,6 +57,12 @@ public static class Program
                 break;
             case "probe":
                 RunCausalProbe();
+                break;
+            case "serve":
+                RunServe(args.Skip(1).ToArray()).GetAwaiter().GetResult();
+                break;
+            case "quality":
+                RunQualityBenchmark().GetAwaiter().GetResult();
                 break;
             default:
                 RunFastEmbed().GetAwaiter().GetResult();
@@ -201,20 +210,20 @@ public static class Program
 
         double su = ollamaSingleMs / latticeSingleMs;
 
-        Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
+        Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
         Console.WriteLine("â•‘     Q1: Single embedding latency  (prompt augmentation / RAG lookup)    â•‘");
-        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
+        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
         Console.WriteLine($"â•‘ Lattice (token lookup)    â•‘ {latticeSingleMs,14:F4}   â•‘ {latticeSingleOps,22:F0}   â•‘");
         Console.WriteLine($"â•‘ Ollama HTTP               â•‘ {ollamaSingleMs,14:F2}   â•‘ {ollamaSingleOps,22:F1}   â•‘");
-        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
+        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
         Console.WriteLine($"â•‘ Lattice speedup           â•‘ {su,13:F0}Ã—    â•‘                          â•‘");
         Console.WriteLine("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•£");
         Console.WriteLine();
-        Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
+        Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
         Console.WriteLine("â•‘     Q2: Document ingestion throughput  (batch vectorisation)            â•‘");
-        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•£");
+        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•£");
         Console.WriteLine("â•‘ Method                    â•‘  10 docs â•‘ 100 docs â•‘  500 docs  â•‘ 1000 docsâ•‘");
-        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•£");
+        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•£");
         // Lattice 1000-doc extrapolated
         double l1000 = latticeBatchOps[2]; // 500-doc rate is representative
         Console.WriteLine($"â•‘ Lattice  (embeds/sec)     â•‘{latticeBatchOps[0],8:F0}  â•‘{latticeBatchOps[1],8:F0}  â•‘{latticeBatchOps[2],10:F0}  â•‘{l1000,8:F0}  â•‘");
@@ -222,11 +231,9 @@ public static class Program
         Console.WriteLine($"â•‘ Ollama   (embeds/sec)     â•‘{ollamaBatchOps[0],8:F1}  â•‘{ollamaBatchOps[1],8:F1}  â•‘{ollamaBatchOps[2],10:F1}  â•‘{o1000,8:F1}  â•‘");
         Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•£");
         Console.WriteLine();
-        Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
+        Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
         Console.WriteLine("â•‘     Q3: Parallel prompt pipeline  (concurrent embed for thinking model) â•‘");
-        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
-        Console.WriteLine("â•‘ Method                    â•‘   c=1        â•‘   c=8        â•‘   c=32        â•‘");
-        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•£");
+        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•£");
         Console.WriteLine($"â•‘ Lattice  (embeds/sec)     â•‘{latticePar[0],10:F0}    â•‘{latticePar[1],10:F0}    â•‘{latticePar[2],11:F0}    â•‘");
         Console.WriteLine($"â•‘ Ollama   (embeds/sec)     â•‘{ollamaPar[0],10:F1}    â•‘{ollamaPar[1],10:F1}    â•‘{ollamaPar[2],11:F1}    â•‘");
         Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•£");
@@ -761,11 +768,7 @@ public static class Program
             long overheadBytes = vocabSize   * 12L;
             long totalEstBytes = entryBytes + overheadBytes;
 
-            Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
-            Console.WriteLine("â•‘               Memory Diagnostics â€” LatticeEmbeddingSource           â•‘");
-            Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•£");
-            // Spot-checking individual embeddings shows up during Lattice load
-            Console.WriteLine();
+            Console.WriteLine("╠═══════════════════════════════╬══════════╬══════════╬══════════╬══════════╣");
             Console.WriteLine("Spot-check individual embeddings (nnz / dims):");
             foreach (var sample in samples.Skip(samples.Length - 5))
             {
@@ -951,5 +954,495 @@ public static class Program
         Console.WriteLine("Tokens:   [" + string.Join(", ", tokens) + "]");
         Console.WriteLine("Decoded:  " + decoded);
         Console.WriteLine("Round-trip match: " + (testText == decoded));
+    }
+
+    // -----------------------------------------------------------------------
+    // serve: Ollama-compatible HTTP server backed by IntegerCausalSource
+    // -----------------------------------------------------------------------
+
+    private static async Task RunServe(string[] extraArgs)
+    {
+        string ollamaRoot = Environment.GetEnvironmentVariable("OLLAMA_MODELS") ?? @"D:\AI\OllamaModels";
+        string modelName = extraArgs.Length > 0 ? extraArgs[0] : "gemma3";
+        string? tag = extraArgs.Length > 1 ? extraArgs[1] : null;
+        int port = 11435;
+        bool useLattice = extraArgs.Any(a => a.Equals("--lattice", StringComparison.OrdinalIgnoreCase));
+
+        Console.WriteLine("╔══════════════════════════════════════════════════════════════════════╗");
+        Console.WriteLine("║       SparseLattice — Integer Causal Server (Ollama-compatible)      ║");
+        Console.WriteLine("╚══════════════════════════════════════════════════════════════════════╝");
+        Console.WriteLine();
+        Console.WriteLine($"Model:   {modelName}" + (tag is not null ? $":{tag}" : ""));
+        Console.WriteLine($"Ollama:  {ollamaRoot}");
+        Console.WriteLine($"Port:    {port}");
+        Console.WriteLine($"Lattice: {(useLattice ? "enabled" : "disabled")}");
+        Console.WriteLine();
+
+        Console.Write("Loading model... ");
+        Stopwatch swLoad = Stopwatch.StartNew();
+        IntegerCausalSource model;
+        try
+        {
+            model = IntegerCausalSource.LoadFromOllama(
+                modelName, ollamaRoot, tag, scaleBits: 30,
+                onProgress: (step, total, name) =>
+                {
+                    if (step % 20 == 0 || step == total)
+                        Console.Write($"\rLoading model... {step}/{total} ({name})    ");
+                });
+        }
+        catch (OutOfMemoryException)
+        {
+            Console.WriteLine();
+            Console.WriteLine("ERROR: OutOfMemoryException — model too large for int64 quantization.");
+            Console.WriteLine("The integer lattice runtime quantizes all weights to int64 (8 bytes each).");
+            Console.WriteLine("Large models (4B+ params) need 20+ GB RAM. Options:");
+            Console.WriteLine("  1. Use a smaller model: embeddinggemma (768-dim, 24 layers)");
+            Console.WriteLine("  2. Increase available RAM");
+            Console.WriteLine("  3. (Future) int32 weight storage for 2× compression");
+            return;
+        }
+        catch (FileNotFoundException ex)
+        {
+            Console.WriteLine();
+            Console.WriteLine($"ERROR: {ex.Message}");
+            Console.WriteLine("Make sure the model is pulled in Ollama: ollama pull " + modelName);
+            return;
+        }
+        swLoad.Stop();
+        Console.WriteLine($"\rModel loaded in {swLoad.Elapsed.TotalSeconds:F1}s — {model.ModelName}, {model.Dimensions}d, {model.LayerCount} layers, {model.VocabSize} vocab");
+
+        if (useLattice)
+        {
+            Console.Write("Building VocabLattice... ");
+            Stopwatch swLattice = Stopwatch.StartNew();
+            model.GetVocabLattice(64);
+            swLattice.Stop();
+            Console.WriteLine($"done in {swLattice.Elapsed.TotalSeconds:F1}s");
+        }
+
+        using HttpListener listener = new();
+        string prefix = $"http://localhost:{port}/";
+        listener.Prefixes.Add(prefix);
+        listener.Start();
+        Console.WriteLine();
+        Console.WriteLine($"Listening on {prefix}");
+        Console.WriteLine("Point LVSCP or curl at this endpoint. Press Ctrl+C to stop.");
+        Console.WriteLine();
+
+        CancellationTokenSource cts = new();
+        Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+
+        while (!cts.IsCancellationRequested)
+        {
+            HttpListenerContext ctx;
+            try { ctx = await listener.GetContextAsync().WaitAsync(cts.Token); }
+            catch (OperationCanceledException) { break; }
+
+            _ = Task.Run(() => HandleRequest(ctx, model, useLattice, cts.Token));
+        }
+
+        Console.WriteLine("Server stopped.");
+        model.Dispose();
+    }
+
+    private static async Task HandleRequest(HttpListenerContext ctx, IntegerCausalSource model,
+        bool useLattice, CancellationToken ct)
+    {
+        HttpListenerRequest req = ctx.Request;
+        HttpListenerResponse resp = ctx.Response;
+        string path = req.Url?.AbsolutePath ?? "/";
+
+        try
+        {
+            if (path == "/api/tags" && req.HttpMethod == "GET")
+            {
+                await WriteJson(resp, new
+                {
+                    models = new[]
+                    {
+                        new
+                        {
+                            name = model.ModelName,
+                            model = model.ModelName,
+                            modified_at = DateTime.UtcNow.ToString("o"),
+                            size = 0L,
+                            digest = "integer-lattice",
+                            details = new
+                            {
+                                format = "gguf",
+                                family = "gemma3",
+                                parameter_size = "unknown",
+                                quantization_level = "int64"
+                            }
+                        }
+                    }
+                });
+                return;
+            }
+
+            if (path == "/api/ps" && req.HttpMethod == "GET")
+            {
+                await WriteJson(resp, new
+                {
+                    models = new[]
+                    {
+                        new
+                        {
+                            name = model.ModelName,
+                            model = model.ModelName,
+                            size = 0L,
+                            digest = "integer-lattice",
+                            expires_at = DateTime.UtcNow.AddHours(24).ToString("o")
+                        }
+                    }
+                });
+                return;
+            }
+
+            if (path == "/api/show" && req.HttpMethod == "POST")
+            {
+                await WriteJson(resp, new
+                {
+                    modelfile = "",
+                    parameters = "",
+                    template = "",
+                    license = "",
+                    details = new
+                    {
+                        format = "gguf",
+                        family = "gemma3",
+                        families = "gemma3",
+                        parameter_size = "unknown",
+                        quantization_level = "int64"
+                    },
+                    model_info = new Dictionary<string, object>
+                    {
+                        ["general.architecture"] = "gemma3",
+                        ["general.context_length"] = 2048,
+                        ["general.embedding_length"] = model.Dimensions,
+                        ["general.type"] = "model"
+                    }
+                });
+                return;
+            }
+
+            if (path == "/api/generate" && req.HttpMethod == "POST")
+            {
+                string body;
+                using (StreamReader sr = new(req.InputStream, req.ContentEncoding))
+                    body = await sr.ReadToEndAsync();
+
+                JsonDocument doc = JsonDocument.Parse(body);
+                string prompt = doc.RootElement.GetProperty("prompt").GetString() ?? "";
+                bool stream = true;
+                if (doc.RootElement.TryGetProperty("stream", out JsonElement streamEl))
+                    stream = streamEl.GetBoolean();
+
+                int maxTokens = 256;
+                if (doc.RootElement.TryGetProperty("options", out JsonElement opts)
+                    && opts.TryGetProperty("num_predict", out JsonElement numPred))
+                    maxTokens = numPred.GetInt32();
+
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Generate: \"{Truncate(prompt, 80)}\" (max={maxTokens}, stream={stream})");
+                Stopwatch swGen = Stopwatch.StartNew();
+                int tokenCount = 0;
+
+                if (stream)
+                {
+                    resp.ContentType = "application/x-ndjson";
+                    resp.SendChunked = true;
+                    using StreamWriter writer = new(resp.OutputStream, leaveOpen: false);
+
+                    string fullResult = model.GenerateStreaming(prompt, maxTokens, token =>
+                    {
+                        tokenCount++;
+                        string line = JsonSerializer.Serialize(new { model = model.ModelName, response = token, done = false });
+                        writer.WriteLine(line);
+                        writer.Flush();
+                    }, useLattice, 64, ct);
+
+                    string doneLine = JsonSerializer.Serialize(new { model = model.ModelName, response = "", done = true });
+                    writer.WriteLine(doneLine);
+                    writer.Flush();
+                }
+                else
+                {
+                    string result = model.Generate(prompt, maxTokens, useLattice, 64);
+                    tokenCount = model.Tokenizer.Encode(result, addSpecialTokens: false).Length;
+                    await WriteJson(resp, new { model = model.ModelName, response = result, done = true });
+                }
+
+                swGen.Stop();
+                double tokPerSec = tokenCount > 0 ? tokenCount / swGen.Elapsed.TotalSeconds : 0;
+                Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]   → {tokenCount} tokens in {swGen.Elapsed.TotalSeconds:F1}s ({tokPerSec:F2} tok/s)");
+                return;
+            }
+
+            resp.StatusCode = 404;
+            await WriteJson(resp, new { error = "Not found: " + path });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] ERROR: {ex.Message}");
+            try
+            {
+                resp.StatusCode = 500;
+                await WriteJson(resp, new { error = ex.Message });
+            }
+            catch { }
+        }
+    }
+
+    private static async Task WriteJson(HttpListenerResponse resp, object payload)
+    {
+        resp.ContentType = "application/json";
+        string json = JsonSerializer.Serialize(payload);
+        byte[] bytes = System.Text.Encoding.UTF8.GetBytes(json);
+        resp.ContentLength64 = bytes.Length;
+        await resp.OutputStream.WriteAsync(bytes);
+        resp.Close();
+    }
+
+    private static string Truncate(string s, int max)
+        => s.Length <= max ? s : s[..(max - 3)] + "...";
+
+    // -----------------------------------------------------------------------
+    // quality: E4-8 determinism + quality benchmark
+    // -----------------------------------------------------------------------
+
+    private static async Task RunQualityBenchmark()
+    {
+        string ollamaRoot = Environment.GetEnvironmentVariable("OLLAMA_MODELS") ?? @"D:\AI\OllamaModels";
+
+        Console.WriteLine("╔══════════════════════════════════════════════════════════════════════╗");
+        Console.WriteLine("║       E4-8: Quality & Determinism Benchmark                          ║");
+        Console.WriteLine("╚══════════════════════════════════════════════════════════════════════╝");
+        Console.WriteLine();
+
+        // Try to find a Gemma model for the benchmark
+        string? ggufPath = null;
+        string[] candidates = ["gemma3", "gemma3:4b", "gemma3:1b"];
+        foreach (string candidate in candidates)
+        {
+            string name = candidate.Contains(':') ? candidate[..candidate.IndexOf(':')] : candidate;
+            string? tag = candidate.Contains(':') ? candidate[(candidate.IndexOf(':') + 1)..] : null;
+            ggufPath = OllamaModelLocator.LocateGgufOllama(name, ollamaRoot, tag);
+            if (ggufPath is not null)
+            {
+                Console.WriteLine($"Found model: {candidate} → {Path.GetFileName(ggufPath)}");
+                break;
+            }
+        }
+
+        if (ggufPath is null)
+        {
+            // Fall back to local test data embeddinggemma
+            string? testData = GetTestDataEmbeddingsDir();
+            if (testData is not null)
+                ggufPath = OllamaModelLocator.LocateGguf("embeddinggemma", testData);
+        }
+
+        if (ggufPath is null)
+        {
+            Console.WriteLine("No Gemma model found. Pull one with: ollama pull gemma3");
+            return;
+        }
+
+        Console.Write("Loading model... ");
+        Stopwatch swLoad = Stopwatch.StartNew();
+        IntegerCausalSource model;
+        try
+        {
+            model = IntegerCausalSource.Load(ggufPath, scaleBits: 30,
+                onProgress: (step, total, name) =>
+                {
+                    if (step % 20 == 0 || step == total)
+                        Console.Write($"\rLoading model... {step}/{total}    ");
+                });
+        }
+        catch (OutOfMemoryException)
+        {
+            Console.WriteLine();
+            Console.WriteLine("ERROR: OutOfMemoryException — model too large for int64 quantization.");
+            Console.WriteLine("Falling back to embeddinggemma from TestData...");
+            string? testData = GetTestDataEmbeddingsDir();
+            if (testData is null)
+            {
+                Console.WriteLine("No fallback model available.");
+                return;
+            }
+            string? fallback = OllamaModelLocator.LocateGguf("embeddinggemma", testData);
+            if (fallback is null)
+            {
+                Console.WriteLine("embeddinggemma not found in TestData.");
+                return;
+            }
+            model = IntegerCausalSource.Load(fallback, scaleBits: 30,
+                onProgress: (step, total, name) =>
+                {
+                    if (step % 20 == 0 || step == total)
+                        Console.Write($"\rLoading fallback... {step}/{total}    ");
+                });
+        }
+        swLoad.Stop();
+        Console.WriteLine($"\rLoaded: {model.ModelName}, {model.Dimensions}d, {model.LayerCount} layers in {swLoad.Elapsed.TotalSeconds:F1}s");
+        Console.WriteLine();
+        using (model)
+        {
+            // ================================================================
+            // Test 1: Determinism — 10 runs of the same prompt, verify bit-identity
+            // ================================================================
+            Console.WriteLine("═══ Test 1: Determinism (10 runs, bit-identity check) ═══");
+            string deterministicPrompt = "The capital of France is";
+            int[] deterministicTokens = model.Tokenizer.Encode(deterministicPrompt, addSpecialTokens: true);
+            long[]? referenceHidden = null;
+            bool allIdentical = true;
+
+            for (int run = 0; run < 10; run++)
+            {
+                long[] hidden = model.ForwardCausal(deterministicTokens);
+                if (referenceHidden is null)
+                {
+                    referenceHidden = hidden;
+                    Console.WriteLine($"  Run {run + 1}/10: reference (dim={hidden.Length})");
+                }
+                else
+                {
+                    bool identical = true;
+                    for (int d = 0; d < hidden.Length; d++)
+                    {
+                        if (hidden[d] != referenceHidden[d])
+                        {
+                            identical = false;
+                            allIdentical = false;
+                            Console.WriteLine($"  Run {run + 1}/10: MISMATCH at dim {d}");
+                            break;
+                        }
+                    }
+                    if (identical)
+                        Console.WriteLine($"  Run {run + 1}/10: bit-identical ✓");
+                }
+            }
+
+            Console.WriteLine($"  Result: {(allIdentical ? "PASS — 10/10 bit-identical" : "FAIL — non-determinism detected")}");
+            Console.WriteLine();
+
+            // ================================================================
+            // Test 2: Token prediction consistency — same prompt, same output
+            // ================================================================
+            Console.WriteLine("═══ Test 2: Generation Consistency (5 runs, same prompt) ═══");
+            string genPrompt = "Hello, my name is";
+            string? referenceOutput = null;
+            bool genConsistent = true;
+
+            for (int run = 0; run < 5; run++)
+            {
+                string output = model.Generate(genPrompt, maxNewTokens: 16, useLattice: false);
+                if (referenceOutput is null)
+                {
+                    referenceOutput = output;
+                    Console.WriteLine($"  Run {run + 1}/5: \"{output}\" (reference)");
+                }
+                else
+                {
+                    bool match = output == referenceOutput;
+                    if (!match) genConsistent = false;
+                    Console.WriteLine($"  Run {run + 1}/5: \"{output}\" {(match ? "✓" : "MISMATCH")}");
+                }
+            }
+
+            Console.WriteLine($"  Result: {(genConsistent ? "PASS" : "FAIL")}");
+            Console.WriteLine();
+
+            // ================================================================
+            // Test 3: Token prediction — probe what the model predicts
+            // ================================================================
+            Console.WriteLine("═══ Test 3: Next-Token Probes ═══");
+            string[] probePrompts =
+            [
+                "The capital of France is",
+                "2 + 2 =",
+                "public static void Main(",
+                "The color of the sky is",
+                "Once upon a time there was a",
+            ];
+
+            foreach (string probePrompt in probePrompts)
+            {
+                int[] tokens = model.Tokenizer.Encode(probePrompt, addSpecialTokens: true);
+                float[] hidden = model.ForwardCausalFloat(tokens);
+                int predicted = VocabLattice.ArgmaxBruteForce(hidden, model.TokenEmbeddingsFloat, model.VocabSize, model.Dimensions);
+                string predictedStr = model.Tokenizer.Decode([predicted]);
+                Console.WriteLine($"  \"{probePrompt}\" → [{predicted}] \"{predictedStr}\"");
+            }
+
+            Console.WriteLine();
+
+            // ================================================================
+            // Test 4: Brute-force vs Lattice recall for actual model hidden states
+            // ================================================================
+            Console.WriteLine("═══ Test 4: Lattice Recall on Real Hidden States ═══");
+            Console.Write("  Building VocabLattice... ");
+            Stopwatch swLattice = Stopwatch.StartNew();
+            VocabLattice lattice = model.GetVocabLattice(64);
+            swLattice.Stop();
+            Console.WriteLine($"done in {swLattice.Elapsed.TotalSeconds:F1}s ({lattice.VocabSize} tokens)");
+
+            int latticeHits = 0;
+            int latticeTotal = 0;
+            foreach (string probePrompt in probePrompts)
+            {
+                int[] tokens = model.Tokenizer.Encode(probePrompt, addSpecialTokens: true);
+                float[] hidden = model.ForwardCausalFloat(tokens);
+
+                int bruteForce = VocabLattice.ArgmaxBruteForce(hidden, model.TokenEmbeddingsFloat, model.VocabSize, model.Dimensions);
+                int[] knnCandidates = lattice.QueryTopK(hidden, 64);
+                (int TokenId, float Score)[] scored = VocabLattice.ScoreCandidates(hidden, knnCandidates, model.TokenEmbeddingsFloat, model.Dimensions);
+                int latticeTop1 = scored.Length > 0 ? scored[0].TokenId : -1;
+
+                latticeTotal++;
+                bool hit = latticeTop1 == bruteForce;
+                if (hit) latticeHits++;
+                string bfStr = model.Tokenizer.Decode([bruteForce]);
+                string ltStr = latticeTop1 >= 0 ? model.Tokenizer.Decode([latticeTop1]) : "?";
+                Console.WriteLine($"  \"{Truncate(probePrompt, 40)}\" brute=\"{bfStr}\" lattice=\"{ltStr}\" {(hit ? "✓" : "MISS")}");
+            }
+
+            double recallRate = latticeTotal > 0 ? (double)latticeHits / latticeTotal : 0;
+            Console.WriteLine($"  Recall: {latticeHits}/{latticeTotal} ({recallRate:P0})");
+            Console.WriteLine();
+
+            // ================================================================
+            // Test 5: Generation speed
+            // ================================================================
+            Console.WriteLine("═══ Test 5: Generation Speed ═══");
+            string speedPrompt = "Write a function that";
+            int speedTokens = 8;
+
+            Stopwatch swBrute = Stopwatch.StartNew();
+            string bruteResult = model.Generate(speedPrompt, maxNewTokens: speedTokens, useLattice: false);
+            swBrute.Stop();
+            double bruteTokPerSec = speedTokens / swBrute.Elapsed.TotalSeconds;
+            Console.WriteLine($"  Brute-force: {speedTokens} tokens in {swBrute.Elapsed.TotalSeconds:F1}s ({bruteTokPerSec:F2} tok/s) → \"{bruteResult}\"");
+
+            Stopwatch swLat = Stopwatch.StartNew();
+            string latticeResult = model.Generate(speedPrompt, maxNewTokens: speedTokens, useLattice: true, latticeK: 64);
+            swLat.Stop();
+            double latTokPerSec = speedTokens / swLat.Elapsed.TotalSeconds;
+            Console.WriteLine($"  Lattice:     {speedTokens} tokens in {swLat.Elapsed.TotalSeconds:F1}s ({latTokPerSec:F2} tok/s) → \"{latticeResult}\"");
+            Console.WriteLine($"  Speedup: {swBrute.Elapsed.TotalSeconds / swLat.Elapsed.TotalSeconds:F2}×");
+            Console.WriteLine();
+
+            // ================================================================
+            // Summary
+            // ================================================================
+            Console.WriteLine("═══ Summary ═══");
+            Console.WriteLine($"  Determinism:    {(allIdentical ? "PASS" : "FAIL")}");
+            Console.WriteLine($"  Gen consistency: {(genConsistent ? "PASS" : "FAIL")}");
+            Console.WriteLine($"  Lattice recall:  {recallRate:P0}");
+            Console.WriteLine($"  Brute tok/s:     {bruteTokPerSec:F2}");
+            Console.WriteLine($"  Lattice tok/s:   {latTokPerSec:F2}");
+        }
     }
 }

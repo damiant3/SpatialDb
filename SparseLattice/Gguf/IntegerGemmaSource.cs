@@ -18,7 +18,8 @@ public sealed partial class IntegerGemmaSource : IEmbeddingSource, IDisposable
     private readonly int m_nHeads;
     private readonly int m_nKvHeads;
     private readonly int m_headDim;
-    private readonly int m_kvDim;
+    private readonly int m_qDim;    // nHeads * headDim (may differ from nEmbd)
+    private readonly int m_kvDim;   // nKvHeads * headDim
     private readonly int m_nFf;
     private readonly float m_ropeFreqBase;
     private readonly float m_normEps;

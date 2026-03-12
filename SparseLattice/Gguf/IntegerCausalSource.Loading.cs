@@ -7,8 +7,7 @@ public sealed partial class IntegerCausalSource
     private IntegerCausalSource(
         string modelName,
         BpeTokenizer tokenizer,
-        long[] tokenEmbeddings,
-        float[] tokenEmbeddingsFloat,
+        Half[] tokenEmbeddingsHalf,
         long[] outputNormW,
         IntegerGemmaSource.GemmaLayerWeights[] layers,
         int nEmbd, int nHeads, int nKvHeads, int headDim, int nFf,
@@ -18,14 +17,14 @@ public sealed partial class IntegerCausalSource
     {
         ModelName = modelName;
         m_tokenizer = tokenizer;
-        m_tokenEmbeddings = tokenEmbeddings;
-        m_tokenEmbeddingsFloat = tokenEmbeddingsFloat;
+        m_tokenEmbeddingsHalf = tokenEmbeddingsHalf;
         m_outputNormW = outputNormW;
         m_layers = layers;
         m_nEmbd = nEmbd;
         m_nHeads = nHeads;
         m_nKvHeads = nKvHeads;
         m_headDim = headDim;
+        m_qDim = nHeads * headDim;
         m_kvDim = nKvHeads * headDim;
         m_nFf = nFf;
         m_vocabSize = vocabSize;
@@ -85,8 +84,7 @@ public sealed partial class IntegerCausalSource
         int step = 0;
         void Report(string name) { step++; onProgress?.Invoke(step, totalSteps, name); }
 
-        float[] tokenEmbdFloat = reader.ReadTensorF32("token_embd.weight");
-        long[] tokenEmbd = Q(tokenEmbdFloat, scaleBits);
+        Half[] tokenEmbdHalf = ReadAsHalf(reader, "token_embd.weight");
         Report("token_embd.weight");
 
         long[] outputNormW = Q(reader.ReadTensorF32("output_norm.weight"), scaleBits);
@@ -98,44 +96,48 @@ public sealed partial class IntegerCausalSource
         {
             string pfx = $"blk.{i}";
 
-            long[] attnNormW     = Q(reader.ReadTensorF32($"{pfx}.attn_norm.weight"), scaleBits);
+            // Norm weights: small vectors, keep as int64 for RmsNorm arithmetic.
+            long[] attnNormW     = ReadAndQuantize(reader, $"{pfx}.attn_norm.weight", scaleBits);
             Report($"blk.{i} attn_norm");
-            long[] attnQ         = Q(reader.ReadTensorF32($"{pfx}.attn_q.weight"), scaleBits);
+
+            // Projection weights: stored as Half (2 bytes/element).
+            // Quantized to int64 on-the-fly during MatMul.
+            Half[] attnQ         = ReadAsHalf(reader, $"{pfx}.attn_q.weight");
             Report($"blk.{i} attn_q");
-            long[] attnK         = Q(reader.ReadTensorF32($"{pfx}.attn_k.weight"), scaleBits);
+            Half[] attnK         = ReadAsHalf(reader, $"{pfx}.attn_k.weight");
             Report($"blk.{i} attn_k");
-            long[] attnV         = Q(reader.ReadTensorF32($"{pfx}.attn_v.weight"), scaleBits);
+            Half[] attnV         = ReadAsHalf(reader, $"{pfx}.attn_v.weight");
             Report($"blk.{i} attn_v");
 
             long[] attnQNormW = reader.HasTensor($"{pfx}.attn_q_norm.weight")
-                ? Q(reader.ReadTensorF32($"{pfx}.attn_q_norm.weight"), scaleBits)
+                ? ReadAndQuantize(reader, $"{pfx}.attn_q_norm.weight", scaleBits)
                 : MakeOnesWeight(nHeads * headDim, scaleBits);
             Report($"blk.{i} attn_q_norm");
 
             long[] attnKNormW = reader.HasTensor($"{pfx}.attn_k_norm.weight")
-                ? Q(reader.ReadTensorF32($"{pfx}.attn_k_norm.weight"), scaleBits)
+                ? ReadAndQuantize(reader, $"{pfx}.attn_k_norm.weight", scaleBits)
                 : MakeOnesWeight(nKvHeads * headDim, scaleBits);
             Report($"blk.{i} attn_k_norm");
 
-            long[] attnOutput    = Q(reader.ReadTensorF32($"{pfx}.attn_output.weight"), scaleBits);
+            Half[] attnOutput    = ReadAsHalf(reader, $"{pfx}.attn_output.weight");
             Report($"blk.{i} attn_output");
 
             long[] postAttnNormW = reader.HasTensor($"{pfx}.post_attention_norm.weight")
-                ? Q(reader.ReadTensorF32($"{pfx}.post_attention_norm.weight"), scaleBits)
+                ? ReadAndQuantize(reader, $"{pfx}.post_attention_norm.weight", scaleBits)
                 : MakeOnesWeight(nEmbd, scaleBits);
             Report($"blk.{i} post_attn_norm");
 
-            long[] ffnNormW      = Q(reader.ReadTensorF32($"{pfx}.ffn_norm.weight"), scaleBits);
+            long[] ffnNormW      = ReadAndQuantize(reader, $"{pfx}.ffn_norm.weight", scaleBits);
             Report($"blk.{i} ffn_norm");
-            long[] ffnGate       = Q(reader.ReadTensorF32($"{pfx}.ffn_gate.weight"), scaleBits);
+            Half[] ffnGate       = ReadAsHalf(reader, $"{pfx}.ffn_gate.weight");
             Report($"blk.{i} ffn_gate");
-            long[] ffnUp         = Q(reader.ReadTensorF32($"{pfx}.ffn_up.weight"), scaleBits);
+            Half[] ffnUp         = ReadAsHalf(reader, $"{pfx}.ffn_up.weight");
             Report($"blk.{i} ffn_up");
-            long[] ffnDown       = Q(reader.ReadTensorF32($"{pfx}.ffn_down.weight"), scaleBits);
+            Half[] ffnDown       = ReadAsHalf(reader, $"{pfx}.ffn_down.weight");
             Report($"blk.{i} ffn_down");
 
             long[] postFfwNormW = reader.HasTensor($"{pfx}.post_ffw_norm.weight")
-                ? Q(reader.ReadTensorF32($"{pfx}.post_ffw_norm.weight"), scaleBits)
+                ? ReadAndQuantize(reader, $"{pfx}.post_ffw_norm.weight", scaleBits)
                 : MakeOnesWeight(nEmbd, scaleBits);
             Report($"blk.{i} post_ffw_norm ({i + 1}/{nLayers})");
 
@@ -162,8 +164,7 @@ public sealed partial class IntegerCausalSource
         return new IntegerCausalSource(
             modelName: reader.ModelName,
             tokenizer: tokenizer,
-            tokenEmbeddings: tokenEmbd,
-            tokenEmbeddingsFloat: tokenEmbdFloat,
+            tokenEmbeddingsHalf: tokenEmbdHalf,
             outputNormW: outputNormW,
             layers: layers,
             nEmbd: nEmbd,
@@ -179,6 +180,33 @@ public sealed partial class IntegerCausalSource
 
     private static long[] Q(float[] source, int scaleBits)
         => IntegerMatMul.QuantizeFromFloat(source, scaleBits).Data;
+
+    /// <summary>
+    /// Reads a tensor from the GGUF reader, quantizes to int64, and aggressively
+    /// releases the float intermediate to reduce GC pressure during loading.
+    /// </summary>
+    private static long[] ReadAndQuantize(GgufReader reader, string name, int scaleBits)
+    {
+        float[] floats = reader.ReadTensorF32(name);
+        double scale = 1L << scaleBits;
+        long[] data = new long[floats.Length];
+        for (int i = 0; i < floats.Length; i++)
+            data[i] = (long)(floats[i] * scale);
+        return data;
+    }
+
+    /// <summary>
+    /// Reads a tensor as float32 and compresses to Half[] for compact storage.
+    /// Saves 2× memory vs float[] and 4× vs long[].
+    /// </summary>
+    private static Half[] ReadAsHalf(GgufReader reader, string name)
+    {
+        float[] floats = reader.ReadTensorF32(name);
+        Half[] halves = new Half[floats.Length];
+        for (int i = 0; i < floats.Length; i++)
+            halves[i] = (Half)floats[i];
+        return halves;
+    }
 
     private static long[] MakeOnesWeight(int length, int scaleBits)
     {

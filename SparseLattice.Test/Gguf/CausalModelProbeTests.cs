@@ -380,4 +380,172 @@ public sealed class CausalModelProbeTests
             result[i] = (long)(rng.NextDouble() * 2.0 * magnitude - magnitude);
         return result;
     }
+
+    // -----------------------------------------------------------------
+    // Gemma3 4B/12B probes (K-quant models)
+    // -----------------------------------------------------------------
+
+    [TestMethod]
+    [TestCategory("Integration")]
+    public void Probe_Gemma3_Architecture()
+    {
+        string? gguf = OllamaModelLocator.LocateGgufOllama("gemma3", OllamaRoot);
+        if (gguf is null)
+        {
+            Assert.Inconclusive("gemma3 GGUF not found in Ollama.");
+            return;
+        }
+
+        using GgufReader reader = GgufReader.Open(gguf);
+        Console.WriteLine($"Architecture: {reader.Architecture}");
+        Console.WriteLine($"Name:         {reader.ModelName}");
+        Console.WriteLine($"Embedding:    {reader.EmbeddingLength}");
+        Console.WriteLine($"Heads:        {reader.HeadCount}");
+        Console.WriteLine($"Layers:       {reader.LayerCount}");
+        Console.WriteLine($"FF:           {reader.FeedForwardLength}");
+        Console.WriteLine($"Context:      {reader.ContextLength}");
+        Console.WriteLine($"Vocab:        {reader.Tokens.Count}");
+        Console.WriteLine($"Tensors:      {reader.TensorInfos.Count}");
+        Console.WriteLine();
+
+        Console.WriteLine("Dtype distribution:");
+        foreach (IGrouping<uint, GgufTensorInfo> group in reader.TensorInfos.GroupBy(t => (uint)t.DType))
+        {
+            string name = Enum.IsDefined((GgufDType)group.Key)
+                ? ((GgufDType)group.Key).ToString()
+                : $"Unknown({group.Key})";
+            Console.WriteLine($"  {name,-20} {group.Count()} tensors");
+        }
+        Console.WriteLine();
+
+        string[] uniquePrefixes = reader.TensorInfos
+            .Select(t => t.Name.Replace("blk.0.", "blk.N."))
+            .Where(n => !n.StartsWith("blk.") || n.StartsWith("blk.N."))
+            .Distinct()
+            .OrderBy(n => n)
+            .ToArray();
+
+        Console.WriteLine("Tensor name patterns:");
+        foreach (string name in uniquePrefixes)
+        {
+            GgufTensorInfo info = name.Contains("blk.N.")
+                ? reader.TensorInfos.First(t => t.Name == name.Replace("blk.N.", "blk.0."))
+                : reader.TensorInfos.First(t => t.Name == name);
+            string dtypeName = Enum.IsDefined(info.DType) ? info.DType.ToString() : $"?({(uint)info.DType})";
+            Console.WriteLine($"  {name,-50} [{string.Join(",", info.Shape),20}] {dtypeName}");
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("Key metadata:");
+        foreach (string key in reader.Metadata.Keys
+            .Where(k =>
+                k.Contains("head_count") || k.Contains("kv") || k.Contains("norm") ||
+                k.Contains("rope") || k.Contains("attention") || k.Contains("type") ||
+                k.Contains("causal") || k.Contains("pool") || k.Contains("vocab"))
+            .OrderBy(k => k))
+        {
+            Console.WriteLine($"  {key} = {reader.Metadata[key]}");
+        }
+    }
+
+    [TestMethod]
+    [TestCategory("Integration")]
+    public void Probe_Gemma3_Dequantize_Smoke()
+    {
+        string? gguf = OllamaModelLocator.LocateGgufOllama("gemma3", OllamaRoot);
+        if (gguf is null)
+        {
+            Assert.Inconclusive("gemma3 GGUF not found in Ollama.");
+            return;
+        }
+
+        using GgufReader reader = GgufReader.Open(gguf);
+
+        // Test dequantization of the first layer's attention weights — these are typically K-quanted
+        string[] tensorNames = ["token_embd.weight", "blk.0.attn_q.weight", "blk.0.ffn_gate.weight", "blk.0.ffn_down.weight"];
+        foreach (string name in tensorNames)
+        {
+            if (!reader.HasTensor(name))
+            {
+                Console.WriteLine($"  {name}: not found, skipping");
+                continue;
+            }
+
+            GgufTensorInfo info = reader.TensorInfos.First(t => t.Name == name);
+            Console.Write($"  {name,-40} dtype={info.DType,-8} shape=[{string.Join(",", info.Shape)}] ... ");
+
+            float[] data = reader.ReadTensorF32(name);
+
+            float absMax = 0f;
+            int nanCount = 0;
+            int infCount = 0;
+            int zeroCount = 0;
+            for (int i = 0; i < data.Length; i++)
+            {
+                float v = data[i];
+                if (float.IsNaN(v)) { nanCount++; continue; }
+                if (float.IsInfinity(v)) { infCount++; continue; }
+                if (v == 0f) zeroCount++;
+                float a = MathF.Abs(v);
+                if (a > absMax) absMax = a;
+            }
+
+            Console.WriteLine($"elements={data.Length:N0}  absMax={absMax:G4}  NaN={nanCount}  Inf={infCount}  zero={zeroCount}");
+            Assert.AreEqual(0, nanCount, $"{name}: NaN values in dequantized tensor");
+            Assert.AreEqual(0, infCount, $"{name}: Inf values in dequantized tensor");
+            Assert.IsTrue(absMax > 0f, $"{name}: all-zero tensor");
+        }
+    }
+
+    [TestMethod]
+    [TestCategory("Integration")]
+    public void Integration_Gemma3_CausalSource_LoadAndForward_Smoke()
+    {
+        string? gguf = OllamaModelLocator.LocateGgufOllama("gemma3", OllamaRoot);
+        if (gguf is null)
+        {
+            Assert.Inconclusive("gemma3 GGUF not found in Ollama.");
+            return;
+        }
+
+        Console.Write("Loading IntegerCausalSource from gemma3... ");
+        IntegerCausalSource src;
+        try
+        {
+            src = IntegerCausalSource.Load(gguf, scaleBits: 30,
+                onProgress: (step, total, name) =>
+                {
+                    if (step % 50 == 0 || step == total)
+                        Console.Write($"\r  Loading... {step}/{total}    ");
+                });
+        }
+        catch (OutOfMemoryException)
+        {
+            Console.WriteLine("\r  OutOfMemoryException — model too large for int64 quantization on this machine.");
+            Console.WriteLine("  Gemma3 4B (48 layers, 3840-dim) requires ~20 GB+ RAM for int64 weights.");
+            Console.WriteLine("  This is expected. Use embeddinggemma (24 layers, 768-dim) for CPU testing.");
+            Assert.Inconclusive("Model too large for int64 quantization.");
+            return;
+        }
+
+        using (src)
+        {
+            Console.WriteLine($"\r  Loaded: {src.ModelName}, {src.Dimensions}d, {src.LayerCount} layers, {src.VocabSize} vocab");
+
+            int[] tokens = src.Tokenizer.Encode("Hello, world!", addSpecialTokens: true);
+            Console.WriteLine($"  Tokens: [{string.Join(", ", tokens)}]");
+
+            float[] hidden = src.ForwardCausalFloat(tokens);
+            Assert.AreEqual(src.Dimensions, hidden.Length);
+
+            float norm = 0f;
+            for (int i = 0; i < hidden.Length; i++)
+                norm += hidden[i] * hidden[i];
+            norm = MathF.Sqrt(norm);
+
+            Console.WriteLine($"  Hidden: dim={hidden.Length}, L2 norm={norm:F6}");
+            Console.WriteLine($"  First 5: [{string.Join(", ", hidden.Take(5).Select(v => $"{v:G4}"))}]");
+            Assert.IsTrue(norm > 1e-6f, $"Hidden state should be non-zero, got L2 norm={norm:F6}");
+        }
+    }
 }
