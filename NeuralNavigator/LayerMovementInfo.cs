@@ -1,9 +1,6 @@
 ///////////////////////////////////////////////
 namespace NeuralNavigator;
 
-/// <summary>
-/// Represents a single layer's hidden-state movement distance for the bar chart display.
-/// </summary>
 sealed class LayerMovementInfo(string label, float distance, float maxDistance)
 {
     public string Label { get; } = label;

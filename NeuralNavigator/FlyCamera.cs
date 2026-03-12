@@ -7,11 +7,6 @@ using PerspectiveCamera = HelixToolkit.Wpf.SharpDX.PerspectiveCamera;
 ///////////////////////////////////////////////
 namespace NeuralNavigator;
 
-/// <summary>
-/// WASD + mouse-look camera controller for video-game-style 3D navigation.
-/// Hooks into WPF input events and drives smooth per-frame camera updates
-/// via CompositionTarget.Rendering.
-/// </summary>
 sealed class FlyCamera : IDisposable
 {
     readonly Viewport3DX m_viewport;
@@ -32,16 +27,9 @@ sealed class FlyCamera : IDisposable
     const double MaxSpeed = 50.0;
     const double SpeedScrollStep = 1.2;
 
-    /// <summary>Raised on mouse move (not during right-click look). Args: screen position.</summary>
     public event Action<Point>? HoverMove;
-
-    /// <summary>Raised on left double-click. Args: screen position.</summary>
     public event Action<Point>? DoubleClick;
-
-    /// <summary>Raised on right-click without dragging (i.e., context menu trigger). Args: screen position.</summary>
     public event Action<Point>? RightClick;
-
-    /// <summary>Raised when the Home key is pressed to reset the camera view.</summary>
     public event Action? ResetView;
 
     public double MoveSpeed
@@ -180,11 +168,9 @@ sealed class FlyCamera : IDisposable
         if (m_heldKeys.Count == 0) return;
 
         double yawRad = m_yaw * (Math.PI / 180.0);
-
         Vector3D forward = new(Math.Sin(yawRad), 0, -Math.Cos(yawRad));
         Vector3D right = new(Math.Cos(yawRad), 0, Math.Sin(yawRad));
         Vector3D up = new(0, 1, 0);
-
         Vector3D move = new(0, 0, 0);
 
         if (m_heldKeys.Contains(Key.W)) move += forward;
@@ -216,10 +202,6 @@ sealed class FlyCamera : IDisposable
             -Math.Cos(yawRad) * cosPitch);
     }
 
-    /// <summary>
-    /// Re-syncs internal yaw/pitch from the current camera direction.
-    /// Call after externally repositioning the camera (e.g., reset view or search fly-to).
-    /// </summary>
     public void SyncFromCamera()
     {
         Vector3D look = m_camera.LookDirection;

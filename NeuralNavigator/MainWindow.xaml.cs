@@ -1,9 +1,8 @@
 using System.Windows;
-using System.Windows.Input;
 ///////////////////////////////////////////////
 namespace NeuralNavigator;
 
-public partial class MainWindow : Window
+partial class MainWindow : Window
 {
     MainViewModel m_viewModel;
 

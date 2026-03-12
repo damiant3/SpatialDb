@@ -4,6 +4,4 @@ using System.Windows;
 
 namespace NeuralNavigator;
 
-public partial class App : Application
-{
-}
+partial class App : Application { }
