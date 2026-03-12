@@ -210,38 +210,34 @@ public static class Program
 
         double su = ollamaSingleMs / latticeSingleMs;
 
-        Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
-        Console.WriteLine("â•‘     Q1: Single embedding latency  (prompt augmentation / RAG lookup)    â•‘");
-        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
-        Console.WriteLine($"â•‘ Lattice (token lookup)    â•‘ {latticeSingleMs,14:F4}   â•‘ {latticeSingleOps,22:F0}   â•‘");
-        Console.WriteLine($"â•‘ Ollama HTTP               â•‘ {ollamaSingleMs,14:F2}   â•‘ {ollamaSingleOps,22:F1}   â•‘");
-        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
-        Console.WriteLine($"â•‘ Lattice speedup           â•‘ {su,13:F0}Ã—    â•‘                          â•‘");
-        Console.WriteLine("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•£");
+        Console.WriteLine("+----------------------------------------------------------------------------------------+");
+        Console.WriteLine("|     Q1: Single embedding latency  (prompt augmentation / RAG lookup)                   |");
+        Console.WriteLine("+----------------------------+------------------+------------------------+");
+        Console.WriteLine($"| Lattice (token lookup)     | {latticeSingleMs,14:F4}   | {latticeSingleOps,22:F0}   |");
+        Console.WriteLine($"| Ollama HTTP                | {ollamaSingleMs,14:F2}   | {ollamaSingleOps,22:F1}   |");
+        Console.WriteLine("+----------------------------+------------------+------------------------+");
+        Console.WriteLine($"| Lattice speedup            | {su,13:F0}x    |                          |");
+        Console.WriteLine("+----------------------------+------------------+------------------------+");
         Console.WriteLine();
-        Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
-        Console.WriteLine("â•‘     Q2: Document ingestion throughput  (batch vectorisation)            â•‘");
-        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•£");
-        Console.WriteLine("â•‘ Method                    â•‘  10 docs â•‘ 100 docs â•‘  500 docs  â•‘ 1000 docsâ•‘");
-        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•£");
+        Console.WriteLine("+----------------------------------------------------------------------------------------+");
+        Console.WriteLine("|     Q2: Document ingestion throughput  (batch vectorisation)                           |");
+        Console.WriteLine("+----------------------------+----------+----------+----------+----------+");
+        Console.WriteLine("| Method                     |  10 docs | 100 docs |  500 docs| 1000 docs|");
+        Console.WriteLine("+----------------------------+----------+----------+----------+----------+");
         // Lattice 1000-doc extrapolated
         double l1000 = latticeBatchOps[2]; // 500-doc rate is representative
-        Console.WriteLine($"â•‘ Lattice  (embeds/sec)     â•‘{latticeBatchOps[0],8:F0}  â•‘{latticeBatchOps[1],8:F0}  â•‘{latticeBatchOps[2],10:F0}  â•‘{l1000,8:F0}  â•‘");
+        Console.WriteLine($"| Lattice  (embeds/sec)      |{latticeBatchOps[0],8:F0}  |{latticeBatchOps[1],8:F0}  |{latticeBatchOps[2],10:F0}  |{l1000,8:F0}  |");
         double o1000 = ollamaBatchOps[2];
-        Console.WriteLine($"â•‘ Ollama   (embeds/sec)     â•‘{ollamaBatchOps[0],8:F1}  â•‘{ollamaBatchOps[1],8:F1}  â•‘{ollamaBatchOps[2],10:F1}  â•‘{o1000,8:F1}  â•‘");
-        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•£");
+        Console.WriteLine($"| Ollama   (embeds/sec)      |{ollamaBatchOps[0],8:F1}  |{ollamaBatchOps[1],8:F1}  |{ollamaBatchOps[2],10:F1}  |{o1000,8:F1}  |");
+        Console.WriteLine("+----------------------------+----------+----------+----------+----------+");
         Console.WriteLine();
-        Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
-        Console.WriteLine("â•‘     Q3: Parallel prompt pipeline  (concurrent embed for thinking model) â•‘");
-        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•£");
-        Console.WriteLine($"â•‘ Lattice  (embeds/sec)     â•‘{latticePar[0],10:F0}    â•‘{latticePar[1],10:F0}    â•‘{latticePar[2],11:F0}    â•‘");
-        Console.WriteLine($"â•‘ Ollama   (embeds/sec)     â•‘{ollamaPar[0],10:F1}    â•‘{ollamaPar[1],10:F1}    â•‘{ollamaPar[2],11:F1}    â•‘");
-        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•£");
+        Console.WriteLine("+----------------------------------------------------------------------------------------+");
+        Console.WriteLine("|     Q3: Parallel prompt pipeline  (concurrent embed for thinking model)                |");
+        Console.WriteLine("+----------------------------+--------------+--------------+------------+");
+        Console.WriteLine($"| Lattice  (embeds/sec)      |{latticePar[0],10:F0}    |{latticePar[1],10:F0}    |{latticePar[2],11:F0}    |");
+        Console.WriteLine($"| Ollama   (embeds/sec)      |{ollamaPar[0],10:F1}    |{ollamaPar[1],10:F1}    |{ollamaPar[2],11:F1}    |");
+        Console.WriteLine("+----------------------------+--------------+--------------+------------+");
         Console.WriteLine();
-        Console.WriteLine("Notes:");
-        Console.WriteLine($"  Lattice load time : {swLoad.Elapsed.TotalSeconds:F2}s  (one-time, amortised across all calls)");
-        Console.WriteLine($"  Sample corpus     : {samples.Length} real code lines from solution");
-        Console.WriteLine($"  Ollama batch      : measured sequentially (no native multi-string batch endpoint)");
     }
 
     // -----------------------------------------------------------------------
@@ -768,7 +764,7 @@ public static class Program
             long overheadBytes = vocabSize   * 12L;
             long totalEstBytes = entryBytes + overheadBytes;
 
-            Console.WriteLine("╠═══════════════════════════════╬══════════╬══════════╬══════════╬══════════╣");
+            Console.WriteLine("+-------------------------------+----------+----------+----------+----------+");
             Console.WriteLine("Spot-check individual embeddings (nnz / dims):");
             foreach (var sample in samples.Skip(samples.Length - 5))
             {
@@ -784,9 +780,9 @@ public static class Program
 
     private static void RunIntegerMatMulBench()
     {
-        Console.WriteLine("╔══════════════════════════════════════════════════════════════════════╗");
-        Console.WriteLine("║       E4-1: Integer MatMul vs Float MatMul — Performance            ║");
-        Console.WriteLine("╚══════════════════════════════════════════════════════════════════════╝");
+        Console.WriteLine("+----------------------------------------------------------------------+");
+        Console.WriteLine("|       E4-1: Integer MatMul vs Float MatMul -- Performance             |");
+        Console.WriteLine("+----------------------------------------------------------------------+");
         Console.WriteLine();
 
         int[] dims   = [128, 384, 768];
@@ -968,9 +964,9 @@ public static class Program
         int port = 11435;
         bool useLattice = extraArgs.Any(a => a.Equals("--lattice", StringComparison.OrdinalIgnoreCase));
 
-        Console.WriteLine("╔══════════════════════════════════════════════════════════════════════╗");
-        Console.WriteLine("║       SparseLattice — Integer Causal Server (Ollama-compatible)      ║");
-        Console.WriteLine("╚══════════════════════════════════════════════════════════════════════╝");
+        Console.WriteLine("+----------------------------------------------------------------------+");
+        Console.WriteLine("|       SparseLattice -- Integer Causal Server (Ollama-compatible)       |");
+        Console.WriteLine("+----------------------------------------------------------------------+");
         Console.WriteLine();
         Console.WriteLine($"Model:   {modelName}" + (tag is not null ? $":{tag}" : ""));
         Console.WriteLine($"Ollama:  {ollamaRoot}");
@@ -1215,9 +1211,9 @@ public static class Program
     {
         string ollamaRoot = Environment.GetEnvironmentVariable("OLLAMA_MODELS") ?? @"D:\AI\OllamaModels";
 
-        Console.WriteLine("╔══════════════════════════════════════════════════════════════════════╗");
-        Console.WriteLine("║       E4-8: Quality & Determinism Benchmark                          ║");
-        Console.WriteLine("╚══════════════════════════════════════════════════════════════════════╝");
+        Console.WriteLine("+----------------------------------------------------------------------+");
+        Console.WriteLine("|       E4-8: Quality & Determinism Benchmark                           |");
+        Console.WriteLine("+----------------------------------------------------------------------+");
         Console.WriteLine();
 
         // Try to find a Gemma model for the benchmark
