@@ -37,6 +37,7 @@ public enum GgufDType : uint
     Q5_1 = 7,
     Q8_0 = 8,
     BF16 = 30,
+    MXFP4 = 39,
 }
 
 // ---------------------------------------------------------------------------
@@ -119,6 +120,7 @@ public sealed class GgufTensorInfo
             GgufDType.Q4_1 => (elements / 32) * (2 + 2 + 16),
             GgufDType.Q5_0 => (elements / 32) * (2 + 4 + 16),
             GgufDType.Q5_1 => (elements / 32) * (2 + 2 + 4 + 16),
+            GgufDType.MXFP4 => (elements / 32) * 17,
             _              => elements * 4,
         };
     }
@@ -162,6 +164,7 @@ public sealed class GgufReader : IDisposable
     public int    HeadCount         { get; }
     public int    LayerCount        { get; }
     public int    FeedForwardLength { get; }
+    public long   TensorDataOffset  => m_tensorDataOffset;
 
     public IReadOnlyList<string> Tokens     { get; }
     public IReadOnlyList<string> Merges     { get; }
@@ -365,6 +368,9 @@ public sealed class GgufReader : IDisposable
             case GgufDType.BF16:
                 DequantizeBF16(m_stream, result);
                 break;
+            case GgufDType.MXFP4:
+                DequantizeMXFP4(m_stream, result);
+                break;
             default:
                 throw new NotSupportedException(
                     $"Dequantization of dtype {info.DType} is not yet implemented");
@@ -461,6 +467,40 @@ public sealed class GgufReader : IDisposable
             ushort raw = BinaryPrimitives.ReadUInt16LittleEndian(buf.AsSpan(i * 2, 2));
             int bits = raw << 16;
             dest[i] = BitConverter.Int32BitsToSingle(bits);
+        }
+    }
+
+    private static readonly float[] s_mxfp4E2M1 =
+    [
+        0.0f,  0.5f,  1.0f,  1.5f,  2.0f,  3.0f,  4.0f,  6.0f,
+       -0.0f, -0.5f, -1.0f, -1.5f, -2.0f, -3.0f, -4.0f, -6.0f,
+    ];
+
+    private static void DequantizeMXFP4(Stream s, float[] dest)
+    {
+        const int BlockElements = 32;
+        const int NibbleBytes = BlockElements / 2;
+        const int BlockBytes = 1 + NibbleBytes;
+
+        int blocks = dest.Length / BlockElements;
+        byte[] buf = new byte[blocks * BlockBytes];
+        ReadExact(s, buf);
+
+        int outIdx = 0;
+        int inIdx = 0;
+        for (int b = 0; b < blocks; b++)
+        {
+            byte e8m0 = buf[inIdx++];
+            float sharedScale = (e8m0 == 0) ? 0f : MathF.Pow(2f, e8m0 - 127);
+
+            for (int j = 0; j < NibbleBytes; j++)
+            {
+                byte raw = buf[inIdx++];
+                int lo = raw & 0x0F;
+                int hi = (raw >> 4) & 0x0F;
+                dest[outIdx++] = s_mxfp4E2M1[lo] * sharedScale;
+                dest[outIdx++] = s_mxfp4E2M1[hi] * sharedScale;
+            }
         }
     }
 

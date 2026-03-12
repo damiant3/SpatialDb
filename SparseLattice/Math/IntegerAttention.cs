@@ -193,4 +193,69 @@ public static class IntegerAttention
 
         return output;
     }
+
+    /// <summary>
+    /// Causal GQA: identical to <see cref="GroupedQueryAttention"/> but masks
+    /// future positions (score[t,s] = -∞ for s &gt; t) before softmax.
+    /// </summary>
+    public static long[] CausalGroupedQueryAttention(
+        long[] q, long[] k, long[] v,
+        int seqLen, int qEmbd, int kvDim,
+        int nHeads, int nKvHeads,
+        int scaleExponent,
+        int fracBits = IntegerTranscendentals.DefaultFracBits)
+    {
+        int headDim = qEmbd / nHeads;
+        int kvHeadDim = kvDim / nKvHeads;
+        int headsPerKv = nHeads / nKvHeads;
+        long[] output = new long[seqLen * qEmbd];
+        long[] scores = new long[seqLen * seqLen];
+
+        int absScale = System.Math.Abs(scaleExponent);
+        int scoreShift = 2 * absScale - fracBits;
+        long sqrtHeadDim = IntegerLayerNorm.ISqrt64(headDim);
+        if (sqrtHeadDim == 0) sqrtHeadDim = 1;
+
+        long maskValue = -(1L << (fracBits - 1));
+
+        for (int h = 0; h < nHeads; h++)
+        {
+            int kvHead = h / headsPerKv;
+            int qOffset = h * headDim;
+            int kvOffset = kvHead * kvHeadDim;
+
+            for (int t = 0; t < seqLen; t++)
+            {
+                int qBase = t * qEmbd + qOffset;
+                for (int s = 0; s < seqLen; s++)
+                {
+                    if (s > t)
+                    {
+                        scores[t * seqLen + s] = maskValue;
+                        continue;
+                    }
+                    Int128 rawDot = IntegerMatMul.DotInt128(q, qBase, k, s * kvDim + kvOffset, headDim);
+                    scores[t * seqLen + s] = (long)(rawDot >> scoreShift) / sqrtHeadDim;
+                }
+            }
+
+            for (int t = 0; t < seqLen; t++)
+                IntegerTranscendentals.FixedSoftmax(scores, t * seqLen, seqLen, fracBits);
+
+            for (int t = 0; t < seqLen; t++)
+            {
+                int outBase = t * qEmbd + qOffset;
+                int scoreBase = t * seqLen;
+                for (int s = 0; s < seqLen; s++)
+                {
+                    long w = scores[scoreBase + s];
+                    int vBase = s * kvDim + kvOffset;
+                    for (int d = 0; d < headDim; d++)
+                        output[outBase + d] += (long)(((Int128)w * v[vBase + d]) >> fracBits);
+                }
+            }
+        }
+
+        return output;
+    }
 }

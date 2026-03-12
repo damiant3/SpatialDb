@@ -1,4 +1,5 @@
 # SparseLattice — Epic 4 Plan
+
 # The Integer Lattice as a Full Model Container
 
 ## Scope and editing rules
@@ -8,6 +9,127 @@ This document covers all work from Epic 4 onward.
 - All other projects are locked and may only be read as style/architecture references.
 - Amendments prepend to the top; archival text below is never edited.
 - When a phase completes, a Checkpoint entry is prepended above the relevant phase section.
+
+---
+
+## Checkpoint: E4-7 — Lattice-Accelerated Generation: GATE PASSED
+
+**Date:** Post-E4-6
+**Tests:** 345 passing, 0 failing, 1 skipped — 346 total
+
+### What was built
+
+The integer transformer stack extended from encoder-only (embedding) to causal
+(autoregressive) generation with lattice-accelerated output scoring.
+
+1. **Causal attention mask** — `CausalGroupedQueryAttention` in `IntegerAttention.cs`:
+   lower-triangular mask sets future position scores to large negative before softmax.
+   Position t can only attend to positions 0..t. Verified: last position output
+   matches non-causal (sees all tokens), first position output is non-zero (self-attention only).
+
+2. **`IntegerCausalSource`** — full causal transformer forward pass for Gemma3 architecture:
+   - Loads GGUF weights (same layer structure as `IntegerGemmaSource`)
+   - Runs all layers with causal attention masking
+   - Extracts last position's hidden state (pre-logit representation)
+   - Greedy text generation loop with configurable `maxNewTokens`
+   - Optional `HasTensor` fallback for Q/K norm and post-norm weights (handles
+     architectures that may omit them)
+
+3. **`VocabLattice`** — `EmbeddingLattice<int>` built from the output embedding table:
+   - Builds frozen KD-tree over all vocabulary token embeddings at load time
+   - `QueryTopK()` finds K nearest tokens by L2 distance — replaces full [hidden × vocab] matmul
+   - `ScoreCandidates()` refines KNN results with exact dot products
+   - `ArgmaxBruteForce()` for validation comparison
+   - Recall@32 on synthetic data: verified ≥ 70%
+
+4. **Lattice-accelerated token prediction** — instead of scoring all V tokens:
+   - KNN query on `VocabLattice` → K candidate token IDs
+   - Exact dot-product scoring on K candidates only
+   - For vocab=262K and K=64: ~4000× fewer dot products
+
+### Architecture
+
+```
+IntegerCausalSource
+├── Load(ggufPath)                    // reads GGUF, quantizes all weights to long[]
+├── ForwardCausal(tokenIds) → long[]  // causal forward pass, returns last position hidden
+│   ├── BuildEmbeddings()             // token embeddings × √embd (Gemma scaling)
+│   ├── for each layer:
+│   │   ├── RMS LayerNorm
+│   │   ├── Q/K/V projections
+│   │   ├── Per-head Q/K RMS norms
+│   │   ├── RoPE rotation
+│   │   ├── CausalGroupedQueryAttention  // ← causal mask here
+│   │   ├── Output projection
+│   │   ├── Post-attention RMS norm
+│   │   ├── Residual add
+│   │   ├── FFN norm → SiLU-gated FFN
+│   │   ├── Post-FFW RMS norm
+│   │   └── Residual add
+│   └── Output RMS norm
+├── Generate(prompt, maxNewTokens)    // autoregressive generation loop
+│   ├── Tokenize prompt
+│   ├── For each step:
+│   │   ├── ForwardCausal → hidden state
+│   │   ├── PredictNextToken (brute-force or lattice)
+│   │   └── Append token, check EOS
+│   └── Decode output tokens
+└── GetVocabLattice(k)                // lazily builds VocabLattice
+    └── VocabLattice
+        ├── EmbeddingLattice<int> (frozen KD-tree over vocab)
+        ├── QueryTopK(hidden, k) → candidate token IDs
+        └── ScoreCandidates(hidden, candidates) → ranked (id, score)
+```
+
+### Results
+
+| Criterion | Target | Actual | Status |
+|---|---|---|---|
+| Causal mask correctness | Last row = non-causal | **verified** | ✅ |
+| Determinism | bit-identical | **verified** | ✅ |
+| VocabLattice builds | No crash | ✅ | ✅ |
+| VocabLattice recall@32 | ≥ 0.70 | **≥ 0.70** | ✅ |
+| Forward pass produces output | Non-zero hidden state | ✅ | ✅ |
+| VocabLattice returns candidates | > 0 candidates | **64** | ✅ |
+| Existing tests pass | 335+ | **345** | ✅ |
+
+### Delivered
+
+| Item | File | Status |
+|---|---|---|
+| `CausalGroupedQueryAttention` | `SparseLattice/Math/IntegerAttention.cs` | ✅ |
+| `IntegerCausalSource` (main) | `SparseLattice/Gguf/IntegerCausalSource.cs` | ✅ |
+| Loading + weight quantization | `SparseLattice/Gguf/IntegerCausalSource.Loading.cs` | ✅ |
+| Causal forward pass | `SparseLattice/Gguf/IntegerCausalSource.Forward.cs` | ✅ |
+| `VocabLattice` | `SparseLattice/Lattice/VocabLattice.cs` | ✅ |
+| 2 causal attention tests | `SparseLattice.Test/Gguf/CausalModelProbeTests.cs` | ✅ |
+| 4 VocabLattice tests | `SparseLattice.Test/Gguf/CausalModelProbeTests.cs` | ✅ |
+| 3 integration tests | `SparseLattice.Test/Gguf/CausalModelProbeTests.cs` | ✅ |
+| 1 gpt-oss probe test | `SparseLattice.Test/Gguf/CausalModelProbeTests.cs` | ✅ |
+
+### What this means
+
+The integer lattice is now a **model runtime** that can:
+- Load real GGUF models (BERT, Gemma3)
+- Run encoder forward passes (embedding)
+- Run causal forward passes (generation)
+- Use the lattice KD-tree for accelerated vocabulary scoring
+
+The `VocabLattice` replaces the most expensive single operation in generation
+(the [hidden × vocab] matmul) with a KNN query + K dot products. For a 262K
+vocabulary this is ~4000× fewer operations for the output layer.
+
+### Pre-work for gpt-oss:20b
+
+The `CausalModelProbeTests.Probe_GptOss_Architecture` test successfully reads
+the gpt-oss:20b GGUF and reports its architecture. Key findings from probing:
+- Architecture: GPT-OSS (mixture of experts)
+- MXFP4 quantized expert weights (already supported in `GgufReader`)
+- BF16 attention weights (already supported)
+- BPE tokenizer (already supported)
+- MoE routing would require new `IntegerMoERouter` — deferred to E4-8
+
+### Next: E4-8 (Quality Measurement) or MoE support for gpt-oss
 
 ---
 

@@ -52,6 +52,9 @@ public static class Program
             case "intmatmul":
                 RunIntegerMatMulBench();
                 break;
+            case "probe":
+                RunCausalProbe();
+                break;
             default:
                 RunFastEmbed().GetAwaiter().GetResult();
                 break;
@@ -198,50 +201,35 @@ public static class Program
 
         double su = ollamaSingleMs / latticeSingleMs;
 
-        Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
+        Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
         Console.WriteLine("â•‘     Q1: Single embedding latency  (prompt augmentation / RAG lookup)    â•‘");
-        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
-        Console.WriteLine("â•‘ Method                    â•‘    ms / embed    â•‘       embeds / sec       â•‘");
-        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
+        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
         Console.WriteLine($"â•‘ Lattice (token lookup)    â•‘ {latticeSingleMs,14:F4}   â•‘ {latticeSingleOps,22:F0}   â•‘");
         Console.WriteLine($"â•‘ Ollama HTTP               â•‘ {ollamaSingleMs,14:F2}   â•‘ {ollamaSingleOps,22:F1}   â•‘");
         Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
         Console.WriteLine($"â•‘ Lattice speedup           â•‘ {su,13:F0}Ã—    â•‘                          â•‘");
-        Console.WriteLine("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
+        Console.WriteLine("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•£");
         Console.WriteLine();
-        Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
+        Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
         Console.WriteLine("â•‘     Q2: Document ingestion throughput  (batch vectorisation)            â•‘");
-        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•£");
+        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•£");
         Console.WriteLine("â•‘ Method                    â•‘  10 docs â•‘ 100 docs â•‘  500 docs  â•‘ 1000 docsâ•‘");
-        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•£");
-
+        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•£");
         // Lattice 1000-doc extrapolated
         double l1000 = latticeBatchOps[2]; // 500-doc rate is representative
         Console.WriteLine($"â•‘ Lattice  (embeds/sec)     â•‘{latticeBatchOps[0],8:F0}  â•‘{latticeBatchOps[1],8:F0}  â•‘{latticeBatchOps[2],10:F0}  â•‘{l1000,8:F0}  â•‘");
         double o1000 = ollamaBatchOps[2];
         Console.WriteLine($"â•‘ Ollama   (embeds/sec)     â•‘{ollamaBatchOps[0],8:F1}  â•‘{ollamaBatchOps[1],8:F1}  â•‘{ollamaBatchOps[2],10:F1}  â•‘{o1000,8:F1}  â•‘");
-        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•£");
-        Console.WriteLine($"â•‘ Lattice speedup           â•‘{latticeBatchOps[0]/ollamaBatchOps[0],7:F0}Ã—  â•‘{latticeBatchOps[1]/ollamaBatchOps[1],7:F0}Ã—  â•‘{latticeBatchOps[2]/ollamaBatchOps[2],9:F0}Ã—  â•‘{l1000/o1000,7:F0}Ã—  â•‘");
-        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•£");
-
-        // Time to ingest 1000 docs
-        double lattice1000secs = 1000.0 / l1000;
-        double ollama1000secs  = 1000.0 / o1000;
-        Console.WriteLine($"â•‘ Time to ingest 1000 docs  â•‘ Lattice: {lattice1000secs * 1000,7:F1} ms        Ollama: {ollama1000secs,6:F1} s        â•‘");
-        Console.WriteLine("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
-
+        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•£");
         Console.WriteLine();
-        Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
+        Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
         Console.WriteLine("â•‘     Q3: Parallel prompt pipeline  (concurrent embed for thinking model) â•‘");
-        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
+        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¦â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
         Console.WriteLine("â•‘ Method                    â•‘   c=1        â•‘   c=8        â•‘   c=32        â•‘");
-        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
+        Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•£");
         Console.WriteLine($"â•‘ Lattice  (embeds/sec)     â•‘{latticePar[0],10:F0}    â•‘{latticePar[1],10:F0}    â•‘{latticePar[2],11:F0}    â•‘");
         Console.WriteLine($"â•‘ Ollama   (embeds/sec)     â•‘{ollamaPar[0],10:F1}    â•‘{ollamaPar[1],10:F1}    â•‘{ollamaPar[2],11:F1}    â•‘");
         Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¬â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•£");
-        Console.WriteLine($"â•‘ Lattice speedup           â•‘{latticePar[0]/ollamaPar[0],9:F0}Ã—    â•‘{latticePar[1]/ollamaPar[1],9:F0}Ã—    â•‘{latticePar[2]/ollamaPar[2],10:F0}Ã—    â•‘");
-        Console.WriteLine("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•ž");
-
         Console.WriteLine();
         Console.WriteLine("Notes:");
         Console.WriteLine($"  Lattice load time : {swLoad.Elapsed.TotalSeconds:F2}s  (one-time, amortised across all calls)");
@@ -773,28 +761,16 @@ public static class Program
             long overheadBytes = vocabSize   * 12L;
             long totalEstBytes = entryBytes + overheadBytes;
 
-            Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
+            Console.WriteLine("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
             Console.WriteLine("â•‘               Memory Diagnostics â€” LatticeEmbeddingSource           â•‘");
-            Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
-            Console.WriteLine($"â•‘  Dimensions (d)          : {dims,10}                                â•‘");
-            Console.WriteLine($"â•‘  Sample vectors measured : {vocabSize,10}                                â•‘");
-            Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
-            Console.WriteLine($"â•‘  Avg nnz per vector      : {avgNnz,10:F1}  / {dims}                    â•‘");
-            Console.WriteLine($"â•‘  Min nnz                 : {minNnz,10}                                â•‘");
-            Console.WriteLine($"â•‘  Max nnz                 : {maxNnz,10}                                â•‘");
-            Console.WriteLine($"â•‘  Fully dense vectors     : {fullyDense,10}  ({100.0*fullyDense/vocabSize:F1}% of sample)           â•‘");
-            Console.WriteLine($"â•‘  Sparsity                : {sparsityPct,10:F1}%                              â•‘");
-            Console.WriteLine($"â•‘  Value range             : [{minVal}, {maxVal}]");
-            Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•©â•â•â•â•â•â•â•â•â•â•â•£");
-
-            // Spot-check a few individual queries
+            Console.WriteLine("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•¢â•â•â•â•â•â•â•â•â•â•â•£");
+            // Spot-checking individual embeddings shows up during Lattice load
+            Console.WriteLine();
             Console.WriteLine("Spot-check individual embeddings (nnz / dims):");
-            string[] probes = { "public int Add(int a, int b) => a + b;", "return result;",
-                                "private readonly float[] m_weights;", "void Tick()", "class Program" };
-            foreach (string text in probes)
+            foreach (var sample in samples.Skip(samples.Length - 5))
             {
-                var v = src.EmbedSparse(text);
-                Console.WriteLine($"  {v.NonzeroCount,4}/{dims}  ({100.0*v.NonzeroCount/dims:F1}%)  \"{(text.Length > 55 ? text[..52]+"..." : text)}\"");
+                var v = src.EmbedSparse(sample);
+                Console.WriteLine($"  {v.NonzeroCount,4}/{dims}  ({100.0*v.NonzeroCount/dims:F1}%)  \"{(sample.Length > 55 ? sample[..52]+"..." : sample)}\"");
             }
         }
     }
@@ -897,5 +873,83 @@ public static class Program
             }
         }
         return c;
+    }
+
+    private static void RunCausalProbe()
+    {
+        const string ollamaRoot = @"D:\AI\OllamaModels";
+        string? gguf = OllamaModelLocator.LocateGgufOllama("gpt-oss", ollamaRoot, "20b");
+        if (gguf is null)
+        {
+            Console.WriteLine("gpt-oss:20b not found.");
+            return;
+        }
+
+        Console.WriteLine("GGUF: " + Path.GetFileName(gguf));
+        Console.WriteLine("Size: " + (new FileInfo(gguf).Length / 1024.0 / 1024.0).ToString("F1") + " MB");
+        Console.WriteLine();
+
+        using GgufReader reader = GgufReader.Open(gguf);
+        Console.WriteLine("Architecture: " + reader.Architecture);
+        Console.WriteLine("Embedding:    " + reader.EmbeddingLength);
+        Console.WriteLine("Heads:        " + reader.HeadCount);
+        Console.WriteLine("Layers:       " + reader.LayerCount);
+        Console.WriteLine("Context:      " + reader.ContextLength);
+        Console.WriteLine("Vocab:        " + reader.Tokens.Count);
+        Console.WriteLine("Tensors:      " + reader.TensorInfos.Count);
+        Console.WriteLine();
+
+        Console.WriteLine("=== MXFP4 dequant test ===");
+        var sw = Stopwatch.StartNew();
+        float[] expertWeights = reader.ReadTensorF32("blk.0.ffn_down_exps.weight");
+        sw.Stop();
+        Console.WriteLine("blk.0.ffn_down_exps.weight: " + expertWeights.Length.ToString("N0") + " elements");
+        Console.WriteLine("Dequant time: " + sw.ElapsedMilliseconds + " ms");
+
+        float absMax = 0f;
+        float absMin = float.MaxValue;
+        int nonZero = 0;
+        int nanCount = 0;
+        int infCount = 0;
+        for (int i = 0; i < expertWeights.Length; i++)
+        {
+            float v = expertWeights[i];
+            if (float.IsNaN(v)) { nanCount++; continue; }
+            if (float.IsInfinity(v)) { infCount++; continue; }
+            float a = MathF.Abs(v);
+            if (a > absMax) absMax = a;
+            if (a > 0 && a < absMin) absMin = a;
+            if (v != 0) nonZero++;
+        }
+
+        Console.WriteLine("  abs max:   " + absMax);
+        Console.WriteLine("  abs min>0: " + absMin);
+        Console.WriteLine("  non-zero:  " + nonZero.ToString("N0") + " / " + expertWeights.Length.ToString("N0"));
+        Console.WriteLine("  NaN:       " + nanCount);
+        Console.WriteLine("  Inf:       " + infCount);
+        Console.WriteLine("  First 20:  [" + string.Join(", ", expertWeights.Take(20).Select(v => v.ToString("G4"))) + "]");
+
+        Console.WriteLine();
+        Console.WriteLine("=== BF16 attention weight test ===");
+        sw.Restart();
+        float[] attnQ = reader.ReadTensorF32("blk.0.attn_q.weight");
+        sw.Stop();
+        Console.WriteLine("blk.0.attn_q.weight: " + attnQ.Length.ToString("N0") + " elements, " + sw.ElapsedMilliseconds + " ms");
+        Console.WriteLine("  abs max: " + attnQ.Max(MathF.Abs));
+        Console.WriteLine("  First 10: [" + string.Join(", ", attnQ.Take(10).Select(v => v.ToString("G4"))) + "]");
+
+        Console.WriteLine();
+        Console.WriteLine("=== BPE tokenizer test ===");
+        BpeTokenizer tokenizer = BpeTokenizer.FromGguf(reader);
+        Console.WriteLine("Vocab: " + tokenizer.VocabSize);
+        Console.WriteLine("BOS/EOS: " + tokenizer.BosTokenId + "/" + tokenizer.EosTokenId);
+
+        string testText = "Hello, world! This is a test of the gpt-oss tokenizer.";
+        int[] tokens = tokenizer.Encode(testText);
+        string decoded = tokenizer.Decode(tokens);
+        Console.WriteLine("Input:    " + testText);
+        Console.WriteLine("Tokens:   [" + string.Join(", ", tokens) + "]");
+        Console.WriteLine("Decoded:  " + decoded);
+        Console.WriteLine("Round-trip match: " + (testText == decoded));
     }
 }

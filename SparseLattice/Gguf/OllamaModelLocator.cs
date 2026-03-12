@@ -107,4 +107,56 @@ public static class OllamaModelLocator
 
         return File.Exists(fullPath) ? fullPath : null;
     }
+
+    /// <summary>
+    /// Scans an Ollama model storage root (containing <c>manifests/</c> and <c>blobs/</c>
+    /// subdirectories) for the model matching <paramref name="modelName"/> and optional
+    /// <paramref name="tag"/>. Returns the full path to the GGUF blob, or <c>null</c>.
+    /// </summary>
+    /// <param name="modelName">Model name, e.g. <c>"gpt-oss"</c>.</param>
+    /// <param name="ollamaRoot">
+    /// Root directory containing <c>manifests/registry.ollama.ai/library/</c> and <c>blobs/</c>.
+    /// </param>
+    /// <param name="tag">Tag/variant, e.g. <c>"20b"</c> or <c>"latest"</c>. If null, tries <c>"latest"</c> first, then the first tag found.</param>
+    public static string? LocateGgufOllama(string modelName, string ollamaRoot, string? tag = null)
+    {
+        if (string.IsNullOrEmpty(modelName))
+            throw new ArgumentNullException(nameof(modelName));
+        if (string.IsNullOrEmpty(ollamaRoot))
+            throw new ArgumentNullException(nameof(ollamaRoot));
+
+        string manifestDir = Path.Combine(ollamaRoot, "manifests", "registry.ollama.ai", "library", modelName);
+        if (!Directory.Exists(manifestDir))
+            return null;
+
+        string? manifestPath = null;
+        if (tag is not null)
+        {
+            string candidate = Path.Combine(manifestDir, tag);
+            if (File.Exists(candidate))
+                manifestPath = candidate;
+        }
+        else
+        {
+            string latest = Path.Combine(manifestDir, "latest");
+            if (File.Exists(latest))
+                manifestPath = latest;
+            else
+            {
+                string[] files = Directory.GetFiles(manifestDir);
+                if (files.Length > 0)
+                    manifestPath = files[0];
+            }
+        }
+
+        if (manifestPath is null)
+            return null;
+
+        string? digest = ReadModelDigest(manifestPath);
+        if (digest is null)
+            return null;
+
+        string blobDir = Path.Combine(ollamaRoot, "blobs");
+        return ResolveBlob(digest, blobDir);
+    }
 }
