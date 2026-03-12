@@ -43,6 +43,14 @@ sealed partial class MainViewModel : ObservableObject, IDisposable
     string m_weightStatus = "";
     ObservableCollection<string> m_weightTensorNames = [];
 
+    // Phase 7: Live generation state
+    string m_generationPrompt = "The capital of France is";
+    string m_generationOutput = "";
+    string m_generationStatus = "";
+    bool m_isGenerating;
+    bool m_generationFollowCamera = true;
+    int m_generationMaxTokens = 32;
+
     bool m_showModelInfo = true;
     bool m_showCoordinateSystem = true;
     bool m_showViewCube;
@@ -50,6 +58,7 @@ sealed partial class MainViewModel : ObservableObject, IDisposable
     bool m_showFrameRate;
     bool m_enableFxaa = true;
     bool m_enableShadows;
+    bool m_neuralopedia;
 
     string m_statusText = "No model loaded.";
     string m_searchText = "";
@@ -114,6 +123,15 @@ sealed partial class MainViewModel : ObservableObject, IDisposable
     public string SelectedWeightTensor { get => m_selectedWeightTensor; set => SetField(ref m_selectedWeightTensor, value); }
     public string WeightStatus { get => m_weightStatus; set => SetField(ref m_weightStatus, value); }
 
+    // Phase 7: Live generation properties
+    public string GenerationPrompt { get => m_generationPrompt; set => SetField(ref m_generationPrompt, value); }
+    public string GenerationOutput { get => m_generationOutput; set => SetField(ref m_generationOutput, value); }
+    public string GenerationStatus { get => m_generationStatus; set => SetField(ref m_generationStatus, value); }
+    public bool IsGenerating { get => m_isGenerating; set => SetField(ref m_isGenerating, value); }
+    public bool GenerationFollowCamera { get => m_generationFollowCamera; set => SetField(ref m_generationFollowCamera, value); }
+    public int GenerationMaxTokens { get => m_generationMaxTokens; set => SetField(ref m_generationMaxTokens, value); }
+    public ObservableCollection<GenerationTokenInfo> GeneratedTokens { get; } = [];
+
     public bool ShowModelInfo
     {
         get => m_showModelInfo;
@@ -131,6 +149,12 @@ sealed partial class MainViewModel : ObservableObject, IDisposable
     }
     public bool EnableShadows { get => m_enableShadows; set => SetField(ref m_enableShadows, value); }
     public FXAALevel FxaaLevel => m_enableFxaa ? FXAALevel.Low : FXAALevel.None;
+    public bool Neuralopedia
+    {
+        get => m_neuralopedia;
+        set { if (SetField(ref m_neuralopedia, value)) OnPropertyChanged(nameof(NeuralopediaVisibility)); }
+    }
+    public Visibility NeuralopediaVisibility => m_neuralopedia ? Visibility.Visible : Visibility.Collapsed;
 
     public ICommand LoadModelCommand { get; }
     public ICommand SearchCommand { get; }
@@ -139,6 +163,11 @@ sealed partial class MainViewModel : ObservableObject, IDisposable
     public ICommand TracePromptCommand { get; }
     public ICommand ClearTraceCommand { get; }
     public ICommand ShowWeightsCommand { get; }
+    public ICommand GenerateCommand { get; }
+    public ICommand CancelGenerationCommand { get; }
+    public ICommand ClearGenerationCommand { get; }
+    public ICommand GenerationTokenClickCommand { get; }
+    public ICommand ToggleNeuralopediaCommand { get; }
     public ICommand ContextSeeNeighborsCommand { get; }
     public ICommand ContextShowDimsCommand { get; }
     public ICommand ContextFindClusterCommand { get; }
@@ -176,6 +205,11 @@ sealed partial class MainViewModel : ObservableObject, IDisposable
         ContextFindClusterCommand = new RelayCommand(_ => ContextFindCluster(), _ => m_selectedTokenIdx >= 0);
         ContextCompareToCommand = new RelayCommand(_ => ContextCompareTo(), _ => m_selectedTokenIdx >= 0);
         ShowOptionsCommand = new RelayCommand(_ => ShowOptions());
+        GenerateCommand = new RelayCommand(_ => StartGeneration(), _ => m_reader is not null && !m_isGenerating);
+        CancelGenerationCommand = new RelayCommand(_ => CancelGeneration(), _ => m_isGenerating);
+        ClearGenerationCommand = new RelayCommand(_ => ClearGeneration());
+        GenerationTokenClickCommand = new RelayCommand(p => OnGeneratedTokenClicked(p as GenerationTokenInfo));
+        ToggleNeuralopediaCommand = new RelayCommand(_ => Neuralopedia = !Neuralopedia);
     }
 
     void OnResetView()
@@ -207,12 +241,14 @@ sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        m_generationCts?.Cancel();
         m_flyCamera?.Dispose();
         m_pointCloudModel?.Dispose();
         m_highlightModel?.Dispose();
         m_vectorLineModel?.Dispose();
         m_traceModel?.Dispose();
         m_weightModel?.Dispose();
+        m_generationTrailModel?.Dispose();
         m_causalSource?.Dispose();
         m_reader?.Dispose();
         (EffectsManager as IDisposable)?.Dispose();

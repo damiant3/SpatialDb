@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Input;
 ///////////////////////////////////////////////
 namespace NeuralNavigator;
 
@@ -18,5 +19,11 @@ partial class MainWindow : Window
     {
         m_viewModel.Dispose();
         base.OnClosed(e);
+    }
+
+    void OnGeneratedTokenClick(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is FrameworkElement fe && fe.DataContext is GenerationTokenInfo token)
+            m_viewModel.GenerationTokenClickCommand.Execute(token);
     }
 }

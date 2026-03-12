@@ -30,10 +30,15 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="NEURAL NAVIGATOR" FontSize="14" FontWeight="Bold"
                                    Foreground="#569cd6" VerticalAlignment="Center" />
-                        <Button Grid.Column="1" Content="⚙" FontSize="16" Padding="4,0"
+                        <Button Grid.Column="1" Content="🔬" FontSize="14" Padding="4,0"
+                                ToolTip="Toggle Neuralopedia"
+                                Background="Transparent" Foreground="#808080" BorderThickness="0"
+                                Command="{Binding ToggleNeuralopediaCommand}" />
+                        <Button Grid.Column="2" Content="⚙" FontSize="16" Padding="4,0"
                                 ToolTip="Viewport Options"
                                 Command="{Binding ShowOptionsCommand}"
                                 Background="Transparent" Foreground="#808080" BorderThickness="0" />
@@ -42,6 +47,14 @@
                     <!-- Load model -->
                     <Button Content="Load Model..." Command="{Binding LoadModelCommand}"
                             Margin="0,0,0,8" Padding="8,4" />
+                    <Border Background="#1a569cd6" CornerRadius="3" Padding="6,4" Margin="0,0,0,4"
+                            Visibility="{Binding NeuralopediaVisibility}">
+                        <TextBlock Foreground="#9cdcfe" FontSize="9" TextWrapping="Wrap">
+                            <Run Text="🔬" /><Run Text=" GGUF" FontWeight="Bold" /> is a file format that stores an AI model's
+                            learned knowledge as billions of numbers (weights). Loading one lets you
+                            explore what the model has learned.
+                        </TextBlock>
+                    </Border>
 
                     <!-- Search -->
                     <TextBlock Text="Search Token" Foreground="#d4d4d4" Margin="0,4,0,4" FontSize="11" />
@@ -56,6 +69,15 @@
                         <Button Content="Go" Command="{Binding SearchCommand}" Grid.Column="1"
                                 Padding="8,4" Margin="4,0,0,0" />
                     </Grid>
+                    <Border Background="#1a569cd6" CornerRadius="3" Padding="6,4" Margin="0,0,0,4"
+                            Visibility="{Binding NeuralopediaVisibility}">
+                        <TextBlock Foreground="#9cdcfe" FontSize="9" TextWrapping="Wrap">
+                            <Run Text="🔬" /><Run Text=" Token" FontWeight="Bold" /> = the smallest unit of text the model
+                            understands. Words like "hello" might be one token, but "unhappiness"
+                            could be ["un", "happiness"]. Each token has a position in the
+                            model's internal space.
+                        </TextBlock>
+                    </Border>
 
                     <!-- Selected token info -->
                     <Border Background="#1e1e1e" CornerRadius="4" Margin="0,8,0,0" Padding="8"
@@ -68,6 +90,15 @@
 
                             <TextBlock Text="Nearest Neighbors" Foreground="#569cd6"
                                        FontWeight="Bold" Margin="0,8,0,4" FontSize="11" />
+                            <Border Background="#1a569cd6" CornerRadius="3" Padding="6,4" Margin="0,0,0,4"
+                                    Visibility="{Binding NeuralopediaVisibility}">
+                                <TextBlock Foreground="#9cdcfe" FontSize="9" TextWrapping="Wrap">
+                                    <Run Text="🔬" /><Run Text=" Nearest Neighbors" FontWeight="Bold" /> = tokens whose
+                                    embedding vectors are closest in the full high-dimensional space. If
+                                    "France" and "Paris" are neighbors, the model learned they're related
+                                    concepts. The distance number shows how far apart they are.
+                                </TextBlock>
+                            </Border>
                             <ItemsControl ItemsSource="{Binding Neighbors}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -89,11 +120,29 @@
 
                     <!-- View controls -->
                     <TextBlock Text="Projection" Foreground="#d4d4d4" Margin="0,12,0,4" FontSize="11" />
+                    <Border Background="#1a569cd6" CornerRadius="3" Padding="6,4" Margin="0,0,0,4"
+                            Visibility="{Binding NeuralopediaVisibility}">
+                        <TextBlock Foreground="#9cdcfe" FontSize="9" TextWrapping="Wrap">
+                            <Run Text="🔬" /><Run Text=" Projection" FontWeight="Bold" /> = how we squash 3,840
+                            dimensions down to 3 so you can see them. <Run Text="PCA" FontWeight="Bold" />
+                            (Principal Component Analysis) picks the 3 directions where tokens
+                            spread out the most — like finding the best camera angle for a group photo.
+                        </TextBlock>
+                    </Border>
                     <ComboBox ItemsSource="{Binding ProjectionModes}"
                               SelectedItem="{Binding SelectedProjection}"
                               Margin="0,0,0,4" FontSize="11" />
 
                     <TextBlock Text="Color By" Foreground="#d4d4d4" Margin="0,4,0,4" FontSize="11" />
+                    <Border Background="#1a569cd6" CornerRadius="3" Padding="6,4" Margin="0,0,0,4"
+                            Visibility="{Binding NeuralopediaVisibility}">
+                        <TextBlock Foreground="#9cdcfe" FontSize="9" TextWrapping="Wrap">
+                            <Run Text="🔬" /><Run Text=" Magnitude" FontWeight="Bold" /> = how "big" a token's
+                            embedding vector is. <Run Text="Cluster" FontWeight="Bold" /> groups tokens by
+                            their first character. Tokens with similar meanings tend to appear near
+                            each other in the space.
+                        </TextBlock>
+                    </Border>
                     <ComboBox ItemsSource="{Binding ColorModes}"
                               SelectedItem="{Binding SelectedColorMode}"
                               Margin="0,0,0,4" FontSize="11" />
@@ -110,7 +159,7 @@
 
                     <!-- Navigation -->
                     <TextBlock Foreground="#4e4e50" TextWrapping="Wrap" FontSize="9" Margin="0,8,0,0"
-                               Text="WASD: Fly | RMB: Look | Scroll: Speed&#x0a;Space/Ctrl: Up/Down | Home: Reset" />
+                               Text="WASD: Fly | RMB: Look | Scroll: Zoom&#x0a;Shift+Scroll: Speed | Space/Ctrl: Up/Down&#x0a;Home: Reset" />
 
                     <Button Content="Reset View" Command="{Binding ResetViewCommand}"
                             Margin="0,4,0,0" Padding="8,3" FontSize="11" />
@@ -120,6 +169,16 @@
                                Margin="0,12,0,4" FontSize="11" />
                     <TextBlock Foreground="#6a9955" TextWrapping="Wrap" FontSize="9"
                                Text="Trace hidden state through layers. Gemma = full forward pass, others = embedding lookup." />
+                    <Border Background="#1a569cd6" CornerRadius="3" Padding="6,4" Margin="0,4,0,4"
+                            Visibility="{Binding NeuralopediaVisibility}">
+                        <TextBlock Foreground="#9cdcfe" FontSize="9" TextWrapping="Wrap">
+                            <Run Text="🔬" /> A transformer processes text through many <Run Text="layers" FontWeight="Bold" />
+                            — each one refines the model's understanding. The <Run Text="hidden state" FontWeight="Bold" />
+                            is the model's internal representation at each layer. This trace shows
+                            how that representation moves through the embedding space — big jumps
+                            mean that layer changed the model's "understanding" significantly.
+                        </TextBlock>
+                    </Border>
                     <TextBox Text="{Binding TracePrompt, UpdateSourceTrigger=PropertyChanged}"
                              Background="#1e1e1e" Foreground="#d4d4d4" BorderBrush="#3e3e42"
                              Padding="4" Margin="0,4,0,4" TextWrapping="Wrap"
@@ -169,11 +228,115 @@
                         </ItemsControl>
                     </StackPanel>
 
+                    <!-- Phase 7: Live Generation -->
+                    <TextBlock Text="Live Generation" Foreground="#569cd6" FontWeight="Bold"
+                               Margin="0,12,0,4" FontSize="11" />
+                    <TextBlock Foreground="#6a9955" TextWrapping="Wrap" FontSize="9"
+                               Text="Generate tokens and watch the model think in 3D." />
+                    <Border Background="#1a569cd6" CornerRadius="3" Padding="6,4" Margin="0,4,0,4"
+                            Visibility="{Binding NeuralopediaVisibility}">
+                        <TextBlock Foreground="#9cdcfe" FontSize="9" TextWrapping="Wrap">
+                            <Run Text="🔬" /><Run Text=" Autoregressive generation" FontWeight="Bold" /> = the model
+                            predicts one token at a time. It reads everything so far, runs it through
+                            all 48 layers, and picks the most likely next word. Then it adds that word
+                            and repeats. This is how ChatGPT works — but here you see it happen in 3D.
+                            <LineBreak /><Run Text="tok/s" FontWeight="Bold" /> = tokens per second.
+                            This runs on CPU in exact integer math — no GPU shortcuts — so it's slow
+                            but mathematically precise.
+                        </TextBlock>
+                    </Border>
+                    <TextBox Text="{Binding GenerationPrompt, UpdateSourceTrigger=PropertyChanged}"
+                             Background="#1e1e1e" Foreground="#d4d4d4" BorderBrush="#3e3e42"
+                             Padding="4" Margin="0,4,0,4" TextWrapping="Wrap"
+                             AcceptsReturn="True" Height="40" FontSize="11" />
+                    <Grid Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Max:" Foreground="#6a9955" VerticalAlignment="Center"
+                                   FontSize="9" Margin="0,0,4,0" />
+                        <Slider Grid.Column="1" Minimum="4" Maximum="128"
+                                Value="{Binding GenerationMaxTokens}"
+                                TickFrequency="4" IsSnapToTickEnabled="True"
+                                VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="2"
+                                   Text="{Binding GenerationMaxTokens, StringFormat='{}{0} tok'}"
+                                   Foreground="#b5cea8" FontSize="9" Margin="4,0,0,0"
+                                   VerticalAlignment="Center" />
+                    </Grid>
+                    <CheckBox Content="Camera follows generation"
+                              IsChecked="{Binding GenerationFollowCamera}"
+                              Foreground="#d4d4d4" Margin="0,0,0,4" FontSize="10" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Content="Generate" Command="{Binding GenerateCommand}"
+                                Padding="8,3" Grid.Column="0" FontSize="11" />
+                        <Button Content="Stop" Command="{Binding CancelGenerationCommand}"
+                                Padding="8,3" Margin="4,0,0,0" Grid.Column="1" FontSize="11" />
+                        <Button Content="Clear" Command="{Binding ClearGenerationCommand}"
+                                Padding="8,3" Margin="4,0,0,0" Grid.Column="2" FontSize="11" />
+                    </Grid>
+                    <TextBlock Text="{Binding GenerationStatus}" Foreground="#9cdcfe"
+                               TextWrapping="Wrap" Margin="0,4,0,0" FontSize="9" />
+
+                    <!-- Generated output with clickable tokens -->
+                    <Border Background="#1e1e1e" CornerRadius="4" Margin="0,4,0,0" Padding="6"
+                            MaxHeight="180">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding GeneratedTokens}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Margin="1" Padding="2,1" CornerRadius="2"
+                                                Cursor="Hand" ToolTip="{Binding Tooltip}"
+                                                Background="Transparent"
+                                                MouseLeftButtonDown="OnGeneratedTokenClick">
+                                            <TextBlock Text="{Binding DisplayText}" FontSize="11"
+                                                       FontFamily="Consolas">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="#b5cea8" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsPromptToken}" Value="True">
+                                                                <Setter Property="Foreground" Value="#569cd6" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Border>
+
                     <!-- Phase 6: Weight Explorer -->
                     <TextBlock Text="Weight Explorer" Foreground="#569cd6" FontWeight="Bold"
                                Margin="0,12,0,4" FontSize="11" />
                     <TextBlock Foreground="#6a9955" TextWrapping="Wrap" FontSize="9"
                                Text="Project weight rows into the embedding space." />
+                    <Border Background="#1a569cd6" CornerRadius="3" Padding="6,4" Margin="0,4,0,4"
+                            Visibility="{Binding NeuralopediaVisibility}">
+                        <TextBlock Foreground="#9cdcfe" FontSize="9" TextWrapping="Wrap">
+                            <Run Text="🔬" /><Run Text=" Weights" FontWeight="Bold" /> are the learned parameters of
+                            the model — billions of numbers that encode everything it knows. Each
+                            layer has weight matrices for <Run Text="attention" FontWeight="Bold" /> (deciding what
+                            to focus on) and <Run Text="FFN" FontWeight="Bold" /> (feed-forward network — the
+                            "thinking" step). <Run Text="Effective rank" FontWeight="Bold" /> tells you how many
+                            dimensions actually carry information vs. being noise.
+                        </TextBlock>
+                    </Border>
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />

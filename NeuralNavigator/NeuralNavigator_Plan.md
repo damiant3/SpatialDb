@@ -9,7 +9,7 @@ SpatialGame, proven working in this solution).
 
 ---
 
-## Current State (v0.3 — Full Explorer)
+## Current State (v0.5 — Neuralopedia + Camera Polish)
 
 The project builds and runs. Implemented:
 - WPF window with HelixToolkit 3D viewport (dark theme, compact side panel)
@@ -21,14 +21,25 @@ The project builds and runs. Implemented:
 - Highlight selected token and neighbors
 - Color modes: by token ID (golden angle hue), magnitude, first-char cluster
 - **Phase 1: WASD fly-through camera** (FlyCamera.cs)
+  - Mouse sensitivity tuned down (0.08 from 0.2)
+  - Scroll wheel → FOV zoom (telephoto/wide-angle, 5°–120°)
+  - Shift+Scroll → adjust move speed (old behavior)
 - **Phase 2: Hover QuickInfo + Double-click select**
 - **Phase 3: Context menu** (neighbors, dimensions, cluster, compare)
 - **Phase 4: Layer trace** (full forward pass for Gemma, embedding lookup fallback)
 - **Phase 5: Attention inspector** (per-layer movement bar chart)
 - **Phase 6: Weight explorer** (project weight rows, effective rank analysis)
+- **Phase 7: Live generation** (streaming token-by-token with 3D trail animation)
+  - Uses `ForwardCausalFloat` (fast path, no per-layer trace overhead)
+  - Per-step timing with tok/s display
+  - Token embedding positions for 3D trail (not hidden state projection)
+- **Phase 8: Neuralopedia** — toggle-able help mode (🔬 button or ⚙ Options)
+  - Plain-English explainers for every section: GGUF, tokens, projection, PCA,
+    neighbors, layers, hidden states, generation, weights, attention, FFN, rank
 - **Viewport Options dialog** (⚙ button):
   - Toggle: Model Info HUD, Coordinate System, Camera Info, FPS
   - Toggle: FXAA anti-aliasing, Shadow Mapping
+  - Toggle: Neuralopedia help mode
   - Model info displayed as transparent HUD overlay on viewport
   - All HelixToolkit overlays controllable from single options window
 
@@ -38,15 +49,16 @@ The project builds and runs. Implemented:
 
 ### Phase 1: Make It Navigable (Video Game Controls) ✅
 
-Implemented in `FlyCamera.cs`. WASD + mouse look + scroll speed + Space/Ctrl vertical.
+Implemented in `FlyCamera.cs`. WASD + mouse look + scroll zoom + Space/Ctrl vertical.
 Per-frame updates via `CompositionTarget.Rendering`. Right-click-drag for look, left-click
 to focus viewport for keyboard. All built-in Viewport3DX camera manipulation left at
 defaults (FlyCamera captures its own events via Preview handlers).
 
 **Requirements:**
 - WASD keys move the camera forward/back/strafe in the camera's local frame
-- Mouse look (hold right-click or always-on) rotates the camera
-- Scroll wheel adjusts move speed
+- Mouse look (hold right-click) rotates the camera (sensitivity 0.08)
+- Scroll wheel adjusts FOV for telephoto zoom (5°–120°)
+- Shift+Scroll adjusts move speed
 - Space = up, Ctrl = down (world-space vertical movement)
 - Smooth movement (per-frame updates, not jerky key repeats)
 - Double-click a point to select it
@@ -137,6 +149,59 @@ Weight tensor picker populated from the GGUF file's tensor table (filtered to
 - Reports tensor shape and effective rank in the status area
 - Limits to 5000 rows for rendering performance
 
+### Phase 7: Live Generation ✅
+
+**Goal:** Type a prompt, hit "Generate", and watch the model produce tokens one by one
+with the 3D viewport animating the token trail in real-time.
+
+Implemented in `MainViewModel.Generation.cs` and `GenerationTokenInfo.cs`:
+
+- **Streaming generation UI** — Prompt input, Generate/Stop/Clear buttons, max token
+  slider (4–128), camera-follow toggle.
+- **Live 3D trail** — Each generated token's embedding is projected into the
+  embedding space and rendered as a colored node connected by trail segments. Prompt
+  tokens are blue; generated tokens gradient from green→yellow→red.
+- **Token-by-token streaming** — The background thread runs `ForwardCausalFloat()`
+  for each step (fast path — no per-layer trace overhead), predicts the next token
+  via brute-force argmax against the embedding table, then dispatches to UI thread.
+- **Per-step timing** — Status shows ms per step, tok/s, and current sequence length.
+- **Camera follows generation** — When enabled, the camera tracks the latest generated
+  token's position in 3D space, so you literally watch the model's "cursor" move.
+- **Clickable generated tokens** — Each token in the output panel is a clickable element.
+  Click to select it in the main explorer, fly to its position, see its neighbors.
+- **Cancel support** — CancellationToken threading allows stopping mid-generation.
+- **Shared causal model** — Reuses the same `IntegerCausalSource` instance as the
+  Layer Trace feature (lazy-loaded on first use, ~21 GB for Gemma3 4B).
+- **Memory-efficient prediction** — Uses the GgufReader's already-loaded `float[]`
+  embedding table for argmax, avoiding the 4 GB Half→float expansion.
+
+**Performance notes:**
+- Full forward pass per generated token (no KV cache — O(n²) per step). ~0.14 tok/s
+  for Gemma3 4B on CPU. KV cache would be the next perf win but requires significant
+  changes to the integer forward pass in SparseLattice.
+- Uses `ForwardCausalFloat` instead of `ForwardCausalWithTrace` — skips per-layer
+  hidden state extraction, saving ~10% overhead per step.
+
+### Phase 8: Neuralopedia ✅
+
+**Goal:** Make the tool accessible to people who don't know transformer terminology.
+A toggle-able "explain everything" mode with inline plain-English definitions.
+
+Implemented via `Neuralopedia` bool property + `NeuralopediaVisibility` converter:
+
+- **🔬 button** in the title bar for one-click toggle
+- **⚙ Options dialog** also has the toggle with description
+- **Inline help blocks** — each major UI section gets a blue-tinted `Border` with
+  a 🔬-prefixed explanation, collapsed when Neuralopedia is off:
+  - **GGUF** — what a model file is and what "weights" mean
+  - **Token** — what tokens are, how words get split
+  - **Projection/PCA** — what dimensionality reduction is, camera angle analogy
+  - **Color modes** — what magnitude and clustering mean
+  - **Nearest Neighbors** — what embedding distance means, "France"→"Paris" example
+  - **Layer Trace** — what transformer layers do, what hidden states are
+  - **Generation** — autoregressive prediction, tok/s, CPU integer math
+  - **Weights** — attention vs FFN, effective rank, what "noise" means
+
 ---
 
 ## Architecture
@@ -146,26 +211,21 @@ NeuralNavigator/
 ├── NeuralNavigator.csproj          .NET 8 WPF + HelixToolkit.Wpf.SharpDX
 ├── App.xaml / App.xaml.cs          Application entry
 ├── MainWindow.xaml / .cs           Window with viewport + side panel
-├── MainViewModel.cs                Core VM: load, project, render, search, select
-├── ViewModelBase.cs                INPC base + RelayCommand
+├── MainViewModel.cs                Core VM: fields, properties, commands, lifecycle
+│   ├── MainViewModel.Loading.cs    Model loading + projection
+│   ├── MainViewModel.Rendering.cs  Point cloud, highlight, color modes
+│   ├── MainViewModel.Selection.cs  Search, hover, click, context menu, compare
+│   ├── MainViewModel.Trace.cs      Layer trace visualization (Phase 4-5)
+│   ├── MainViewModel.Weights.cs    Weight tensor explorer (Phase 6)
+│   └── MainViewModel.Generation.cs Live streaming generation (Phase 7)
+├── ObservableObject.cs             INPC base + RelayCommand
+├── FlyCamera.cs                    WASD + mouse look camera controller (Phase 1)
+├── TokenSpatialIndex.cs            Fast 3D lookup for hover/click hit testing
 ├── NeighborInfo.cs                 Neighbor display model
-├── NeuralNavigator_Plan.md         This file
-│
-├── Input/                          (Phase 1)
-│   └── FlyCamera.cs               WASD + mouse look camera controller
-│
-├── Projection/                     (Phase 1-3)
-│   ├── PcaProjector.cs            Real PCA via power iteration
-│   └── TsneProjector.cs           t-SNE for better cluster separation
-│
-├── Visualization/                  (Phase 4-6)
-│   ├── LayerTraceRenderer.cs       Hidden state trajectory rendering
-│   ├── AttentionHeatmap.cs         2D attention matrix view
-│   └── WeightExplorer.cs           Layer weight navigation
-│
-└── Data/                           (shared)
-    ├── ModelSession.cs             Loaded model state (reader, embeddings, tokenizer)
-    └── TokenSpatialIndex.cs        Fast 3D lookup for hover/click hit testing
+├── LayerMovementInfo.cs            Per-layer movement bar chart model (Phase 5)
+├── GenerationTokenInfo.cs          Generated token display model (Phase 7)
+├── ViewportOptionsWindow.xaml/.cs  Viewport settings dialog
+└── NeuralNavigator_Plan.md         This file
 ```
 
 ---

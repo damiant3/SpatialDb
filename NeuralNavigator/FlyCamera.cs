@@ -16,7 +16,7 @@ sealed class FlyCamera : IDisposable
     double m_yaw;
     double m_pitch;
     double m_moveSpeed = 1.0;
-    double m_lookSensitivity = 0.2;
+    double m_lookSensitivity = 0.08;
     Point m_lastMouse;
     bool m_mouseLooking;
     bool m_mouseDragged;
@@ -26,6 +26,9 @@ sealed class FlyCamera : IDisposable
     const double MinSpeed = 0.1;
     const double MaxSpeed = 50.0;
     const double SpeedScrollStep = 1.2;
+    const double MinFov = 5.0;
+    const double MaxFov = 120.0;
+    const double FovScrollStep = 3.0;
 
     public event Action<Point>? HoverMove;
     public event Action<Point>? DoubleClick;
@@ -148,10 +151,21 @@ sealed class FlyCamera : IDisposable
 
     void OnMouseWheel(object sender, MouseWheelEventArgs e)
     {
-        if (e.Delta > 0)
-            MoveSpeed *= SpeedScrollStep;
+        // Shift+scroll = adjust move speed (old behavior).
+        // Plain scroll = zoom via FOV (telephoto/wide-angle).
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+        {
+            if (e.Delta > 0)
+                MoveSpeed *= SpeedScrollStep;
+            else
+                MoveSpeed /= SpeedScrollStep;
+        }
         else
-            MoveSpeed /= SpeedScrollStep;
+        {
+            double fov = m_camera.FieldOfView;
+            fov += e.Delta > 0 ? -FovScrollStep : FovScrollStep;
+            m_camera.FieldOfView = Math.Clamp(fov, MinFov, MaxFov);
+        }
         e.Handled = true;
     }
 
