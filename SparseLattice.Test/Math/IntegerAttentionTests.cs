@@ -316,4 +316,83 @@ public sealed class IntegerAttentionTests
             result[i] = (long)((rng.NextDouble() * 2 - 1) * maxVal);
         return result;
     }
+
+    [TestMethod]
+    public void Unit_SlidingWindowCausalGQA_MasksOutsideWindow()
+    {
+        // With a sliding window of 2, position t can only see positions [t-1, t].
+        // Position 0 sees only itself. Position 2 sees [1, 2]. Position 3 sees [2, 3].
+        // The output at position 3 should differ from full causal (which sees all 0..3).
+        int seqLen = 4;
+        int qEmbd = 8;
+        int nHeads = 2;
+        int nKvHeads = 2;
+        int headDim = qEmbd / nHeads;
+        int kvDim = nKvHeads * headDim;
+        int scaleBits = 20;
+        int windowSize = 2;
+
+        Random rng = new(42);
+        long[] q = RandomLongs(rng, seqLen * qEmbd, scaleBits);
+        long[] k = RandomLongs(rng, seqLen * kvDim, scaleBits);
+        long[] v = RandomLongs(rng, seqLen * kvDim, scaleBits);
+
+        long[] fullCausal = IntegerAttention.CausalGroupedQueryAttention(
+            q, k, v, seqLen, qEmbd, kvDim, nHeads, nKvHeads, -scaleBits);
+        long[] slidingWindow = IntegerAttention.SlidingWindowCausalGQA(
+            q, k, v, seqLen, qEmbd, kvDim, nHeads, nKvHeads, -scaleBits, windowSize);
+
+        Assert.AreEqual(fullCausal.Length, slidingWindow.Length);
+
+        // Position 0: both should be identical (window=2 covers positions [-1, 0], so just 0)
+        for (int d = 0; d < qEmbd; d++)
+            Assert.AreEqual(fullCausal[0 * qEmbd + d], slidingWindow[0 * qEmbd + d],
+                $"Position 0 dim {d}: sliding should match full causal (only self-attention).");
+
+        // Position 1: both should be identical (window=2 covers [0, 1], same as full causal for t=1)
+        for (int d = 0; d < qEmbd; d++)
+            Assert.AreEqual(fullCausal[1 * qEmbd + d], slidingWindow[1 * qEmbd + d],
+                $"Position 1 dim {d}: sliding should match full causal (window covers [0,1]).");
+
+        // Position 3: full causal sees [0,1,2,3], sliding sees [2,3].
+        // These should differ.
+        bool anyDiff = false;
+        for (int d = 0; d < qEmbd; d++)
+        {
+            if (fullCausal[3 * qEmbd + d] != slidingWindow[3 * qEmbd + d])
+            {
+                anyDiff = true;
+                break;
+            }
+        }
+        Assert.IsTrue(anyDiff,
+            "Position 3: sliding window output should differ from full causal " +
+            "(full sees [0,1,2,3], sliding sees [2,3] only).");
+    }
+
+    [TestMethod]
+    public void Unit_SlidingWindowCausalGQA_LargeWindow_MatchesFullCausal()
+    {
+        // When window >= seqLen, sliding window should produce identical results to full causal.
+        int seqLen = 4;
+        int qEmbd = 8;
+        int nHeads = 2;
+        int nKvHeads = 2;
+        int headDim = qEmbd / nHeads;
+        int kvDim = nKvHeads * headDim;
+        int scaleBits = 20;
+
+        Random rng = new(42);
+        long[] q = RandomLongs(rng, seqLen * qEmbd, scaleBits);
+        long[] k = RandomLongs(rng, seqLen * kvDim, scaleBits);
+        long[] v = RandomLongs(rng, seqLen * kvDim, scaleBits);
+
+        long[] fullCausal = IntegerAttention.CausalGroupedQueryAttention(
+            q, k, v, seqLen, qEmbd, kvDim, nHeads, nKvHeads, -scaleBits);
+        long[] slidingLargeWindow = IntegerAttention.SlidingWindowCausalGQA(
+            q, k, v, seqLen, qEmbd, kvDim, nHeads, nKvHeads, -scaleBits, seqLen + 100);
+
+        CollectionAssert.AreEqual(fullCausal, slidingLargeWindow,
+            "Sliding window with window >= seqLen should be identical to full causal.");
+    }
 }

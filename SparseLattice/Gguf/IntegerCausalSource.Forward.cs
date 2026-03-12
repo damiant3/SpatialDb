@@ -30,8 +30,20 @@ public sealed partial class IntegerCausalSource
         return x;
     }
 
+    /// <summary>
+    /// Returns true if this layer should use global (full) attention.
+    /// In Gemma3, every 6th layer (indices 5, 11, 17, ...) is global.
+    /// Layers not on that interval use local (sliding window) attention.
+    /// </summary>
+    private bool IsGlobalLayer(int layerIdx)
+    {
+        if (m_globalLayerInterval <= 0) return true; // no sliding window → all global
+        // Gemma3 convention: layer indices (5, 11, 17, 23, ...) = (interval-1) mod interval
+        return ((layerIdx + 1) % m_globalLayerInterval) == 0;
+    }
+
     private void ApplyCausalBlock(long[] x, int seqLen, IntegerGemmaSource.GemmaLayerWeights layer,
-        IntegerAttention.IntegerRoPECache ropeCache)
+        IntegerAttention.IntegerRoPECache ropeCache, bool isGlobal)
     {
         int embd = m_nEmbd;
         int qDim = m_qDim;   // nHeads * headDim — may differ from embd
@@ -64,8 +76,20 @@ public sealed partial class IntegerCausalSource
 
         ApplyRoPEGqa(q, k, seqLen, ropeCache);
 
-        long[] attnOut = IntegerAttention.CausalGroupedQueryAttention(
-            q, k, v, seqLen, qDim, m_kvDim, m_nHeads, m_nKvHeads, -m_scaleBits);
+        // Global layers: full causal attention (attend to all previous positions).
+        // Local layers: sliding window causal attention (attend to at most m_slidingWindow positions back).
+        long[] attnOut;
+        if (isGlobal || m_slidingWindow <= 0)
+        {
+            attnOut = IntegerAttention.CausalGroupedQueryAttention(
+                q, k, v, seqLen, qDim, m_kvDim, m_nHeads, m_nKvHeads, -m_scaleBits);
+        }
+        else
+        {
+            attnOut = IntegerAttention.SlidingWindowCausalGQA(
+                q, k, v, seqLen, qDim, m_kvDim, m_nHeads, m_nKvHeads, -m_scaleBits,
+                m_slidingWindow);
+        }
 
         // Output projection: [seqLen, qDim] → [seqLen, embd]
         long[] projected = IntegerMatMul.MatMul(attnOut, seqLen, qDim, layer.AttnOutput, embd, m_scaleBits, m_scaleBits);
@@ -105,11 +129,19 @@ public sealed partial class IntegerCausalSource
                 IntegerLayerNorm.RmsNormRow(x, t * totalDim + h * headDim, headDim, weight, scaleExponent);
     }
 
-    private IntegerAttention.IntegerRoPECache GetRoPECache()
+    private IntegerAttention.IntegerRoPECache GetRoPECacheLocal()
     {
-        if (m_ropeCache is not null) return m_ropeCache;
-        m_ropeCache = new IntegerAttention.IntegerRoPECache(
+        if (m_ropeCacheLocal is not null) return m_ropeCacheLocal;
+        m_ropeCacheLocal = new IntegerAttention.IntegerRoPECache(
             RopeMaxSeqLen, m_headDim, m_ropeFreqBase);
-        return m_ropeCache;
+        return m_ropeCacheLocal;
+    }
+
+    private IntegerAttention.IntegerRoPECache GetRoPECacheGlobal()
+    {
+        if (m_ropeCacheGlobal is not null) return m_ropeCacheGlobal;
+        m_ropeCacheGlobal = new IntegerAttention.IntegerRoPECache(
+            RopeMaxSeqLen, m_headDim, m_ropeFreqBaseGlobal);
+        return m_ropeCacheGlobal;
     }
 }

@@ -12,7 +12,9 @@ public sealed partial class IntegerCausalSource
         IntegerGemmaSource.GemmaLayerWeights[] layers,
         int nEmbd, int nHeads, int nKvHeads, int headDim, int nFf,
         int vocabSize,
-        float ropeFreqBase, float normEps,
+        float ropeFreqBase, float ropeFreqBaseGlobal,
+        int slidingWindow, int globalLayerInterval,
+        float normEps,
         int scaleBits)
     {
         ModelName = modelName;
@@ -29,6 +31,9 @@ public sealed partial class IntegerCausalSource
         m_nFf = nFf;
         m_vocabSize = vocabSize;
         m_ropeFreqBase = ropeFreqBase;
+        m_ropeFreqBaseGlobal = ropeFreqBaseGlobal;
+        m_slidingWindow = slidingWindow;
+        m_globalLayerInterval = globalLayerInterval;
         m_normEps = normEps;
         m_scaleBits = scaleBits;
     }
@@ -79,6 +84,14 @@ public sealed partial class IntegerCausalSource
         float ropeFreqBase = GetFloat(reader, $"{arch}.rope.freq_base", 10000f);
         float normEps = GetFloat(reader, $"{arch}.attention.layer_norm_rms_epsilon", 1e-6f);
         int vocabSize = reader.Tokens.Count;
+
+        // Gemma3 sliding window attention: local layers use sliding window + low-freq RoPE,
+        // global layers (every Nth) use full attention + high-freq RoPE.
+        int slidingWindow = GetInt(reader, $"{arch}.attention.sliding_window", 0);
+        // Gemma3 convention: global layers every 6th layer, freq_base 1M for global.
+        // These are architectural constants not stored in the GGUF metadata.
+        int globalLayerInterval = (slidingWindow > 0) ? 6 : 0;
+        float ropeFreqBaseGlobal = (slidingWindow > 0) ? 1_000_000f : ropeFreqBase;
 
         int totalSteps = 2 + nLayers * 13;
         int step = 0;
@@ -174,6 +187,9 @@ public sealed partial class IntegerCausalSource
             nFf: nFf,
             vocabSize: vocabSize,
             ropeFreqBase: ropeFreqBase,
+            ropeFreqBaseGlobal: ropeFreqBaseGlobal,
+            slidingWindow: slidingWindow,
+            globalLayerInterval: globalLayerInterval,
             normEps: normEps,
             scaleBits: scaleBits);
     }

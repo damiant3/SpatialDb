@@ -1,0 +1,150 @@
+<Window x:Class="NeuralNavigator.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:ht="http://helix-toolkit.org/wpf/SharpDX"
+        xmlns:local="clr-namespace:NeuralNavigator"
+        mc:Ignorable="d"
+        Title="Neural Navigator — Model Embedding Explorer"
+        Width="1440" Height="900"
+        WindowState="Maximized"
+        Background="#1e1e1e">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="300" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Left panel: search, info, controls -->
+        <Border Grid.Column="0" Background="#252526" BorderBrush="#3e3e42" BorderThickness="0,0,1,0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="8">
+                    <!-- Model info -->
+                    <TextBlock Text="NEURAL NAVIGATOR" FontSize="16" FontWeight="Bold"
+                               Foreground="#569cd6" Margin="0,0,0,12" />
+
+                    <TextBlock Text="{Binding StatusText}" Foreground="#9cdcfe"
+                               TextWrapping="Wrap" Margin="0,0,0,8" />
+
+                    <!-- Load model -->
+                    <Button Content="Load Model..." Command="{Binding LoadModelCommand}"
+                            Margin="0,0,0,12" Padding="8,4" />
+
+                    <!-- Search -->
+                    <TextBlock Text="Search Token" Foreground="#d4d4d4" Margin="0,8,0,4" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="SearchBox" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                 Background="#1e1e1e" Foreground="#d4d4d4" BorderBrush="#3e3e42"
+                                 Padding="4" Grid.Column="0" />
+                        <Button Content="Go" Command="{Binding SearchCommand}" Grid.Column="1"
+                                Padding="8,4" Margin="4,0,0,0" />
+                    </Grid>
+
+                    <!-- Selected token info -->
+                    <Border Background="#1e1e1e" CornerRadius="4" Margin="0,12,0,0" Padding="8"
+                            Visibility="{Binding HasSelection, Converter={StaticResource BoolToVis}}">
+                        <StackPanel>
+                            <TextBlock Text="Selected Token" Foreground="#569cd6" FontWeight="Bold" />
+                            <TextBlock Text="{Binding SelectedTokenText}" Foreground="#ce9178"
+                                       FontSize="18" Margin="0,4,0,4" />
+                            <TextBlock Text="{Binding SelectedTokenId}" Foreground="#b5cea8" />
+
+                            <TextBlock Text="Nearest Neighbors" Foreground="#569cd6"
+                                       FontWeight="Bold" Margin="0,12,0,4" />
+                            <ItemsControl ItemsSource="{Binding Neighbors}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="0,1">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Token}" Foreground="#d4d4d4"
+                                                       Cursor="Hand" />
+                                            <TextBlock Text="{Binding Distance, StringFormat='{}{0:F4}'}"
+                                                       Foreground="#6a9955" Grid.Column="1" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- View controls -->
+                    <TextBlock Text="Projection" Foreground="#d4d4d4" Margin="0,16,0,4" />
+                    <ComboBox ItemsSource="{Binding ProjectionModes}"
+                              SelectedItem="{Binding SelectedProjection}"
+                              Margin="0,0,0,8" />
+
+                    <TextBlock Text="Color By" Foreground="#d4d4d4" Margin="0,4,0,4" />
+                    <ComboBox ItemsSource="{Binding ColorModes}"
+                              SelectedItem="{Binding SelectedColorMode}"
+                              Margin="0,0,0,8" />
+
+                    <TextBlock Text="Point Size" Foreground="#d4d4d4" Margin="0,4,0,4" />
+                    <Slider Minimum="0.5" Maximum="10" Value="{Binding PointSize}"
+                            TickFrequency="0.5" IsSnapToTickEnabled="True" />
+
+                    <TextBlock Text="Visible Tokens" Foreground="#d4d4d4" Margin="0,8,0,4" />
+                    <Slider Minimum="100" Maximum="50000" Value="{Binding VisibleTokenCount}"
+                            TickFrequency="500" IsSnapToTickEnabled="True" />
+                    <TextBlock Text="{Binding VisibleTokenCount, StringFormat='{}{0:N0} tokens'}"
+                               Foreground="#6a9955" />
+
+                    <!-- Camera info -->
+                    <TextBlock Text="Navigation" Foreground="#569cd6" FontWeight="Bold"
+                               Margin="0,16,0,4" />
+                    <TextBlock Foreground="#6a9955" TextWrapping="Wrap" FontSize="11"
+                               Text="WASD: Fly  |  Mouse: Look&#x0a;Scroll: Speed  |  Space: Up  |  Ctrl: Down&#x0a;Double-click: Select token" />
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- 3D Viewport -->
+        <ht:Viewport3DX
+            x:Name="Viewport"
+            Grid.Column="1"
+            Background="Black"
+            ShowCoordinateSystem="True"
+            CoordinateSystemLabelForeground="White"
+            ZoomExtentsWhenLoaded="False"
+            EnableSwapChainRendering="True"
+            EffectsManager="{Binding EffectsManager}"
+            Camera="{Binding Camera}"
+            CameraRotationMode="Trackball"
+            EnableRotation="False"
+            EnablePan="False"
+            EnableZoom="False"
+            EnableChangeFieldOfView="False"
+            ShowCameraInfo="True"
+            IsShadowMappingEnabled="False"
+            Focusable="True"
+            FXAALevel="Low">
+            <ht:AmbientLight3D Color="#404040" />
+            <ht:DirectionalLight3D Color="White" Direction="0,-1,-1" />
+            <ht:DirectionalLight3D Color="#606060" Direction="0,1,1" />
+        </ht:Viewport3DX>
+
+        <!-- Hover tooltip overlay -->
+        <Border x:Name="HoverTooltip"
+                Grid.Column="1"
+                Background="#cc1e1e1e"
+                CornerRadius="4"
+                Padding="8,4"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Top"
+                Margin="20,20,0,0"
+                Visibility="Collapsed">
+            <TextBlock Text="{Binding HoverText}" Foreground="#d4d4d4" FontSize="14" />
+        </Border>
+    </Grid>
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </Window.Resources>
+</Window>

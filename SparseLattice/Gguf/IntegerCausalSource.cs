@@ -23,10 +23,14 @@ public sealed partial class IntegerCausalSource : IDisposable
     private readonly int m_kvDim;   // nKvHeads * headDim
     private readonly int m_nFf;
     private readonly int m_vocabSize;
-    private readonly float m_ropeFreqBase;
+    private readonly float m_ropeFreqBase;       // local layers (sliding window)
+    private readonly float m_ropeFreqBaseGlobal; // global layers (full attention)
+    private readonly int m_slidingWindow;        // 0 = no sliding window
+    private readonly int m_globalLayerInterval;  // every Nth layer is global (default 6)
     private readonly float m_normEps;
     private readonly int m_scaleBits;
-    private IntegerAttention.IntegerRoPECache? m_ropeCache;
+    private IntegerAttention.IntegerRoPECache? m_ropeCacheLocal;
+    private IntegerAttention.IntegerRoPECache? m_ropeCacheGlobal;
     private VocabLattice? m_vocabLattice;
     private float[]? m_tokenEmbeddingsFloatCache;
     private bool m_disposed;
@@ -126,9 +130,14 @@ public sealed partial class IntegerCausalSource : IDisposable
         int seqLen = tokenIds.Length;
         long[] x = BuildEmbeddings(tokenIds, seqLen);
 
-        IntegerAttention.IntegerRoPECache ropeCache = GetRoPECache();
+        IntegerAttention.IntegerRoPECache ropeCacheLocal = GetRoPECacheLocal();
+        IntegerAttention.IntegerRoPECache ropeCacheGlobal = GetRoPECacheGlobal();
         for (int layerIdx = 0; layerIdx < m_layers.Length; layerIdx++)
-            ApplyCausalBlock(x, seqLen, m_layers[layerIdx], ropeCache);
+        {
+            bool isGlobal = IsGlobalLayer(layerIdx);
+            IntegerAttention.IntegerRoPECache ropeCache = isGlobal ? ropeCacheGlobal : ropeCacheLocal;
+            ApplyCausalBlock(x, seqLen, m_layers[layerIdx], ropeCache, isGlobal);
+        }
 
         IntegerLayerNorm.RmsNormInPlace(x, seqLen, m_nEmbd, m_outputNormW, -m_scaleBits);
 

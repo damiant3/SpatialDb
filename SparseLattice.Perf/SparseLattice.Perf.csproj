@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <None Include="tools\GenerateSamples\GenerateSamples.csproj" />
+    <None Include="tools\ProbeGemma3\ProbeGemma3.csproj" />
     <Compile Remove="tools\**\*.cs" />
     <None Include="tools\**\*.cs" />
   </ItemGroup>
