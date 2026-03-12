@@ -9,11 +9,11 @@ SpatialGame, proven working in this solution).
 
 ---
 
-## Current State (v0.2 — Fly + Hover)
+## Current State (v0.3 — Full Explorer)
 
 The project builds and runs. Implemented:
-- WPF window with HelixToolkit 3D viewport (dark theme, side panel)
-- Load GGUF model (file dialog, reads token_embd.weight)
+- WPF window with HelixToolkit 3D viewport (dark theme, compact side panel)
+- Load GGUF model (file dialog, reads token_embd.weight, auto-clamps vocab)
 - Project embeddings to 3D (top-3 variance dimensions)
 - Render token embedding point cloud (colored spheres)
 - Search for a token by text, fly camera to it
@@ -21,16 +21,16 @@ The project builds and runs. Implemented:
 - Highlight selected token and neighbors
 - Color modes: by token ID (golden angle hue), magnitude, first-char cluster
 - **Phase 1: WASD fly-through camera** (FlyCamera.cs)
-  - WASD movement in camera's local horizontal frame
-  - Right-click drag for mouse look (yaw/pitch)
-  - Scroll wheel adjusts move speed (0.1–50x range)
-  - Space=up, Ctrl=down (world-space vertical)
-  - Smooth per-frame updates via CompositionTarget.Rendering
-  - Click viewport to focus for keyboard input
 - **Phase 2: Hover QuickInfo + Double-click select**
-  - Mouse hover ray-casts into 3D point cloud (TokenSpatialIndex)
-  - Floating tooltip shows token text and ID on hover
-  - Double-click a token to select it (shows neighbors, highlights)
+- **Phase 3: Context menu** (neighbors, dimensions, cluster, compare)
+- **Phase 4: Layer trace** (full forward pass for Gemma, embedding lookup fallback)
+- **Phase 5: Attention inspector** (per-layer movement bar chart)
+- **Phase 6: Weight explorer** (project weight rows, effective rank analysis)
+- **Viewport Options dialog** (⚙ button):
+  - Toggle: Model Info HUD, Coordinate System, Camera Info, FPS
+  - Toggle: FXAA anti-aliasing, Shadow Mapping
+  - Model info displayed as transparent HUD overlay on viewport
+  - All HelixToolkit overlays controllable from single options window
 
 ---
 
@@ -97,34 +97,45 @@ Right-click a token → context menu:
 - "Compare to..." — select two tokens, show the vector between them, find tokens
   along that direction (the "King - Man + Woman = Queen" analogy test)
 
-### Phase 4: Layer-by-Layer Activation Visualization
+### Phase 4: Layer-by-Layer Activation Visualization ✅
 
-Load `IntegerCausalSource`, run a prompt through the forward pass, capture
-the hidden state at each layer. Show the trajectory as a line/trail through
-the 3D space.
+Implemented via `IntegerCausalSource.ForwardCausalWithTrace()` (new method in
+SparseLattice) which captures the last-position hidden state after each transformer
+layer. In NeuralNavigator, the "Layer Trace" panel lets you enter a prompt and
+visualize the trajectory through the 3D embedding space:
 
-**Questions to answer visually:**
-- Does the hidden state "converge" toward the correct answer token?
-- Which layers cause the biggest moves?
-- Do different prompts follow similar trajectories through the space?
+- **Causal models (Gemma):** Full forward pass through all layers, capturing hidden
+  state at each layer. Renders as a 3D trail with blue→cyan→green→yellow→red gradient
+  showing layer progression. Per-layer movement distance bar chart shows which layers
+  cause the biggest hidden-state moves.
+- **Encoder models (BERT/nomic):** Falls back to embedding lookup — tokenizes the
+  prompt and plots each token's embedding position, showing how the prompt tokens
+  are distributed in the space.
+- Layer slider flies the camera to each layer's position in the trajectory.
+- "Clear Trace" button removes the trace overlay.
 
-This requires instrumenting `IntegerCausalSource.ApplyCausalBlock` to return
-intermediate states, or a new `ForwardCausalWithTrace()` method.
+New in SparseLattice: `IntegerCausalSource.ForwardCausalWithTrace(int[] tokenIds)`
+returns `float[LayerCount+1][dims]` — the hidden state at each layer boundary.
 
-### Phase 5: Attention Pattern Heatmap
+### Phase 5: Attention Inspector ✅ (movement visualization)
 
-For a given prompt and layer, visualize the attention matrix:
-- 2D heatmap overlay (separate panel or toggle)
-- 3D visualization: draw lines between attended positions, thickness = weight
-- Per-head breakdown: cycle through heads to see what each one learns
+Per-layer movement distance bar chart implemented as part of Phase 4. Shows which
+layers cause the biggest displacement in the hidden state trajectory. Color-coded
+bars (red = large movement, green = small). Layer slider navigates through the trace.
 
-### Phase 6: Weight Explorer
+Full attention matrix heatmap (2D per-head visualization) deferred to a future
+iteration — requires capturing attention weights during the forward pass.
 
-Navigate into individual layer weights:
-- Select a layer → show its weight matrices as heatmaps
-- Select a weight row → project it into the same embedding space
-- Find weight rows that are "near" each other (redundancy detection)
-- Prune a dimension interactively: zero it out, re-run a prompt, see the effect
+### Phase 6: Weight Explorer ✅
+
+Weight tensor picker populated from the GGUF file's tensor table (filtered to
+2D weight matrices: attn, ffn, embd tensors). "Show" button:
+- Reads and dequantizes the selected weight tensor on a background thread
+- Projects weight rows to 3D using top-3 variance dimensions
+- Renders as a blue point cloud overlaid on the token embedding space
+- Computes approximate effective rank (dimensions explaining 90% of variance)
+- Reports tensor shape and effective rank in the status area
+- Limits to 5000 rows for rendering performance
 
 ---
 

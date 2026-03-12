@@ -17,7 +17,7 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="300" />
+            <ColumnDefinition Width="220" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
@@ -25,19 +25,26 @@
         <Border Grid.Column="0" Background="#252526" BorderBrush="#3e3e42" BorderThickness="0,0,1,0">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="8">
-                    <!-- Model info -->
-                    <TextBlock Text="NEURAL NAVIGATOR" FontSize="16" FontWeight="Bold"
-                               Foreground="#569cd6" Margin="0,0,0,12" />
-
-                    <TextBlock Text="{Binding StatusText}" Foreground="#9cdcfe"
-                               TextWrapping="Wrap" Margin="0,0,0,8" />
+                    <!-- Title + Options -->
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="NEURAL NAVIGATOR" FontSize="14" FontWeight="Bold"
+                                   Foreground="#569cd6" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Content="⚙" FontSize="16" Padding="4,0"
+                                ToolTip="Viewport Options"
+                                Command="{Binding ShowOptionsCommand}"
+                                Background="Transparent" Foreground="#808080" BorderThickness="0" />
+                    </Grid>
 
                     <!-- Load model -->
                     <Button Content="Load Model..." Command="{Binding LoadModelCommand}"
-                            Margin="0,0,0,12" Padding="8,4" />
+                            Margin="0,0,0,8" Padding="8,4" />
 
                     <!-- Search -->
-                    <TextBlock Text="Search Token" Foreground="#d4d4d4" Margin="0,8,0,4" />
+                    <TextBlock Text="Search Token" Foreground="#d4d4d4" Margin="0,4,0,4" FontSize="11" />
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -51,16 +58,16 @@
                     </Grid>
 
                     <!-- Selected token info -->
-                    <Border Background="#1e1e1e" CornerRadius="4" Margin="0,12,0,0" Padding="8"
+                    <Border Background="#1e1e1e" CornerRadius="4" Margin="0,8,0,0" Padding="8"
                             Visibility="{Binding HasSelection, Converter={StaticResource BoolToVis}}">
                         <StackPanel>
-                            <TextBlock Text="Selected Token" Foreground="#569cd6" FontWeight="Bold" />
+                            <TextBlock Text="Selected Token" Foreground="#569cd6" FontWeight="Bold" FontSize="11" />
                             <TextBlock Text="{Binding SelectedTokenText}" Foreground="#ce9178"
-                                       FontSize="18" Margin="0,4,0,4" />
-                            <TextBlock Text="{Binding SelectedTokenId}" Foreground="#b5cea8" />
+                                       FontSize="16" Margin="0,2,0,2" />
+                            <TextBlock Text="{Binding SelectedTokenId}" Foreground="#b5cea8" FontSize="11" />
 
                             <TextBlock Text="Nearest Neighbors" Foreground="#569cd6"
-                                       FontWeight="Bold" Margin="0,12,0,4" />
+                                       FontWeight="Bold" Margin="0,8,0,4" FontSize="11" />
                             <ItemsControl ItemsSource="{Binding Neighbors}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -70,9 +77,9 @@
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Text="{Binding Token}" Foreground="#d4d4d4"
-                                                       Cursor="Hand" />
+                                                       Cursor="Hand" FontSize="11" />
                                             <TextBlock Text="{Binding Distance, StringFormat='{}{0:F4}'}"
-                                                       Foreground="#6a9955" Grid.Column="1" />
+                                                       Foreground="#6a9955" Grid.Column="1" FontSize="11" />
                                         </Grid>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -81,34 +88,105 @@
                     </Border>
 
                     <!-- View controls -->
-                    <TextBlock Text="Projection" Foreground="#d4d4d4" Margin="0,16,0,4" />
+                    <TextBlock Text="Projection" Foreground="#d4d4d4" Margin="0,12,0,4" FontSize="11" />
                     <ComboBox ItemsSource="{Binding ProjectionModes}"
                               SelectedItem="{Binding SelectedProjection}"
-                              Margin="0,0,0,8" />
+                              Margin="0,0,0,4" FontSize="11" />
 
-                    <TextBlock Text="Color By" Foreground="#d4d4d4" Margin="0,4,0,4" />
+                    <TextBlock Text="Color By" Foreground="#d4d4d4" Margin="0,4,0,4" FontSize="11" />
                     <ComboBox ItemsSource="{Binding ColorModes}"
                               SelectedItem="{Binding SelectedColorMode}"
-                              Margin="0,0,0,8" />
+                              Margin="0,0,0,4" FontSize="11" />
 
-                    <TextBlock Text="Point Size" Foreground="#d4d4d4" Margin="0,4,0,4" />
+                    <TextBlock Text="Point Size" Foreground="#d4d4d4" Margin="0,4,0,2" FontSize="11" />
                     <Slider Minimum="0.5" Maximum="10" Value="{Binding PointSize}"
                             TickFrequency="0.5" IsSnapToTickEnabled="True" />
 
-                    <TextBlock Text="Visible Tokens" Foreground="#d4d4d4" Margin="0,8,0,4" />
+                    <TextBlock Text="Visible Tokens" Foreground="#d4d4d4" Margin="0,4,0,2" FontSize="11" />
                     <Slider Minimum="100" Maximum="50000" Value="{Binding VisibleTokenCount}"
                             TickFrequency="500" IsSnapToTickEnabled="True" />
                     <TextBlock Text="{Binding VisibleTokenCount, StringFormat='{}{0:N0} tokens'}"
-                               Foreground="#6a9955" />
+                               Foreground="#6a9955" FontSize="10" />
 
-                    <!-- Camera info -->
-                    <TextBlock Text="Navigation" Foreground="#569cd6" FontWeight="Bold"
-                               Margin="0,16,0,4" />
-                    <TextBlock Foreground="#6a9955" TextWrapping="Wrap" FontSize="11"
-                               Text="WASD: Fly  |  Mouse: Look&#x0a;Scroll: Speed  |  Space: Up  |  Ctrl: Down&#x0a;Double-click: Select  |  Home: Reset view" />
+                    <!-- Navigation -->
+                    <TextBlock Foreground="#4e4e50" TextWrapping="Wrap" FontSize="9" Margin="0,8,0,0"
+                               Text="WASD: Fly | RMB: Look | Scroll: Speed&#x0a;Space/Ctrl: Up/Down | Home: Reset" />
 
-                    <Button Content="Reset View (Home)" Command="{Binding ResetViewCommand}"
-                            Margin="0,8,0,0" Padding="8,4" />
+                    <Button Content="Reset View" Command="{Binding ResetViewCommand}"
+                            Margin="0,4,0,0" Padding="8,3" FontSize="11" />
+
+                    <!-- Phase 4: Prompt Trace -->
+                    <TextBlock Text="Layer Trace" Foreground="#569cd6" FontWeight="Bold"
+                               Margin="0,12,0,4" FontSize="11" />
+                    <TextBlock Foreground="#6a9955" TextWrapping="Wrap" FontSize="9"
+                               Text="Trace hidden state through layers. Gemma = full forward pass, others = embedding lookup." />
+                    <TextBox Text="{Binding TracePrompt, UpdateSourceTrigger=PropertyChanged}"
+                             Background="#1e1e1e" Foreground="#d4d4d4" BorderBrush="#3e3e42"
+                             Padding="4" Margin="0,4,0,4" TextWrapping="Wrap"
+                             AcceptsReturn="True" Height="40" FontSize="11" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Content="Trace" Command="{Binding TracePromptCommand}"
+                                Padding="8,3" Grid.Column="0" FontSize="11" />
+                        <Button Content="Clear" Command="{Binding ClearTraceCommand}"
+                                Padding="8,3" Margin="4,0,0,0" Grid.Column="1" FontSize="11" />
+                    </Grid>
+                    <TextBlock Text="{Binding TraceStatus}" Foreground="#9cdcfe"
+                               TextWrapping="Wrap" Margin="0,4,0,0" FontSize="9" />
+
+                    <!-- Phase 5: Layer/Head selector for attention -->
+                    <StackPanel Visibility="{Binding HasTrace, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Foreground="#6a9955" FontSize="9" Text="Layer:" Margin="0,4,0,0" />
+                        <Slider Minimum="0" Maximum="{Binding MaxLayerIndex}" Value="{Binding SelectedLayerIndex}"
+                                TickFrequency="1" IsSnapToTickEnabled="True" />
+                        <TextBlock Text="{Binding SelectedLayerIndex, StringFormat='Layer {0}'}"
+                                   Foreground="#b5cea8" FontSize="9" />
+
+                        <TextBlock Foreground="#6a9955" FontSize="9" Text="Movement per layer:" Margin="0,4,0,0" />
+                        <ItemsControl ItemsSource="{Binding LayerMovements}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,1">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="28" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Label}" Foreground="#6a9955" FontSize="9" />
+                                        <Border Grid.Column="1" Background="#3e3e42" Height="6"
+                                                VerticalAlignment="Center" CornerRadius="2">
+                                            <Border Background="{Binding BarColor}" HorizontalAlignment="Left"
+                                                    Width="{Binding BarWidth}" Height="6" CornerRadius="2" />
+                                        </Border>
+                                        <TextBlock Grid.Column="2" Text="{Binding Distance, StringFormat='{}{0:F0}'}"
+                                                   Foreground="#b5cea8" FontSize="9" Margin="4,0,0,0" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <!-- Phase 6: Weight Explorer -->
+                    <TextBlock Text="Weight Explorer" Foreground="#569cd6" FontWeight="Bold"
+                               Margin="0,12,0,4" FontSize="11" />
+                    <TextBlock Foreground="#6a9955" TextWrapping="Wrap" FontSize="9"
+                               Text="Project weight rows into the embedding space." />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ComboBox ItemsSource="{Binding WeightTensorNames}"
+                                  SelectedItem="{Binding SelectedWeightTensor}"
+                                  Margin="0,4,0,4" Grid.Column="0" FontSize="10" />
+                        <Button Content="Show" Command="{Binding ShowWeightsCommand}"
+                                Padding="8,3" Margin="4,4,0,4" Grid.Column="1" FontSize="11" />
+                    </Grid>
+                    <TextBlock Text="{Binding WeightStatus}" Foreground="#9cdcfe"
+                               TextWrapping="Wrap" FontSize="9" />
                 </StackPanel>
             </ScrollViewer>
         </Border>
@@ -118,16 +196,18 @@
             x:Name="Viewport"
             Grid.Column="1"
             Background="Black"
-            ShowCoordinateSystem="True"
-            CoordinateSystemLabelForeground="White"
+            ShowCoordinateSystem="{Binding ShowCoordinateSystem}"
+            CoordinateSystemLabelForeground="#60FFFFFF"
+            ShowViewCube="{Binding ShowViewCube}"
             ZoomExtentsWhenLoaded="False"
-            EnableSwapChainRendering="True"
+            EnableSwapChainRendering="False"
             EffectsManager="{Binding EffectsManager}"
             Camera="{Binding Camera}"
-            ShowCameraInfo="True"
-            IsShadowMappingEnabled="False"
+            ShowCameraInfo="{Binding ShowCameraInfo}"
+            ShowFrameRate="{Binding ShowFrameRate}"
+            IsShadowMappingEnabled="{Binding EnableShadows}"
             Focusable="True"
-            FXAALevel="Low"
+            FXAALevel="{Binding FxaaLevel}"
             IsRotationEnabled="False"
             IsPanEnabled="False"
             IsZoomEnabled="False"
@@ -139,6 +219,20 @@
             <ht:DirectionalLight3D Color="#606060" Direction="0,1,1" />
         </ht:Viewport3DX>
 
+        <!-- Model info HUD overlay (top-left of viewport) -->
+        <Border Grid.Column="1"
+                Background="#401e1e1e"
+                CornerRadius="4"
+                Padding="10,6"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Top"
+                Margin="12,12,0,0"
+                IsHitTestVisible="False"
+                Visibility="{Binding ShowModelInfoVisibility}">
+            <TextBlock Text="{Binding StatusText}" Foreground="#80d4d4d4" FontSize="11"
+                       FontFamily="Consolas" />
+        </Border>
+
         <!-- Hover tooltip overlay -->
         <Border x:Name="HoverTooltip"
                 Grid.Column="1"
@@ -147,10 +241,10 @@
                 Padding="8,4"
                 HorizontalAlignment="Left"
                 VerticalAlignment="Top"
-                Margin="20,20,0,0"
+                Margin="12,80,0,0"
                 IsHitTestVisible="False"
                 Visibility="{Binding HasHoverText, Converter={StaticResource BoolToVis}}">
-            <TextBlock Text="{Binding HoverText}" Foreground="#d4d4d4" FontSize="14" />
+            <TextBlock Text="{Binding HoverText}" Foreground="#d4d4d4" FontSize="13" />
         </Border>
     </Grid>
 </Window>

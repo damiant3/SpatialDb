@@ -144,4 +144,43 @@ public sealed partial class IntegerCausalSource
             RopeMaxSeqLen, m_headDim, m_ropeFreqBaseGlobal);
         return m_ropeCacheGlobal;
     }
+
+    /// <summary>
+    /// Runs the causal forward pass and captures the last-position hidden state
+    /// as a dequantized float vector after each layer. Returns an array of length
+    /// LayerCount+1 where [0] = initial embedding, [i] = state after layer i-1,
+    /// and the final entry is post-output-norm.
+    /// </summary>
+    public float[][] ForwardCausalWithTrace(int[] tokenIds)
+    {
+        int seqLen = tokenIds.Length;
+        long[] x = BuildEmbeddings(tokenIds, seqLen);
+        double scale = System.Math.Pow(2.0, -m_scaleBits);
+
+        float[][] trace = new float[m_layers.Length + 1][];
+
+        // Capture initial embedding state (last position)
+        trace[0] = ExtractLastPositionFloat(x, seqLen, scale);
+
+        IntegerAttention.IntegerRoPECache ropeCacheLocal = GetRoPECacheLocal();
+        IntegerAttention.IntegerRoPECache ropeCacheGlobal = GetRoPECacheGlobal();
+        for (int layerIdx = 0; layerIdx < m_layers.Length; layerIdx++)
+        {
+            bool isGlobal = IsGlobalLayer(layerIdx);
+            IntegerAttention.IntegerRoPECache ropeCache = isGlobal ? ropeCacheGlobal : ropeCacheLocal;
+            ApplyCausalBlock(x, seqLen, m_layers[layerIdx], ropeCache, isGlobal);
+            trace[layerIdx + 1] = ExtractLastPositionFloat(x, seqLen, scale);
+        }
+
+        return trace;
+    }
+
+    private float[] ExtractLastPositionFloat(long[] x, int seqLen, double scale)
+    {
+        int lastBase = (seqLen - 1) * m_nEmbd;
+        float[] result = new float[m_nEmbd];
+        for (int d = 0; d < m_nEmbd; d++)
+            result[d] = (float)(x[lastBase + d] * scale);
+        return result;
+    }
 }
