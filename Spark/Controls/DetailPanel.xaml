@@ -1,0 +1,126 @@
+<UserControl x:Class="Spark.Controls.DetailPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d">
+
+    <Border Style="{StaticResource PanelBorder}" BorderThickness="1,0,0,0">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="10">
+
+                <!-- Preview -->
+                <Border Background="Black" CornerRadius="4" Height="220">
+                    <Image Source="{Binding DetailImage.FilePath}" Stretch="Uniform" Margin="2" />
+                </Border>
+
+                <!-- ── RATE ── -->
+                <TextBlock Text="RATE" Style="{StaticResource SectionHeader}" Margin="0,6,0,2" />
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="☆" CommandParameter="1" Command="{Binding RateDetailCommand}" Style="{StaticResource StarBtn}" />
+                    <Button Content="☆" CommandParameter="2" Command="{Binding RateDetailCommand}" Style="{StaticResource StarBtn}" />
+                    <Button Content="☆" CommandParameter="3" Command="{Binding RateDetailCommand}" Style="{StaticResource StarBtn}" />
+                    <Button Content="☆" CommandParameter="4" Command="{Binding RateDetailCommand}" Style="{StaticResource StarBtn}" />
+                    <Button Content="☆" CommandParameter="5" Command="{Binding RateDetailCommand}" Style="{StaticResource StarBtn}" />
+                    <TextBlock Text="{Binding DetailImage.RatingStars}"
+                               Foreground="{StaticResource GoldBrush}" FontSize="14"
+                               Margin="6,0,0,0" />
+                </StackPanel>
+                <TextBlock Text="☆≤2 auto-deletes + regens" Style="{StaticResource HintText}" Margin="0,1,0,0" />
+
+                <!-- ── ACTIONS ── -->
+                <WrapPanel Margin="0,5,0,0">
+                    <Button Content="💾 Save"    Command="{Binding SaveDetailCommand}"    Style="{StaticResource AccentBtn}" Margin="0,0,3,0" />
+                    <Button Content="🗑 Delete"   Command="{Binding DeleteDetailCommand}"  Margin="0,0,3,0" />
+                    <Button Content="🔄 Regen"    Command="{Binding RegenDetailCommand}"   Margin="0,0,3,0" />
+                    <Button Content="🎲 Creative" Command="{Binding CreativeRegenCommand}" />
+                </WrapPanel>
+
+                <!-- ── VARIANTS ── -->
+                <TextBlock Text="VARIANTS" Style="{StaticResource SectionHeader}" Margin="0,6,0,2" />
+                <WrapPanel>
+                    <Button Content="⬆ Bigger"  Command="{Binding VariantBiggerCommand}"  Margin="0,0,3,0" />
+                    <Button Content="⬇ Smaller" Command="{Binding VariantSmallerCommand}" />
+                    <TextBlock Style="{StaticResource HintText}" FontSize="8"
+                               Margin="6,0,0,0" Text="Same seed, SDXL bucket" />
+                </WrapPanel>
+
+                <!-- ── PROMPT AUGMENT ── -->
+                <TextBlock Text="PROMPT AUGMENT" Style="{StaticResource SectionHeader}" Margin="0,6,0,2" />
+                <TextBox Text="{Binding PromptAugment, UpdateSourceTrigger=PropertyChanged}"
+                         TextWrapping="Wrap" Height="42" AcceptsReturn="True"
+                         VerticalScrollBarVisibility="Auto" />
+                <TextBlock Text="Added to prompt on Regen/Creative" Style="{StaticResource HintText}" Margin="0,1,0,0" />
+
+                <!-- ── LORA ── -->
+                <TextBlock Text="LORA" Style="{StaticResource SectionHeader}" Margin="0,6,0,2" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <ComboBox ItemsSource="{Binding AvailableLoras}" SelectedItem="{Binding SelectedLora}" />
+                    <Button Grid.Column="1" Content="↻" Command="{Binding RefreshLorasCommand}"
+                            FontSize="12" Padding="4,2" Margin="3,0,0,0" ToolTip="Refresh LoRA list" />
+                    <Button Grid.Column="2" Content="🌐" Command="{Binding BrowseLoraSiteCommand}"
+                            FontSize="12" Padding="4,2" Margin="3,0,0,0" ToolTip="Browse CivitAI LoRAs" />
+                </Grid>
+                <Grid Margin="0,3,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="52" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="30" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Weight:" />
+                    <Slider Grid.Column="1" Minimum="0" Maximum="2"
+                            Value="{Binding LoraWeight}" LargeChange="0.1" SmallChange="0.05" />
+                    <TextBlock Grid.Column="2" Text="{Binding LoraWeight, StringFormat=F1}"
+                               HorizontalAlignment="Center" />
+                </Grid>
+
+                <!-- ── DOWNLOAD LORA ── -->
+                <TextBlock Text="DOWNLOAD LORA" Foreground="{StaticResource SecondAccent}"
+                           FontWeight="Bold" FontSize="9" Margin="0,5,0,2" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox Text="{Binding LoraUrl, UpdateSourceTrigger=PropertyChanged}" FontSize="9" />
+                    <Button Grid.Column="1" Content="⬇" Command="{Binding DownloadLoraCommand}"
+                            FontSize="12" Padding="4,2" Margin="3,0,0,0" ToolTip="Download and install LoRA" />
+                </Grid>
+
+                <!-- ── IMAGE INFO ── -->
+                <TextBlock Text="{Binding DetailImage.DisplayName}"
+                           Foreground="{StaticResource AccentBrush}"
+                           FontWeight="Bold" FontSize="11" TextWrapping="Wrap" Margin="0,8,0,1" />
+                <TextBlock Text="{Binding DetailImage.Series}"
+                           Foreground="{StaticResource SecondAccent}" FontSize="9" Margin="0,0,0,1" />
+                <TextBlock FontSize="8" Margin="0,0,0,1">
+                    <Run Text="Seed: " /><Run Text="{Binding DetailImage.Seed, Mode=OneWay}" />
+                    <Run Text="  |  " /><Run Text="{Binding DetailImage.RefinePreset, Mode=OneWay}" />
+                    <Run Text="  |  " /><Run Text="{Binding DetailImage.SourceWidth, Mode=OneWay}" />
+                    <Run Text="×" /><Run Text="{Binding DetailImage.SourceHeight, Mode=OneWay}" />
+                </TextBlock>
+                <TextBlock Foreground="{StaticResource DimFg}" FontSize="8" Margin="0,0,0,1"
+                           Text="{Binding DetailImage.LoraTag}" />
+                <TextBlock Foreground="{StaticResource DimFg}" FontSize="8" Margin="0,0,0,4">
+                    <Run Text="{Binding DetailImage.StatusIcon, Mode=OneWay}" />
+                    <Run Text=" " />
+                    <Run Text="{Binding DetailImage.SettingsDisplay, Mode=OneWay}" />
+                </TextBlock>
+
+                <!-- ── PROMPT ── -->
+                <TextBlock Text="PROMPT" Style="{StaticResource SectionHeader}" Margin="0,0,0,2" />
+                <TextBox Text="{Binding DetailPromptText, Mode=OneWay}"
+                         Background="{StaticResource DeepBg}"
+                         FontSize="8" TextWrapping="Wrap" IsReadOnly="True"
+                         BorderThickness="0" Padding="5" MaxHeight="100"
+                         VerticalScrollBarVisibility="Auto" />
+
+            </StackPanel>
+        </ScrollViewer>
+    </Border>
+</UserControl>

@@ -1,0 +1,81 @@
+{
+  "colorThemes": [
+    "deep purple and amber palette",
+    "cyan and copper palette",
+    "blood red and black palette",
+    "teal and gold palette",
+    "violet and silver palette",
+    "warm amber and deep blue palette",
+    "neon magenta and dark teal palette",
+    "earthy ochre and forest green palette",
+    "ice blue and white palette",
+    "burnt orange and charcoal palette",
+    "emerald and bronze palette",
+    "rose gold and midnight blue palette"
+  ],
+  "compositions": [
+    "extreme close-up portrait composition",
+    "wide establishing shot composition",
+    "dutch angle dynamic composition",
+    "symmetrical Kubrick-style composition",
+    "rule of thirds with negative space",
+    "layered foreground-midground-background depth",
+    "silhouette composition against dramatic sky",
+    "overhead bird's eye view composition",
+    "dramatic low angle worm's eye view",
+    "split composition with strong diagonal",
+    "crowded frame with dense detail",
+    "minimalist composition with single focal point"
+  ],
+  "inspirations": [
+    "inspired by Moebius linework",
+    "influenced by Simon Stålenhag",
+    "in the manner of Syd Mead",
+    "reminiscent of Studio Ghibli warmth",
+    "channeling Beksinski surrealism",
+    "with H.R. Giger biomechanical elegance",
+    "in NASA concept art style",
+    "with Alphonse Mucha Art Nouveau elements",
+    "influenced by Tsutomu Nihei architecture",
+    "channeling Ralph McQuarrie concept work",
+    "with Yoshitaka Amano ethereal quality",
+    "in Chris Foss spacecraft aesthetic",
+    "inspired by John Harris vast landscapes",
+    "with Caspar David Friedrich romanticism"
+  ],
+  "moods": [
+    "melancholic contemplative atmosphere",
+    "tense anticipatory mood",
+    "serene awe-struck wonder",
+    "gritty industrial determination",
+    "ethereal dreamlike quality",
+    "urgent kinetic energy",
+    "quiet reverent solitude",
+    "triumphant discovery moment",
+    "mysterious foggy uncertainty",
+    "warm intimate human connection",
+    "vast cosmic insignificance",
+    "fierce competitive intensity"
+  ],
+  "lightingSetups": [
+    "single harsh spotlight from above",
+    "golden hour rim lighting",
+    "cool moonlight with warm accent",
+    "volumetric god rays through dust",
+    "bioluminescent ambient glow",
+    "chiaroscuro dramatic contrast",
+    "neon reflected off wet surfaces",
+    "soft diffused overcast light",
+    "dual-tone split lighting warm and cool",
+    "backlit silhouette with lens flare",
+    "multiple colored practical lights",
+    "deep shadow with single candle warmth"
+  ],
+  "samplerHints": [
+    "", "", "", "",
+    "Euler a",
+    "DPM++ SDE",
+    "DPM++ 3M SDE",
+    "UniPC"
+  ]
+}

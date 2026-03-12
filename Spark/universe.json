@@ -1,0 +1,11 @@
+{
+  "glossary": "In this universe: a 'Spark' is a tiny ancient alien machine creature (15-43cm tall, six-limbed, ceramic-metal composite shell with geometric engravings, bioluminescent panels, unique personality, NOT fire/flame/electricity). 'Progenitors' are the extinct alien civilization that built them 40000 years ago. 'Embers' are human deep-space explorers/archaeologists in worn exosuits and salvage gear. 'Crucibles' are Progenitor combat arenas with shifting terrain. 'Lumens' are alien crystal instruments (90cm, ceramic-metal, geometric engravings) that feed Sparks via photonic resonance. 'Singers' are humans gifted at playing Lumens. Aesthetic: utilitarian sci-fi meets ancient alien archaeology, NOT fantasy/medieval. Characters wear practical functional gear, NOT revealing clothing.",
+  "properNouns": [
+    "Cinder", "Whisper", "Rust", "Echo", "Quill",
+    "Amara", "Yael", "Davi", "Hofmann", "Cassidy",
+    "Brennan-Yee", "Forager's Luck", "Conservatory", "Nairobi Institute",
+    "Crucible Championship", "Colonial Compact", "Big Nothing",
+    "Keeper", "Singer", "Ember", "Spark", "Lumen", "Progenitor", "Umbral"
+  ],
+  "storyFilePatterns": [ "*.txt", "*.md" ]
+}

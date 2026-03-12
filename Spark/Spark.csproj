@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -7,5 +7,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="art_directions.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="creative_pools.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="refine_presets.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="universe.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 
 </Project>

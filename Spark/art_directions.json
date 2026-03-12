@@ -1,0 +1,104 @@
+{
+  "groups": [
+    {
+      "category": "Style",
+      "emoji": "🎨",
+      "items": [
+        { "label": "Less Anime",     "promptAdd": "reduce anime influence, more Western illustration, realistic proportions", "negativeAdd": "anime, cel shading, manga, chibi" },
+        { "label": "More Anime",     "promptAdd": "bold anime style, cel shading, vivid saturated colors, sharp linework, Studio Trigger influence", "negativeAdd": "photorealistic, photograph" },
+        { "label": "Less Realistic", "promptAdd": "stylized, painterly, illustration, bold graphic shapes", "negativeAdd": "photorealistic, photograph, DSLR, RAW photo" },
+        { "label": "More Realistic", "promptAdd": "photorealistic, hyperrealistic, RAW photo, 8K UHD, DSLR, film grain", "negativeAdd": "anime, cartoon, illustration, drawing, stylized" },
+        { "label": "More Painterly", "promptAdd": "oil painting style, visible brushstrokes, fine art, museum quality, Rembrandt lighting", "negativeAdd": "photograph, digital art, 3d render" },
+        { "label": "More Abstract",  "promptAdd": "abstract, expressionist, gestural, loose interpretation, shapes over forms", "negativeAdd": "photorealistic, detailed, sharp" },
+        { "label": "Less Abstract",  "promptAdd": "concrete, literal interpretation, clear subjects, sharp details, representational", "negativeAdd": "abstract, expressionist, blurry" }
+      ]
+    },
+    {
+      "category": "Character",
+      "emoji": "👤",
+      "items": [
+        { "label": "More Clothes",    "promptAdd": "fully clothed, practical outfit, layered clothing, armor plating, heavy gear, tactical vest, covered", "negativeAdd": "revealing, exposed skin, swimsuit, bikini, underwear, shirtless" },
+        { "label": "More Armor",      "promptAdd": "heavy armor, power armor, exosuit plating, military hardsuit, tactical gear, armored", "negativeAdd": "revealing, casual, swimsuit, light clothing" },
+        { "label": "More Ornate",     "promptAdd": "ornate details, filigree, engravings, decorative elements, jeweled, embossed, gilded", "negativeAdd": "plain, simple, utilitarian, minimalist" },
+        { "label": "More Futuristic", "promptAdd": "futuristic, high-tech, holographic elements, neon accents, advanced technology, cyberpunk influence", "negativeAdd": "medieval, primitive, low-tech, steampunk" },
+        { "label": "More Rugged",     "promptAdd": "battle-worn, weathered, scratched, dented, patched, jury-rigged, scavenged parts", "negativeAdd": "pristine, clean, polished, new" },
+        { "label": "More Fantasy",    "promptAdd": "fantasy elements, magical, enchanted, arcane runes, mystical energy, ethereal", "negativeAdd": "realistic, mundane, modern, sci-fi" },
+        { "label": "Less Fantasy",    "promptAdd": "grounded sci-fi, hard science fiction, realistic technology, industrial, utilitarian", "negativeAdd": "magical, fantasy, ethereal, arcane, enchanted" }
+      ]
+    },
+    {
+      "category": "Composition",
+      "emoji": "📐",
+      "items": [
+        { "label": "Zoom In",           "promptAdd": "close-up shot, tight framing, face detail, portrait composition, shallow depth of field", "negativeAdd": "wide shot, establishing shot, full body" },
+        { "label": "Zoom Out",          "promptAdd": "extreme wide shot, establishing shot, vast scale, tiny figures in landscape, epic scope", "negativeAdd": "close-up, portrait, tight framing" },
+        { "label": "More Dynamic",      "promptAdd": "dynamic angle, dutch tilt, motion blur, action pose, dramatic perspective, foreshortening", "negativeAdd": "static, centered, symmetrical" },
+        { "label": "More Symmetrical",  "promptAdd": "symmetrical composition, centered subject, Kubrick framing, balanced, formal", "negativeAdd": "dutch angle, tilted, asymmetric" },
+        { "label": "Bird's Eye",        "promptAdd": "bird's eye view, top-down perspective, looking down, aerial view", "negativeAdd": "worm's eye, upward angle" },
+        { "label": "Worm's Eye",        "promptAdd": "worm's eye view, looking up, dramatic low angle, towering perspective", "negativeAdd": "bird's eye, top-down, aerial" }
+      ]
+    },
+    {
+      "category": "Lighting",
+      "emoji": "💡",
+      "items": [
+        { "label": "Brighter",        "promptAdd": "bright lighting, well-lit, high key, luminous, radiant, sunlit", "negativeAdd": "dark, moody, shadow, noir, underexposed" },
+        { "label": "Darker",          "promptAdd": "dark and moody, chiaroscuro, deep shadows, rim lighting only, noir atmosphere", "negativeAdd": "bright, high key, overexposed" },
+        { "label": "Warmer",          "promptAdd": "warm tones, golden hour, amber light, sunset palette, copper highlights", "negativeAdd": "cool tones, blue, cold" },
+        { "label": "Cooler",          "promptAdd": "cool tones, blue hour, moonlight, steel blue, cold atmosphere, winter light", "negativeAdd": "warm tones, golden, amber, sunset" },
+        { "label": "More Dramatic",   "promptAdd": "dramatic lighting, volumetric rays, god rays, spotlight, theatrical, high contrast", "negativeAdd": "flat lighting, even, soft" },
+        { "label": "Neon / Cyberpunk", "promptAdd": "neon lighting, cyberpunk atmosphere, electric blue and magenta, rain-slicked surfaces, holographic", "negativeAdd": "natural lighting, daylight, pastoral" },
+        { "label": "Bioluminescent",  "promptAdd": "bioluminescent glow, alien luminescence, glowing organic patterns, phosphorescent", "negativeAdd": "artificial light, electric light, sun" }
+      ]
+    },
+    {
+      "category": "Color",
+      "emoji": "🎨",
+      "items": [
+        { "label": "More Saturated",  "promptAdd": "vivid colors, highly saturated, bold palette, chromatic intensity", "negativeAdd": "desaturated, muted, washed out" },
+        { "label": "Desaturated",     "promptAdd": "desaturated palette, muted colors, restrained, pastel, faded", "negativeAdd": "vivid, saturated, bold, neon" },
+        { "label": "Monochrome",      "promptAdd": "monochromatic, single color palette, tonal, limited palette", "negativeAdd": "colorful, rainbow, multicolored" },
+        { "label": "Purple Dominant", "promptAdd": "deep purple palette, violet tones, amethyst, lavender accents, plum shadows", "negativeAdd": "" },
+        { "label": "Amber Dominant",  "promptAdd": "amber palette, golden tones, copper highlights, warm metallics, honey glow", "negativeAdd": "" },
+        { "label": "Cyan / Teal",     "promptAdd": "cyan and teal palette, turquoise, aquamarine, deep sea blue-green", "negativeAdd": "" }
+      ]
+    },
+    {
+      "category": "Subject",
+      "emoji": "🏛",
+      "items": [
+        { "label": "More Machines",     "promptAdd": "mechanical details, intricate machinery, gears, circuits, robotic elements, tech-heavy", "negativeAdd": "organic, natural, biological" },
+        { "label": "More Organic",      "promptAdd": "organic shapes, biological forms, living texture, coral-like, grown not built", "negativeAdd": "mechanical, geometric, angular" },
+        { "label": "More Architecture", "promptAdd": "architectural focus, massive structures, cathedral scale, imposing buildings, monumental", "negativeAdd": "character focus, portrait" },
+        { "label": "More Characters",   "promptAdd": "character-focused, group scene, human presence, expressive faces, body language", "negativeAdd": "empty, desolate, architectural only" },
+        { "label": "More Alien",        "promptAdd": "alien design, non-human aesthetic, xenomorphic, truly foreign, incomprehensible geometry", "negativeAdd": "human, familiar, earthlike" },
+        { "label": "More Ancient",      "promptAdd": "ancient feel, weathered stone, millennia of age, archaeological, patina of deep time", "negativeAdd": "new, modern, pristine, futuristic" }
+      ]
+    },
+    {
+      "category": "Ember Worlds",
+      "emoji": "🌌",
+      "items": [
+        { "label": "Spark Focus",      "promptAdd": "tiny alien machine creature (20cm tall, six-limbed, ceramic-metal shell, geometric engravings, bioluminescent panels, unique personality), NOT a literal spark/flame/light, ancient Progenitor artifact, curious posture, personality visible in body language", "negativeAdd": "fire, flame, electricity, sparkle, literal spark, bonfire" },
+        { "label": "Progenitor Ruins", "promptAdd": "ancient alien ruins, geometric relief patterns, cathedral-scale Progenitor architecture, copper-colored alien stonework, forty-thousand-year-old structures, sealed chambers, archaeological excavation, alien geometric script", "negativeAdd": "modern, human-built, Earth architecture" },
+        { "label": "Ember Explorer",   "promptAdd": "deep-space explorer in worn exosuit, mismatched salvage gear, jury-rigged equipment, frontier prospector, helmet lamp, archaeological tools, practical not glamorous, rugged weathered look, fully clothed functional gear", "negativeAdd": "swimsuit, revealing, fashion model, clean pristine" },
+        { "label": "Crucible Arena",   "promptAdd": "Progenitor combat arena (Crucible), shifting alien terrain, deployable obstacles, theatrical scale, dramatic alien architecture, spectacle lighting, ancient sporting arena", "negativeAdd": "modern stadium, Earth sports" },
+        { "label": "Singer / Lumen",   "promptAdd": "musician holding alien crystal instrument (Lumen, 90cm long, ceramic-metal with geometric engravings, crystal matrices, apertures along length), playing for tiny Spark creature, resonance glow, photonic feeding, intimate reverent scene", "negativeAdd": "guitar, piano, modern instrument" },
+        { "label": "Conservatory",     "promptAdd": "vast alien cathedral chamber, walls covered in alien musical notation layer upon layer, thousands of glowing crystal matrices in walls, central dais with massive instrument, archaeological wonder, luminous ancient space", "negativeAdd": "modern, human, Earth" }
+      ]
+    },
+    {
+      "category": "Inspiration",
+      "emoji": "✨",
+      "items": [
+        { "label": "Moebius Style",     "promptAdd": "in the style of Moebius / Jean Giraud, intricate linework, alien landscapes, European comic art, vast open spaces, fine detail, dreamlike", "negativeAdd": "" },
+        { "label": "Studio Ghibli",     "promptAdd": "Studio Ghibli aesthetic, Miyazaki-inspired, pastoral beauty meets technology, lush detail, warm humanity, hand-painted feel", "negativeAdd": "" },
+        { "label": "Syd Mead",          "promptAdd": "Syd Mead style, futurism, sleek industrial design, retro-futuristic, chrome and glass, concept vehicle design, Blade Runner influence", "negativeAdd": "" },
+        { "label": "H.R. Giger",        "promptAdd": "biomechanical aesthetic, Giger-inspired organic-mechanical fusion, dark beauty, intricate surface detail, unsettling elegance", "negativeAdd": "cute, cartoon, bright" },
+        { "label": "Simon Stålenhag",   "promptAdd": "Simon Stålenhag style, mundane meets monumental, rural landscape with alien technology, Scandinavian light, melancholy beauty, grounded sci-fi", "negativeAdd": "" },
+        { "label": "Beksinski",         "promptAdd": "Beksinski-inspired, surreal, dreamlike, bone-like structures, ethereal atmosphere, otherworldly, hauntingly beautiful", "negativeAdd": "" },
+        { "label": "NASA Concept",      "promptAdd": "NASA concept art style, technical illustration, plausible engineering, space habitat design, clean diagrammatic beauty, optimistic futurism", "negativeAdd": "fantasy, magical" }
+      ]
+    }
+  ]
+}

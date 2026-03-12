@@ -3,10 +3,11 @@ using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 ///////////////////////////////////////////////
 namespace Spark;
 
-sealed class ImageGeneratorSettings
+sealed record ImageGeneratorSettings
 {
     public int Width { get; init; } = 1344;
     public int Height { get; init; } = 768;
@@ -20,9 +21,108 @@ sealed class ImageGeneratorSettings
         "mutated, extra limbs, missing limbs, poorly drawn face, poorly drawn hands, " +
         "low quality, worst quality, blurry, out of focus";
 
-    // Human-readable tag used as the subdirectory name under Concept\
     public string SettingsTag =>
         $"{Width}x{Height}_s{Steps}_cfg{CfgScale}_{Sampler.Replace("++ ", "pp").Replace(" ", "-")}_{Scheduler}_seed{Seed}";
+}
+
+static class RefinePresets
+{
+    sealed record PresetData(
+        [property: JsonPropertyName("name")] string Name,
+        [property: JsonPropertyName("width")] int? Width = null,
+        [property: JsonPropertyName("height")] int? Height = null,
+        [property: JsonPropertyName("steps")] int? Steps = null,
+        [property: JsonPropertyName("cfgScale")] double? CfgScale = null,
+        [property: JsonPropertyName("promptSuffix")] string PromptSuffix = "",
+        [property: JsonPropertyName("negativeSuffix")] string NegativeSuffix = "");
+
+    static PresetData[]? s_presets;
+
+    static PresetData[] LoadAll()
+    {
+        if (s_presets is not null) return s_presets;
+        string path = Path.Combine(AppContext.BaseDirectory, "refine_presets.json");
+        if (File.Exists(path))
+        {
+            try
+            {
+                string json = File.ReadAllText(path);
+                s_presets = JsonSerializer.Deserialize<PresetData[]>(json) ?? [];
+                return s_presets;
+            }
+            catch { /* fall through */ }
+        }
+        s_presets = [new PresetData("none")];
+        return s_presets;
+    }
+
+    public static void Reload() { s_presets = null; }
+
+    public static string[] Names => LoadAll().Select(p => p.Name).ToArray();
+
+    public static (ImageGeneratorSettings settings, string promptSuffix, string negativeSuffix) Apply(
+        string preset, ImageGeneratorSettings baseSettings)
+    {
+        PresetData? data = LoadAll().FirstOrDefault(p => p.Name == preset);
+        if (data is null || data.Name == "none")
+            return (baseSettings, "", "");
+
+        ImageGeneratorSettings s = baseSettings;
+        if (data.Width.HasValue)    s = s with { Width = data.Width.Value };
+        if (data.Height.HasValue)   s = s with { Height = data.Height.Value };
+        if (data.Steps.HasValue)    s = s with { Steps = data.Steps.Value };
+        if (data.CfgScale.HasValue) s = s with { CfgScale = data.CfgScale.Value };
+
+        return (s, data.PromptSuffix, data.NegativeSuffix);
+    }
+}
+
+// SDXL trained resolution buckets — these produce best results because the
+// model was actually trained on these aspect ratios at 1024px base.
+static class SdxlResolutions
+{
+    public static readonly (int w, int h, string label)[] Buckets =
+    [
+        (1024, 1024, "1:1 Square"),
+        (1152,  896, "9:7 Landscape"),
+        (1216,  832, "3:2 Landscape"),
+        (1344,  768, "16:9 Landscape"),
+        (1536,  640, "21:9 Ultra-wide"),
+        ( 896, 1152, "7:9 Portrait"),
+        ( 832, 1216, "2:3 Portrait"),
+        ( 768, 1344, "9:16 Portrait"),
+        ( 640, 1536, "9:21 Tall"),
+    ];
+
+    // Scale a bucket up/down while preserving its aspect ratio and staying
+    // at reasonable pixel counts for SDXL (max ~2 megapixels).
+    public static (int w, int h) ScaleBucket(int baseW, int baseH, double factor)
+    {
+        int w = ((int)(baseW * factor) / 64) * 64;
+        int h = ((int)(baseH * factor) / 64) * 64;
+        return (Math.Max(512, w), Math.Max(512, h));
+    }
+
+    public static (int w, int h) FindClosestBucket(int width, int height)
+    {
+        double targetRatio = (double)width / height;
+        double bestDiff = double.MaxValue;
+        (int, int) best = (1344, 768);
+        foreach ((int bw, int bh, _) in Buckets)
+        {
+            double diff = Math.Abs((double)bw / bh - targetRatio);
+            if (diff < bestDiff) { bestDiff = diff; best = (bw, bh); }
+        }
+        return best;
+    }
+}
+
+sealed class LoraInfo
+{
+    public string Name { get; init; } = "";
+    public string Alias { get; init; } = "";
+    public string Path { get; init; } = "";
+    public string PromptTag(double weight = 0.8) => $"<lora:{Name}:{weight:F1}>";
 }
 
 sealed class GenerateResult
@@ -37,10 +137,13 @@ sealed class ImageGenerator : IDisposable
 {
     readonly HttpClient m_http;
     readonly string m_apiBase;
+    readonly string m_baseUrl;
+    List<LoraInfo>? m_cachedLoras;
 
     public ImageGenerator(string baseUrl = "http://127.0.0.1:7860")
     {
-        m_apiBase = baseUrl.TrimEnd('/') + "/sdapi/v1";
+        m_baseUrl = baseUrl.TrimEnd('/');
+        m_apiBase = m_baseUrl + "/sdapi/v1";
         m_http = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
     }
 
@@ -66,53 +169,139 @@ sealed class ImageGenerator : IDisposable
         catch { return ""; }
     }
 
+    public async Task<List<LoraInfo>> GetAvailableLoras(bool forceRefresh = false)
+    {
+        if (m_cachedLoras is not null && !forceRefresh)
+            return m_cachedLoras;
+        try
+        {
+            string json = await m_http.GetStringAsync($"{m_apiBase}/loras");
+            JsonArray? arr = JsonNode.Parse(json)?.AsArray();
+            m_cachedLoras = [];
+            if (arr is null) return m_cachedLoras;
+            foreach (JsonNode? item in arr)
+            {
+                if (item is null) continue;
+                m_cachedLoras.Add(new LoraInfo
+                {
+                    Name = item["name"]?.GetValue<string>() ?? "",
+                    Alias = item["alias"]?.GetValue<string>() ?? "",
+                    Path = item["path"]?.GetValue<string>() ?? "",
+                });
+            }
+            return m_cachedLoras;
+        }
+        catch { return m_cachedLoras ?? []; }
+    }
+
+    public async Task RefreshLoras()
+    {
+        try
+        {
+            StringContent body = new("{}", Encoding.UTF8, "application/json");
+            await m_http.PostAsync($"{m_apiBase}/refresh-loras", body);
+            m_cachedLoras = null;
+        }
+        catch { /* non-fatal */ }
+    }
+
+    public async Task<bool> DownloadLoraAsync(string url, string fileName,
+        Action<string>? onStatus = null, CancellationToken ct = default)
+    {
+        try
+        {
+            onStatus?.Invoke($"Downloading LoRA: {fileName}…");
+            string loraDir = Path.Combine("D:", "AI", "DiffusionForge", "webui", "models", "Lora");
+            Directory.CreateDirectory(loraDir);
+            string dest = Path.Combine(loraDir, fileName);
+            if (File.Exists(dest))
+            {
+                onStatus?.Invoke($"LoRA already exists: {fileName}");
+                return true;
+            }
+
+            using HttpResponseMessage resp = await m_http.GetAsync(url,
+                HttpCompletionOption.ResponseHeadersRead, ct);
+            resp.EnsureSuccessStatusCode();
+
+            await using Stream stream = await resp.Content.ReadAsStreamAsync(ct);
+            await using FileStream fs = File.Create(dest);
+            await stream.CopyToAsync(fs, ct);
+
+            onStatus?.Invoke($"Downloaded LoRA: {fileName} ({fs.Length / 1024 / 1024}MB)");
+            await RefreshLoras();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            onStatus?.Invoke($"LoRA download failed: {ex.Message}");
+            return false;
+        }
+    }
+
     /// <summary>
-    /// Generates one image via the A1111/Forge REST API (/sdapi/v1/txt2img).
-    /// Saves the PNG to Concept\{settingsTag}\{promptFilename}.png.
-    /// Returns the file path on success, null on failure.
+    /// Generates one image. The <paramref name="runIndex"/> differentiates multiple
+    /// runs of the same prompt (appended to filename as _r01, _r02, etc.).
     /// </summary>
     public async Task<GenerateResult> GenerateAsync(
         ArtPrompt prompt,
         ImageGeneratorSettings settings,
         string outputDir,
+        int runIndex = 0,
+        string refinePreset = "none",
+        string? promptOverride = null,
+        string? loraTag = null,
+        string? promptAugment = null,
         Action<string>? onStatus = null,
         CancellationToken ct = default)
     {
-        Directory.CreateDirectory(outputDir);
-        string settingsDir = Path.Combine(outputDir, settings.SettingsTag);
+        (ImageGeneratorSettings refined, string promptSuffix, string negativeSuffix) =
+            RefinePresets.Apply(refinePreset, settings);
+
+        string settingsDir = Path.Combine(outputDir, refined.SettingsTag);
         Directory.CreateDirectory(settingsDir);
 
-        string outputPath = Path.Combine(settingsDir, prompt.Filename + ".png");
+        string suffix = runIndex > 0 ? $"_r{runIndex:D2}" : "";
+        string fileName = prompt.Filename + suffix + ".png";
+        string outputPath = Path.Combine(settingsDir, fileName);
+
         if (File.Exists(outputPath))
         {
-            onStatus?.Invoke($"[{prompt.Number:D2}] Cached — {prompt.Title}");
+            onStatus?.Invoke($"[{prompt.Number:D2}] Cached — {prompt.Title} (run {runIndex})");
             return new GenerateResult { Success = true, FilePath = outputPath };
         }
 
-        onStatus?.Invoke($"[{prompt.Number:D2}] Generating: {prompt.Title}…");
+        onStatus?.Invoke($"[{prompt.Number:D2}] Generating: {prompt.Title} (run {runIndex}, {refinePreset})…");
+
+        string basePrompt = promptOverride ?? prompt.FullText;
+        if (!string.IsNullOrWhiteSpace(promptAugment))
+            basePrompt += ", " + promptAugment.Trim();
+        if (!string.IsNullOrWhiteSpace(loraTag))
+            basePrompt += " " + loraTag;
+        string finalPrompt = basePrompt + promptSuffix;
+        string finalNegative = refined.NegativePrompt + negativeSuffix;
 
         JsonObject payload = new()
         {
-            ["prompt"] = prompt.FullText,
-            ["negative_prompt"] = settings.NegativePrompt,
-            ["width"] = settings.Width,
-            ["height"] = settings.Height,
-            ["steps"] = settings.Steps,
-            ["cfg_scale"] = settings.CfgScale,
-            ["sampler_name"] = settings.Sampler,
-            ["scheduler"] = settings.Scheduler,
-            ["seed"] = settings.Seed,
+            ["prompt"] = finalPrompt,
+            ["negative_prompt"] = finalNegative,
+            ["width"] = refined.Width,
+            ["height"] = refined.Height,
+            ["steps"] = refined.Steps,
+            ["cfg_scale"] = refined.CfgScale,
+            ["sampler_name"] = refined.Sampler,
+            ["scheduler"] = refined.Scheduler,
+            ["seed"] = refined.Seed,
             ["batch_size"] = 1,
             ["n_iter"] = 1,
-            ["save_images"] = false,       // we handle saving ourselves
-            ["send_images"] = true,        // return base64 in response
+            ["save_images"] = false,
+            ["send_images"] = true,
         };
 
         try
         {
             StringContent body = new(payload.ToJsonString(), Encoding.UTF8, "application/json");
             HttpResponseMessage resp = await m_http.PostAsync($"{m_apiBase}/txt2img", body, ct);
-
             string responseJson = await resp.Content.ReadAsStringAsync(ct);
 
             if (!resp.IsSuccessStatusCode)
@@ -123,8 +312,6 @@ sealed class ImageGenerator : IDisposable
             }
 
             JsonNode? root = JsonNode.Parse(responseJson);
-
-            // images[] is an array of base64-encoded PNG strings.
             string? b64 = root?["images"]?[0]?.GetValue<string>();
             if (string.IsNullOrEmpty(b64))
             {
@@ -135,7 +322,6 @@ sealed class ImageGenerator : IDisposable
             byte[] pngBytes = Convert.FromBase64String(b64);
             await File.WriteAllBytesAsync(outputPath, pngBytes, ct);
 
-            // Extract the actual seed that was used (for caching / reproducibility).
             long actualSeed = -1;
             try
             {
@@ -143,9 +329,9 @@ sealed class ImageGenerator : IDisposable
                 if (infoJson is not null)
                     actualSeed = JsonNode.Parse(infoJson)?["seed"]?.GetValue<long>() ?? -1;
             }
-            catch { /* non-fatal */ }
+            catch { /* seed extraction is non-fatal */ }
 
-            onStatus?.Invoke($"[{prompt.Number:D2}] ✓ {prompt.Title}  ({pngBytes.Length / 1024}KB, seed {actualSeed})");
+            onStatus?.Invoke($"[{prompt.Number:D2}] ✓ {prompt.Title} run {runIndex}  ({pngBytes.Length / 1024}KB, seed {actualSeed})");
             return new GenerateResult { Success = true, FilePath = outputPath, ActualSeed = actualSeed };
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

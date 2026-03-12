@@ -1,0 +1,8 @@
+[
+  { "name": "none" },
+  { "name": "hires",     "width": 1920, "height": 1080, "steps": 30,  "promptSuffix": ", ultra high resolution, extremely detailed, 8K", "negativeSuffix": ", low resolution, pixelated" },
+  { "name": "anime",     "cfgScale": 9.0, "steps": 25,  "promptSuffix": ", anime art style, cel shading, bold linework, vivid saturated colors, Studio Ghibli influence, stylized", "negativeSuffix": ", photorealistic, photo, 3d render" },
+  { "name": "realism",   "cfgScale": 5.5, "steps": 25,  "promptSuffix": ", photorealistic, hyperrealistic, RAW photo, 8K UHD, DSLR, film grain, cinematic lighting", "negativeSuffix": ", anime, cartoon, illustration, drawing, painting, stylized" },
+  { "name": "painterly", "cfgScale": 8.0, "steps": 28,  "promptSuffix": ", oil painting style, visible brushstrokes, painterly, fine art, museum quality, Bierstadt, Rembrandt lighting", "negativeSuffix": ", photograph, digital art, anime, 3d render" },
+  { "name": "cinematic", "cfgScale": 7.5, "steps": 25,  "promptSuffix": ", cinematic film still, anamorphic lens, 35mm, shallow depth of field, bokeh, dramatic lighting, color graded", "negativeSuffix": ", anime, cartoon, flat, illustration" }
+]
