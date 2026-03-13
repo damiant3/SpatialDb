@@ -1,7 +1,7 @@
 # Spark — Modernization & Generalization Plan
 
 > **Created:** 2026-03-12  
-> **Status:** In Progress — CP-1 ✅, CP-2 ✅, CP-3 ✅ completed
+> **Status:** In Progress — CP-1 ✅, CP-2 ✅, CP-3 ✅, CP-4 ✅, CP-5 ✅, UI polish ✅, Document Store ✅  
 > **Scope:** Refactor Spark from a hardcoded Ember Worlds concept-art tool into a general-purpose "Make My Game Art" wizard that any creative project can use.
 
 ---
@@ -173,8 +173,8 @@ Extend `PromptParser` to recognize an optional `LORA: <name>:<weight>` line with
 Allow saving LoRA+weight combos as named presets in `lora_presets.json`. A quick-pick dropdown.
 
 ### Exit Criteria
-- [ ] Generate All uses the LoRA selected in the control panel.
-- [ ] Per-prompt LoRA override works.
+- [x] Generate All uses the LoRA selected in the control panel.
+- [x] Per-prompt LoRA override works.
 - [ ] LoRA presets save/load.
 
 ---
@@ -211,9 +211,9 @@ Allow saving LoRA+weight combos as named presets in `lora_presets.json`. A quick
 - Switch projects without restarting.
 
 ### Exit Criteria
-- [ ] Spark loads all configuration from `spark_project.json`.
-- [ ] Renaming or moving JSON config files via the project file works.
-- [ ] Old projects without `spark_project.json` still work (backwards compat: auto-generate a project file on first open).
+- [x] Spark loads all configuration from `spark_project.json`.
+- [x] Renaming or moving JSON config files via the project file works.
+- [x] Old projects without `spark_project.json` still work (backwards compat: auto-generate a project file on first open).
 
 ---
 

@@ -1,0 +1,73 @@
+<Window x:Class="Spark.DocumentManagerDialog"
+        x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Documents — Story &amp; Reference Files"
+        Width="700" Height="500"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip">
+
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Margin="0,0,0,6" TextWrapping="Wrap">
+            <Run Text="Project documents are indexed for relevance-based prompt conditioning. "
+                 Foreground="{StaticResource TextFg}" />
+            <Run Text="Add .txt or .md files to the project folder, or create new ones here."
+                 Foreground="{StaticResource DimFg}" />
+        </TextBlock>
+
+        <ListBox x:Name="DocList" Grid.Row="1"
+                 MouseDoubleClick="OnDocDoubleClick"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Grid Margin="2,3">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Text="{Binding RoleIcon}" FontSize="14" VerticalAlignment="Center"
+                                   Margin="0,0,6,0" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding FileName}" FontWeight="Bold" FontSize="11"
+                                       Foreground="{StaticResource BrightFg}" />
+                            <TextBlock FontSize="8" Foreground="{StaticResource DimFg}">
+                                <Run Text="{Binding Role, Mode=OneWay}" />
+                                <Run Text="  •  " />
+                                <Run Text="{Binding KeywordCount, Mode=OneWay}" />
+                                <Run Text=" keywords" />
+                            </TextBlock>
+                        </StackPanel>
+                        <Button Grid.Column="2" Content="✏ Edit" Click="OnEditClick" Tag="{Binding}"
+                                Padding="8,3" Margin="4,0,0,0" VerticalAlignment="Center" />
+                        <Button Grid.Column="3" Content="🗑" Click="OnDeleteClick" Tag="{Binding}"
+                                Padding="6,3" Margin="4,0,0,0" VerticalAlignment="Center" />
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <Grid Grid.Row="2" Margin="0,6,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Button Content="📄 New Document" Click="OnNewDocClick" Padding="10,4" />
+            <Button Grid.Column="1" Content="↻ Re-scan" Click="OnRescanClick" Padding="10,4" Margin="4,0,0,0" />
+            <TextBlock x:Name="StatusLabel" Grid.Column="2" FontSize="9"
+                       Foreground="{StaticResource DimFg}" VerticalAlignment="Center" Margin="8,0,0,0" />
+            <Button Grid.Column="4" Content="Close" Click="OnCloseClick" Padding="16,4" />
+        </Grid>
+    </Grid>
+</Window>

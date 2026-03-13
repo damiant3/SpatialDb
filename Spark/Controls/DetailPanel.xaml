@@ -9,40 +9,43 @@
         <ScrollViewer VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="10">
 
-                <!-- Preview -->
-                <Border Background="Black" CornerRadius="4" Height="220">
+                <!-- Preview (double-click for lightbox) -->
+                <Border Background="Black" CornerRadius="4" Height="220"
+                        MouseLeftButtonDown="OnPreviewDoubleClick" Cursor="Hand">
                     <Image Source="{Binding DetailImage.FilePath}" Stretch="Uniform" Margin="2" />
                 </Border>
 
                 <!-- ── RATE ── -->
                 <TextBlock Text="RATE" Style="{StaticResource SectionHeader}" Margin="0,6,0,2" />
-                <StackPanel Orientation="Horizontal">
-                    <Button Content="☆" CommandParameter="1" Command="{Binding RateDetailCommand}" Style="{StaticResource StarBtn}" />
-                    <Button Content="☆" CommandParameter="2" Command="{Binding RateDetailCommand}" Style="{StaticResource StarBtn}" />
-                    <Button Content="☆" CommandParameter="3" Command="{Binding RateDetailCommand}" Style="{StaticResource StarBtn}" />
-                    <Button Content="☆" CommandParameter="4" Command="{Binding RateDetailCommand}" Style="{StaticResource StarBtn}" />
-                    <Button Content="☆" CommandParameter="5" Command="{Binding RateDetailCommand}" Style="{StaticResource StarBtn}" />
-                    <TextBlock Text="{Binding DetailImage.RatingStars}"
-                               Foreground="{StaticResource GoldBrush}" FontSize="14"
-                               Margin="6,0,0,0" />
+                <StackPanel Orientation="Horizontal" x:Name="StarPanel">
+                    <Button Content="★" CommandParameter="1" Command="{Binding RateDetailCommand}"
+                            Style="{StaticResource StarBtn}" Tag="1" />
+                    <Button Content="★" CommandParameter="2" Command="{Binding RateDetailCommand}"
+                            Style="{StaticResource StarBtn}" Tag="2" />
+                    <Button Content="★" CommandParameter="3" Command="{Binding RateDetailCommand}"
+                            Style="{StaticResource StarBtn}" Tag="3" />
+                    <Button Content="★" CommandParameter="4" Command="{Binding RateDetailCommand}"
+                            Style="{StaticResource StarBtn}" Tag="4" />
+                    <Button Content="★" CommandParameter="5" Command="{Binding RateDetailCommand}"
+                            Style="{StaticResource StarBtn}" Tag="5" />
                 </StackPanel>
-                <TextBlock Text="☆≤2 auto-deletes + regens" Style="{StaticResource HintText}" Margin="0,1,0,0" />
+                <TextBlock Text="★≤2 auto-deletes  •  ★3+ is positive" Style="{StaticResource HintText}" Margin="0,1,0,0" />
 
                 <!-- ── ACTIONS ── -->
                 <WrapPanel Margin="0,5,0,0">
                     <Button Content="💾 Save"    Command="{Binding SaveDetailCommand}"    Style="{StaticResource AccentBtn}" Margin="0,0,3,0" />
                     <Button Content="🗑 Delete"   Command="{Binding DeleteDetailCommand}"  Margin="0,0,3,0" />
                     <Button Content="🔄 Regen"    Command="{Binding RegenDetailCommand}"   Margin="0,0,3,0" />
-                    <Button Content="🎲 Creative" Command="{Binding CreativeRegenCommand}" />
+                    <Button Content="🧬 Mutate"   Command="{Binding CreativeRegenCommand}" />
                 </WrapPanel>
 
                 <!-- ── VARIANTS ── -->
                 <TextBlock Text="VARIANTS" Style="{StaticResource SectionHeader}" Margin="0,6,0,2" />
                 <WrapPanel>
-                    <Button Content="⬆ Bigger"  Command="{Binding VariantBiggerCommand}"  Margin="0,0,3,0" />
+                    <Button Content="⬆ Upscale"  Command="{Binding VariantBiggerCommand}"  Margin="0,0,3,0" />
                     <Button Content="⬇ Smaller" Command="{Binding VariantSmallerCommand}" />
                     <TextBlock Style="{StaticResource HintText}" FontSize="8"
-                               Margin="6,0,0,0" Text="Same seed, SDXL bucket" />
+                               Margin="6,0,0,0" Text="Upscale keeps seed + prompt" />
                 </WrapPanel>
 
                 <!-- ── PROMPT AUGMENT ── -->
@@ -50,7 +53,7 @@
                 <TextBox Text="{Binding PromptAugment, UpdateSourceTrigger=PropertyChanged}"
                          TextWrapping="Wrap" Height="42" AcceptsReturn="True"
                          VerticalScrollBarVisibility="Auto" />
-                <TextBlock Text="Added to prompt on Regen/Creative" Style="{StaticResource HintText}" Margin="0,1,0,0" />
+                <TextBlock Text="Added to prompt on Regen/Mutate" Style="{StaticResource HintText}" Margin="0,1,0,0" />
 
                 <!-- ── LORA ── -->
                 <TextBlock Text="LORA" Style="{StaticResource SectionHeader}" Margin="0,6,0,2" />
@@ -98,19 +101,10 @@
                            FontWeight="Bold" FontSize="11" TextWrapping="Wrap" Margin="0,8,0,1" />
                 <TextBlock Text="{Binding DetailImage.Series}"
                            Foreground="{StaticResource SecondAccent}" FontSize="9" Margin="0,0,0,1" />
-                <TextBlock FontSize="8" Margin="0,0,0,1">
-                    <Run Text="Seed: " /><Run Text="{Binding DetailImage.Seed, Mode=OneWay}" />
-                    <Run Text="  |  " /><Run Text="{Binding DetailImage.RefinePreset, Mode=OneWay}" />
-                    <Run Text="  |  " /><Run Text="{Binding DetailImage.SourceWidth, Mode=OneWay}" />
-                    <Run Text="×" /><Run Text="{Binding DetailImage.SourceHeight, Mode=OneWay}" />
-                </TextBlock>
-                <TextBlock Foreground="{StaticResource DimFg}" FontSize="8" Margin="0,0,0,1"
-                           Text="{Binding DetailImage.LoraTag}" />
-                <TextBlock Foreground="{StaticResource DimFg}" FontSize="8" Margin="0,0,0,4">
-                    <Run Text="{Binding DetailImage.StatusIcon, Mode=OneWay}" />
-                    <Run Text=" " />
-                    <Run Text="{Binding DetailImage.SettingsDisplay, Mode=OneWay}" />
-                </TextBlock>
+                <TextBlock Text="{Binding DetailInfoLine}" FontSize="8" Margin="0,0,0,1"
+                           TextWrapping="Wrap" />
+                <TextBlock Foreground="{StaticResource DimFg}" FontSize="8" Margin="0,0,0,4"
+                           Text="{Binding DetailImage.SettingsDisplay}" />
 
                 <!-- ── PROMPT ── -->
                 <TextBlock Text="PROMPT" Style="{StaticResource SectionHeader}" Margin="0,0,0,2" />

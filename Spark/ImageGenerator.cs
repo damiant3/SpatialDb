@@ -211,7 +211,7 @@ sealed class ImageGenerator : IDisposable
         try
         {
             onStatus?.Invoke($"Downloading LoRA: {fileName}…");
-            string loraDir = Path.Combine("D:", "AI", "DiffusionForge", "webui", "models", "Lora");
+            string loraDir = Path.Combine(@"D:\AI\DiffusionForge\webui\models\Lora");
             Directory.CreateDirectory(loraDir);
             string dest = Path.Combine(loraDir, fileName);
             if (File.Exists(dest))
@@ -220,15 +220,28 @@ sealed class ImageGenerator : IDisposable
                 return true;
             }
 
-            using HttpResponseMessage resp = await m_http.GetAsync(url,
-                HttpCompletionOption.ResponseHeadersRead, ct);
-            resp.EnsureSuccessStatusCode();
+            // Download to a temp file first, then rename — avoids Forge seeing a partial file
+            string tempDest = dest + ".downloading";
+            long fileSize;
 
-            await using Stream stream = await resp.Content.ReadAsStreamAsync(ct);
-            await using FileStream fs = File.Create(dest);
-            await stream.CopyToAsync(fs, ct);
+            using (HttpResponseMessage resp = await m_http.GetAsync(url,
+                HttpCompletionOption.ResponseHeadersRead, ct))
+            {
+                resp.EnsureSuccessStatusCode();
 
-            onStatus?.Invoke($"Downloaded LoRA: {fileName} ({fs.Length / 1024 / 1024}MB)");
+                using Stream stream = await resp.Content.ReadAsStreamAsync(ct);
+                using FileStream fs = File.Create(tempDest);
+                await stream.CopyToAsync(fs, ct);
+                await fs.FlushAsync(ct);
+                fileSize = fs.Length;
+            }
+            // All handles closed here before we rename
+
+            File.Move(tempDest, dest);
+            onStatus?.Invoke($"Downloaded LoRA: {fileName} ({fileSize / 1024 / 1024}MB)");
+
+            // Brief delay so the OS fully releases the file handle before Forge reads it
+            await Task.Delay(500, ct);
             await RefreshLoras();
             return true;
         }

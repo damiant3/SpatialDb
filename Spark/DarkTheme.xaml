@@ -10,10 +10,12 @@
     <!-- Backgrounds (darkest → lightest) -->
     <SolidColorBrush x:Key="DeepBg"       Color="#0d1b2a" />
     <SolidColorBrush x:Key="WindowBg"     Color="#1a1a2e" />
+    <SolidColorBrush x:Key="CenterBg"     Color="#000000" />
     <SolidColorBrush x:Key="PanelBg"      Color="#16213e" />
     <SolidColorBrush x:Key="ControlBg"    Color="#0f3460" />
     <SolidColorBrush x:Key="ControlHover" Color="#1f2a44" />
     <SolidColorBrush x:Key="StackShadow1" Color="#122544" />
+    <SolidColorBrush x:Key="ToolbarBg"    Color="#0e1525" />
 
     <!-- Foregrounds -->
     <SolidColorBrush x:Key="TextFg"       Color="#a2a2b0" />
@@ -120,6 +122,21 @@
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
                 <Setter Property="Foreground" Value="{StaticResource GoldBrush}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="ToolbarBtn" TargetType="Button">
+        <Setter Property="Background"      Value="Transparent" />
+        <Setter Property="Foreground"      Value="{StaticResource TextFg}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding"         Value="8,4" />
+        <Setter Property="FontSize"        Value="11" />
+        <Setter Property="Cursor"          Value="Hand" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Foreground" Value="{StaticResource BrightFg}" />
             </Trigger>
         </Style.Triggers>
     </Style>

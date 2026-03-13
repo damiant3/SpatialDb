@@ -11,8 +11,14 @@ sealed class ArtPrompt
     public string Scene { get; init; } = "";
     public string Style { get; init; } = "";
     public string Series { get; init; } = "";
+    public string? Lora { get; init; }
+    public double LoraWeight { get; init; } = 0.8;
 
     public string Filename => $"prompt_{Number:D2}_{SanitizeFilename(Title)}";
+
+    public string? LoraTag => Lora is { Length: > 0 }
+        ? $"<lora:{Lora}:{LoraWeight:F1}>"
+        : null;
 
     static string SanitizeFilename(string name)
         => Regex.Replace(name.ToLowerInvariant().Replace(' ', '_'), @"[^a-z0-9_]", "");
@@ -20,6 +26,11 @@ sealed class ArtPrompt
 
 static class PromptParser
 {
+    // Matches "LORA: SomeName" or "LORA: SomeName:0.6"
+    static readonly Regex s_loraRx = new(
+        @"^LORA:\s*(.+?)(?::(\d+(?:\.\d+)?))?\s*$",
+        RegexOptions.Multiline | RegexOptions.IgnoreCase);
+
     public static List<ArtPrompt> Parse(string filePath)
     {
         string text = File.ReadAllText(filePath);
@@ -75,6 +86,20 @@ static class PromptParser
 
             string body = text[bodyStart..bodyEnd].Trim();
 
+            // Extract optional LORA: directive and strip it from body
+            string? lora = null;
+            double loraWeight = 0.8;
+            Match loraMatch = s_loraRx.Match(body);
+            if (loraMatch.Success)
+            {
+                lora = loraMatch.Groups[1].Value.Trim();
+                if (loraMatch.Groups[2].Success && double.TryParse(loraMatch.Groups[2].Value, out double w))
+                    loraWeight = w;
+                body = body[..loraMatch.Index].TrimEnd() +
+                       body[(loraMatch.Index + loraMatch.Length)..].TrimStart();
+                body = body.Trim();
+            }
+
             // Split into scene description and style directions.
             // The style block is typically the last paragraph — starts with a visual direction keyword.
             string[] paragraphs = Regex.Split(body, @"\n\s*\n")
@@ -107,6 +132,8 @@ static class PromptParser
                 Scene = scene,
                 Style = style,
                 Series = currentSeries,
+                Lora = lora,
+                LoraWeight = loraWeight,
             });
         }
 

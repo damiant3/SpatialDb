@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "name": "Spark",
+  "outputDir": "Concept",
+  "storyFiles": [
+    "Photonics.txt",
+    "PLAN.md",
+    "Spark.md"
+  ],
+  "promptsFile": "ArtPrompts.txt",
+  "universeFile": "universe.json",
+  "artDirectionsFile": "art_directions.json",
+  "creativePoolsFile": "creative_pools.json",
+  "refinePresetsFile": "refine_presets.json"
+}

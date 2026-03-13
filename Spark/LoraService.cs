@@ -15,17 +15,9 @@ sealed class LoraService
     public string SelectedLora { get; set; } = "(none)";
     public double LoraWeight { get; set; } = 0.8;
 
-    public static readonly (string name, string url)[] PopularLoras =
-    [
-        ("Detail Tweaker XL", "https://civitai.com/api/download/models/135867"),
-        ("SDXL Offset Noise", "https://civitai.com/api/download/models/134820"),
-        ("Pixel Art XL", "https://civitai.com/api/download/models/120096"),
-        ("Anime Lineart Style", "https://civitai.com/api/download/models/128713"),
-        ("Cinematic Film Grain", "https://civitai.com/api/download/models/162627"),
-        ("Sci-Fi Environments", "https://civitai.com/api/download/models/170268"),
-    ];
-
     public LoraService(ImageGenerator generator) => m_generator = generator;
+
+    public ImageGenerator Generator => m_generator;
 
     public void LoadLoras(Action<string> log)
     {
@@ -69,10 +61,14 @@ sealed class LoraService
         return $"<lora:{SelectedLora}:{LoraWeight:F1}>";
     }
 
-    public static void BrowseCivitAI()
+    /// <summary>
+    /// Opens the LoRA browser dialog. Returns trigger words if a LoRA was installed, null otherwise.
+    /// </summary>
+    public (string? loraName, string? triggerWords) BrowseAndInstall(Action<string> log)
     {
-        try { Process.Start(new ProcessStartInfo("https://civitai.com/models?types=LORA&sort=Most+Downloaded") { UseShellExecute = true }); }
-        catch { /* non-fatal */ }
+        LoraBrowserDialog dialog = new(m_generator, this, log);
+        dialog.ShowDialog();
+        return (dialog.InstalledLoraName, dialog.InstalledTriggerWords);
     }
 
     static void Dispatch(Action action)

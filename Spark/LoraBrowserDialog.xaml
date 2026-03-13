@@ -1,0 +1,88 @@
+<Window x:Class="Spark.LoraBrowserDialog"
+        x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="LoRA Browser — SDXL Compatible"
+        Width="820" Height="620"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip">
+
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Search bar -->
+        <Grid Grid.Row="0" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="SearchBox" FontSize="12" Padding="6,4"
+                     Text="concept art" KeyDown="OnSearchKeyDown" />
+            <Button Grid.Column="1" Content="🔍 Search" Click="OnSearchClick"
+                    Padding="10,4" Margin="4,0,0,0" />
+            <Button Grid.Column="2" Content="📋 Popular" Click="OnPopularClick"
+                    Padding="10,4" Margin="4,0,0,0" />
+        </Grid>
+
+        <!-- Results list -->
+        <ListBox x:Name="ResultsList" Grid.Row="1"
+                 SelectionChanged="OnSelectionChanged"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Grid Margin="2,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="80" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Background="Black" CornerRadius="4" Width="75" Height="75">
+                            <Image Source="{Binding ThumbnailUrl}" Stretch="UniformToFill"
+                                   RenderOptions.BitmapScalingMode="HighQuality" />
+                        </Border>
+
+                        <StackPanel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="12"
+                                       Foreground="{StaticResource BrightFg}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock FontSize="9" Margin="0,2,0,0">
+                                <Run Text="Base: " /><Run Text="{Binding BaseModel, Mode=OneWay}"
+                                     Foreground="{StaticResource AccentBrush}" />
+                            </TextBlock>
+                            <TextBlock FontSize="9">
+                                <Run Text="⬇ " /><Run Text="{Binding Downloads, Mode=OneWay}" />
+                                <Run Text="  ★ " /><Run Text="{Binding Rating, Mode=OneWay}" />
+                            </TextBlock>
+                            <TextBlock Text="{Binding TriggerWords}" FontSize="8"
+                                       Foreground="{StaticResource GoldBrush}" TextTrimming="CharacterEllipsis"
+                                       Visibility="{Binding HasTriggerWords, Converter={StaticResource BoolToVis}}" />
+                            <TextBlock Text="{Binding Tags}" FontSize="8"
+                                       Foreground="{StaticResource DimFg}" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+
+                        <Button Grid.Column="2" Content="⬇ Install"
+                                Click="OnInstallClick" Tag="{Binding}"
+                                Style="{StaticResource AccentBtn}" Padding="8,4"
+                                VerticalAlignment="Center" />
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <!-- Preview / Status bar -->
+        <Grid Grid.Row="2" Margin="0,6,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="StatusLabel" FontSize="9"
+                       Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Content="Close" Click="OnCloseClick" Padding="16,4" />
+        </Grid>
+    </Grid>
+</Window>

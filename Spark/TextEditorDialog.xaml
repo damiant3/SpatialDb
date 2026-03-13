@@ -1,0 +1,39 @@
+<Window x:Class="Spark.TextEditorDialog"
+        x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Edit" Width="750" Height="600"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip">
+
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,6">
+            <TextBlock x:Name="HeaderText" FontWeight="Bold" FontSize="13"
+                       Foreground="{StaticResource AccentBrush}" />
+            <TextBlock x:Name="HintText" FontSize="8"
+                       Foreground="{StaticResource DimFg}" Margin="0,2,0,0" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <!-- Editor -->
+        <TextBox x:Name="Editor" Grid.Row="1"
+                 AcceptsReturn="True" AcceptsTab="True"
+                 TextWrapping="Wrap" FontFamily="Consolas" FontSize="11"
+                 VerticalScrollBarVisibility="Auto"
+                 HorizontalScrollBarVisibility="Auto" />
+
+        <!-- Button bar -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
+            <TextBlock x:Name="StatusText" FontSize="9"
+                       Foreground="{StaticResource DimFg}" VerticalAlignment="Center" Margin="0,0,12,0" />
+            <Button Content="Cancel" Click="OnCancelClick" Padding="16,4" Margin="0,0,4,0" />
+            <Button Content="💾 Save" Click="OnSaveClick" Style="{StaticResource AccentBtn}" Padding="16,4" />
+        </StackPanel>
+    </Grid>
+</Window>

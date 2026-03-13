@@ -250,6 +250,28 @@ grandeur, ultra-modern americanized anime, Easley compositional
 mastery, wide 16:9 final image, the frame that contains the entire 
 game's promise
 
+PROMPT 16 — "Inheritance"
+A child sits alone in an archive chamber deep underground, surrounded 
+by towering shelves of Progenitor data cores — crystalline hexagonal 
+columns pulsing with faint amber light, thousands of them stretching 
+into the shadows above. The child holds a single dormant Spark in her 
+lap with both hands, its eyes dark, its shell cold. On a workbench 
+beside her, her grandmother's tools — old-school excavation gear, 
+battered, lovingly maintained. The grandmother is not here. A single 
+data core on the bench is playing a holographic recording: a younger 
+version of the grandmother, kneeling in this same chamber years ago, 
+holding this same Spark, smiling. The child's face is lit by both the 
+hologram and the faintest glow beginning at the Spark's eye seams — 
+it is waking up for the second time in its long existence, and this 
+time it has chosen.
+
+The passing of wonder between generations, archive as cathedral, the 
+weight of stored alien knowledge, the Spark as bridge between past and 
+present, holographic memory versus living moment, ultra-modern 
+americanized anime, painterly warmth in cold archive light, Easley 
+emotional staging, wide 16:9, amber and purple, the quiet scene that 
+says everything about why any of this matters
+
 PRODUCTION NOTES
 These prompts are written for Midjourney v6 / DALL-E 3 / Stable Diffusion XL with full inpainting workflows. For human faces, supplement with style reference images from the Easley / Whelan school of American sci-fi illustration. The persistent purple sky is a brand element — treat it as a constant even when interior lighting dominates.
 The Spark designs should be developed as a separate character design sheet before prompt generation — their forms need to be consistent enough to be recognizable across all fifteen images while remaining each individual.

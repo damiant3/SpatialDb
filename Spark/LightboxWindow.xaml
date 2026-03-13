@@ -1,0 +1,32 @@
+<Window x:Class="Spark.LightboxWindow"
+        x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Lightbox" WindowState="Maximized"
+        WindowStyle="None" AllowsTransparency="True"
+        Background="#DD000000"
+        KeyDown="OnKeyDown" MouseWheel="OnMouseWheel"
+        MouseLeftButtonDown="OnMouseDown" MouseLeftButtonUp="OnMouseUp"
+        MouseMove="OnMouseMoveHandler">
+
+    <Grid>
+        <Border x:Name="ImageBorder" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <Border.RenderTransform>
+                <TransformGroup>
+                    <ScaleTransform x:Name="ScaleXform" ScaleX="1" ScaleY="1" />
+                    <TranslateTransform x:Name="TranslateXform" />
+                </TransformGroup>
+            </Border.RenderTransform>
+            <Image x:Name="FullImage" Stretch="Uniform"
+                   RenderOptions.BitmapScalingMode="HighQuality" />
+        </Border>
+
+        <TextBlock x:Name="InfoText" FontSize="11"
+                   Foreground="#88FFFFFF" VerticalAlignment="Bottom" HorizontalAlignment="Left"
+                   Margin="16,0,0,16" />
+
+        <TextBlock Text="ESC to close  •  Scroll to zoom  •  Drag to pan  •  ←→ cycle stack"
+                   FontSize="9" Foreground="#44FFFFFF"
+                   VerticalAlignment="Top" HorizontalAlignment="Center" Margin="0,12,0,0" />
+    </Grid>
+</Window>
