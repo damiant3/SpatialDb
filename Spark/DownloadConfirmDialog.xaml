@@ -1,0 +1,116 @@
+<Window x:Class="Spark.DownloadConfirmDialog"
+        x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Spark.ViewModels"
+        Title="{Binding HeaderText}"
+        Width="750" Height="650"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        ResizeMode="CanResizeWithGrip">
+
+    <Window.Resources>
+        <Style x:Key="SelectableText" TargetType="TextBox">
+            <Setter Property="IsReadOnly" Value="True" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Cursor" Value="IBeam" />
+            <Setter Property="Foreground" Value="{StaticResource TextFg}" />
+            <Setter Property="CaretBrush" Value="{StaticResource TextFg}" />
+            <Setter Property="SelectionBrush" Value="{StaticResource AccentBrush}" />
+        </Style>
+
+        <local:GuideTemplateSelector x:Key="GuideSelector">
+            <local:GuideTemplateSelector.StepTemplate>
+                <DataTemplate>
+                    <Border Margin="0,0,0,8" Padding="10,8" CornerRadius="4"
+                            Background="{Binding Background}" BorderBrush="{Binding BorderColor}"
+                            BorderThickness="{Binding BorderWidth}">
+                        <StackPanel>
+                            <TextBlock FontWeight="Bold" FontSize="12" Margin="0,0,0,4">
+                                <Run Text="{Binding Label, Mode=OneTime}" Foreground="{StaticResource AccentBrush}" />
+                                <Run Text="{Binding Title, Mode=OneTime}" />
+                            </TextBlock>
+                            <TextBox Text="{Binding Body, Mode=OneTime}" FontSize="11"
+                                     FontFamily="{Binding BodyFont, Mode=OneTime}"
+                                     Style="{StaticResource SelectableText}" />
+                            <TextBox Text="{Binding StatusNote, Mode=OneTime}" FontSize="10" FontWeight="SemiBold"
+                                     Foreground="{Binding StatusColor, Mode=OneTime}" Margin="0,4,0,0"
+                                     Visibility="{Binding HasStatus, Converter={StaticResource BoolToVis}}"
+                                     Style="{StaticResource SelectableText}" />
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </local:GuideTemplateSelector.StepTemplate>
+            <local:GuideTemplateSelector.WarningTemplate>
+                <DataTemplate>
+                    <Border Margin="0,0,0,8" Padding="10,8" CornerRadius="4"
+                            Background="{StaticResource WarningBg}">
+                        <StackPanel>
+                            <TextBlock Text="⚠ Important" FontWeight="SemiBold"
+                                       Foreground="{StaticResource GoldBrush}" />
+                            <TextBox Text="{Binding Body, Mode=OneTime}" FontSize="11" Margin="0,4,0,0"
+                                     Style="{StaticResource SelectableText}" />
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </local:GuideTemplateSelector.WarningTemplate>
+            <local:GuideTemplateSelector.HintTemplate>
+                <DataTemplate>
+                    <TextBox Text="{Binding Body, Mode=OneTime}" FontSize="10"
+                             FontStyle="Italic" Foreground="{StaticResource DimFg}" Margin="0,2,0,8"
+                             Style="{StaticResource SelectableText}" />
+                </DataTemplate>
+            </local:GuideTemplateSelector.HintTemplate>
+        </local:GuideTemplateSelector>
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <DockPanel Grid.Row="0" Margin="0,0,0,10">
+            <TextBlock DockPanel.Dock="Right" Text="{Binding ScanStatus}" FontSize="10"
+                       Foreground="{StaticResource DimFg}" VerticalAlignment="Center" Margin="8,0,0,0" />
+            <TextBlock Text="{Binding HeaderText}" FontWeight="Bold" FontSize="16" />
+        </DockPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Items}"
+                          ItemTemplateSelector="{StaticResource GuideSelector}" Margin="0,0,10,0" />
+        </ScrollViewer>
+
+        <Border Grid.Row="2" CornerRadius="4" Padding="10,8" Margin="0,10,0,0"
+                Background="{Binding StatusBackground}">
+            <TextBox Text="{Binding StatusText}" FontSize="11"
+                     Foreground="{Binding StatusForeground}"
+                     Style="{StaticResource SelectableText}" />
+        </Border>
+
+        <DockPanel Grid.Row="3" Margin="0,12,0,0">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button Content="🔧 Auto-Fix" Width="100" Command="{Binding AutoRepairCommand}" Margin="0,0,8,0"
+                        ToolTip="Automatically fix detected issues (reinstall PyTorch with CUDA, etc.)"
+                        Visibility="{Binding ShowRepairButton, Converter={StaticResource BoolToVis}}"
+                        Style="{StaticResource BlueButton}" />
+                <Button Content="🧹 Reset venv" Width="110" Command="{Binding ResetVenvCommand}" Margin="0,0,8,0"
+                        ToolTip="Delete the MusicGen venv and reinstall everything from scratch"
+                        Visibility="{Binding ShowResetVenvButton, Converter={StaticResource BoolToVis}}" />
+                <Button Content="🔍 Re-scan" Width="100" Command="{Binding RescanCommand}" Margin="0,0,8,0"
+                        IsEnabled="{Binding CanRescan}"
+                        ToolTip="Scan AI directory for installed tools" />
+                <Button Content="🌐 Download Page" Width="130" Command="{Binding OpenPageCommand}" Margin="0,0,8,0" />
+                <Button Content="Done" Width="80" IsCancel="True" IsDefault="True" />
+            </StackPanel>
+            <Button Content="📂 Open Terminal" Command="{Binding OpenTerminalCommand}" Width="120"
+                    ToolTip="Open a command prompt in the AI directory"
+                    HorizontalAlignment="Left" />
+        </DockPanel>
+    </Grid>
+</Window>

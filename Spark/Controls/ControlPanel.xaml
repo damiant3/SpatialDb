@@ -135,9 +135,9 @@
                         </Grid.ColumnDefinitions>
                         <ComboBox ItemsSource="{Binding Lora.AvailableLoras}" SelectedItem="{Binding Lora.SelectedLora}" />
                         <Button Grid.Column="1" Content="↻" Command="{Binding Lora.RefreshLorasCommand}"
-                                FontSize="12" Padding="4,2" Margin="3,0,0,0" ToolTip="Refresh LoRA list" />
+                                Style="{StaticResource PanelBtn}" FontSize="12" Padding="6,3" Margin="3,0,0,0" ToolTip="Refresh LoRA list" />
                         <Button Grid.Column="2" Content="🌐" Command="{Binding Lora.BrowseLoraSiteCommand}"
-                                FontSize="12" Padding="4,2" Margin="3,0,0,0" ToolTip="Browse CivitAI LoRAs" />
+                                Style="{StaticResource PanelBtn}" FontSize="12" Padding="6,3" Margin="3,0,0,0" ToolTip="Browse CivitAI LoRAs" />
                     </Grid>
                     <Grid Margin="0,3,0,0">
                         <Grid.ColumnDefinitions>
@@ -163,7 +163,7 @@
                                    Foreground="{StaticResource GoldBrush}" TextWrapping="Wrap"
                                    TextTrimming="CharacterEllipsis" MaxHeight="28" />
                         <Button Grid.Column="1" Content="➕" Command="{Binding Lora.InjectTriggerWordsCommand}"
-                                FontSize="10" Padding="4,2" Margin="3,0,0,0"
+                                Style="{StaticResource PanelBtn}" FontSize="10" Padding="6,3" Margin="3,0,0,0"
                                 ToolTip="Inject trigger words into Prompt Augment" />
                     </Grid>
 
@@ -179,10 +179,10 @@
                         <Button Content="🔥 Generate All"
                                 Command="{Binding GenerateAllCommand}"
                                 Style="{StaticResource AccentBtn}" />
-                        <Button Grid.Column="1" Content="⏹"
-                                Command="{Binding CancelCommand}" Margin="4,0,0,0" />
+                        <Button Grid.Column="1" Content="🛑 Stop"
+                                Command="{Binding CancelCommand}" Style="{StaticResource StopBtn}" Margin="4,0,0,0" />
                         <Button Grid.Column="2" Content="↻"
-                                Command="{Binding RefreshCommand}" Margin="4,0,0,0" FontSize="14" />
+                                Command="{Binding RefreshCommand}" Style="{StaticResource PanelBtn}" Margin="4,0,0,0" FontSize="14" />
                     </Grid>
 
                     <!-- Status -->

@@ -16,7 +16,7 @@ namespace Spark.ViewModels;
 /// </summary>
 sealed class MusicViewModel : ObservableObject, IDisposable
 {
-    readonly MusicGenClient m_client = new();
+    readonly MusicGenClient m_client;
     readonly LogViewModel m_log;
     readonly DispatcherTimer m_playTimer;
     WaveOutEvent? m_player;
@@ -102,8 +102,9 @@ sealed class MusicViewModel : ObservableObject, IDisposable
 
     // ── Constructor ─────────────────────────────────────────────
 
-    public MusicViewModel(LogViewModel log)
+    public MusicViewModel(MusicGenClient client, LogViewModel log)
     {
+        m_client = client;
         m_log = log;
 
         GenerateCommand = new RelayCommand(_ => Generate(), _ => IsNotGenerating && m_prompt.Length > 0);
@@ -171,7 +172,7 @@ sealed class MusicViewModel : ObservableObject, IDisposable
         MusicGenAvailable = await m_client.IsAvailableAsync();
         StatusText = MusicGenAvailable
             ? "✓ MusicGen online at localhost:7860"
-            : "MusicGen not found — start: python -m audiocraft.demos.musicgen_app --server_port 7860";
+            : "MusicGen not found — start: python demos/musicgen_app.py --server_port 7860";
     }
 
     // ── Generation ──────────────────────────────────────────────

@@ -1,0 +1,32 @@
+[
+  {
+    "id": 2,
+    "title": "eerie horror ambient, unsettling and",
+    "prompt": "eerie horror ambient, unsettling and atmospheric",
+    "filePath": "D:\\Projects\\SpatialDb\\Spark\\Music\\track_002_eerie_horror_ambient__unsettling_and.wav",
+    "duration": 10,
+    "temperature": 1,
+    "cfgCoeff": 3,
+    "createdUtc": "2026-03-13T22:44:06.5950182Z",
+    "vibeTag": "moderate-energy, mid-tempo (117 BPM), dark, bassy",
+    "bpm": 117.1875,
+    "rating": 0,
+    "saved": false,
+    "deleted": false
+  },
+  {
+    "id": 1,
+    "title": "epic orchestral battle music, intense",
+    "prompt": "epic orchestral battle music, intense and heroic",
+    "filePath": "D:\\Projects\\SpatialDb\\Spark\\Music\\track_001_epic_orchestral_battle_music__intense.wav",
+    "duration": 10,
+    "temperature": 1,
+    "cfgCoeff": 3,
+    "createdUtc": "2026-03-13T22:42:51.389439Z",
+    "vibeTag": "moderate-energy, relaxed-tempo (72 BPM), dark, bassy",
+    "bpm": 72.11539,
+    "rating": 0,
+    "saved": false,
+    "deleted": false
+  }
+]

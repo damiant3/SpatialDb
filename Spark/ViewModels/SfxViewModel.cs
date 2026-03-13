@@ -17,7 +17,7 @@ namespace Spark.ViewModels;
 /// </summary>
 sealed class SfxViewModel : ObservableObject, IDisposable
 {
-    readonly MusicGenClient m_client = new();
+    readonly MusicGenClient m_client;
     readonly LogViewModel m_log;
     readonly DispatcherTimer m_playTimer;
     WaveOutEvent? m_player;
@@ -150,8 +150,9 @@ sealed class SfxViewModel : ObservableObject, IDisposable
 
     // ── Constructor ─────────────────────────────────────────────
 
-    public SfxViewModel(LogViewModel log)
+    public SfxViewModel(MusicGenClient client, LogViewModel log)
     {
+        m_client = client;
         m_log = log;
 
         GenerateCommand = new RelayCommand(_ => GenerateSingle(), _ => IsNotGenerating && m_prompt.Length > 0);

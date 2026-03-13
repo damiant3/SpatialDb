@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Common.Core.Net;
 ///////////////////////////////////////////////
 namespace Spark;
 
@@ -8,10 +9,15 @@ namespace Spark;
 /// </summary>
 sealed class GenerationService : IDisposable
 {
-    readonly ImageGenerator m_generator = new();
+    readonly ImageGenerator m_generator;
     readonly ConcurrentQueue<Func<CancellationToken, Task>> m_queue = new();
     CancellationTokenSource? m_cts;
     bool m_queueRunning;
+
+    public GenerationService(ServiceUri<StableDiffusionApi> endpoint)
+    {
+        m_generator = new ImageGenerator(endpoint);
+    }
 
     public event Action<string>? LogMessage;
     public event Action? StatusChanged;

@@ -16,7 +16,7 @@ namespace Spark.Wizard;
 /// </summary>
 sealed class WizardViewModel : INotifyPropertyChanged
 {
-    readonly OllamaClient m_ollama = new();
+    readonly OllamaClient m_ollama;
     CancellationTokenSource? m_cts;
 
     // ── Step tracking ───────────────────────────────────────────
@@ -162,8 +162,10 @@ sealed class WizardViewModel : INotifyPropertyChanged
 
     // ── Constructor ─────────────────────────────────────────────
 
-    public WizardViewModel()
+    public WizardViewModel(OllamaClient ollama)
     {
+        m_ollama = ollama;
+
         NextCommand = new RelayCommand(_ => GoNext(), _ => IsNotBusy);
         BackCommand = new RelayCommand(_ => GoBack(), _ => CanGoBack && IsNotBusy);
         BrowseFolderCommand = new RelayCommand(_ => BrowseFolder());

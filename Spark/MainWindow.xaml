@@ -28,6 +28,80 @@
                                Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" />
                 </StackPanel>
 
+                <!-- ── Service status indicators ── -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+
+                    <!-- Ollama -->
+                    <Border Margin="4,0" Padding="4,2" CornerRadius="3" Cursor="Hand"
+                            Background="{StaticResource ToolbarBg}"
+                            MouseLeftButtonDown="OnServiceIndicatorClick"
+                            Tag="Ollama">
+                        <Border.ToolTip>
+                            <StackPanel MaxWidth="280">
+                                <TextBlock Text="Ollama (LLM)" FontWeight="Bold" />
+                                <TextBlock Text="{Binding ServiceManager.Ollama.StatusText}" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding ServiceManager.Ollama.DetailText}" TextWrapping="Wrap"
+                                           Foreground="{StaticResource DimFg}" />
+                                <TextBlock Text="Click for setup · Double-click to start"
+                                           Foreground="{StaticResource DimFg}" FontSize="8" Margin="0,4,0,0" />
+                            </StackPanel>
+                        </Border.ToolTip>
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse x:Name="OllamaIndicator" Width="8" Height="8" Margin="0,0,4,0"
+                                     Fill="{Binding ServiceManager.Ollama.Phase,
+                                            Converter={StaticResource PhaseToBrush}}" />
+                            <TextBlock Text="Ollama" FontSize="9" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Stable Diffusion -->
+                    <Border Margin="4,0" Padding="4,2" CornerRadius="3" Cursor="Hand"
+                            Background="{StaticResource ToolbarBg}"
+                            MouseLeftButtonDown="OnServiceIndicatorClick"
+                            Tag="StableDiffusion">
+                        <Border.ToolTip>
+                            <StackPanel MaxWidth="280">
+                                <TextBlock Text="Stable Diffusion (Forge)" FontWeight="Bold" />
+                                <TextBlock Text="{Binding ServiceManager.StableDiffusion.StatusText}" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding ServiceManager.StableDiffusion.DetailText}" TextWrapping="Wrap"
+                                           Foreground="{StaticResource DimFg}" />
+                                <TextBlock Text="Click for setup · Double-click to start"
+                                           Foreground="{StaticResource DimFg}" FontSize="8" Margin="0,4,0,0" />
+                            </StackPanel>
+                        </Border.ToolTip>
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse x:Name="SdIndicator" Width="8" Height="8" Margin="0,0,4,0"
+                                     Fill="{Binding ServiceManager.StableDiffusion.Phase,
+                                            Converter={StaticResource PhaseToBrush}}" />
+                            <TextBlock Text="SD Forge" FontSize="9" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- MusicGen -->
+                    <Border Margin="4,0" Padding="4,2" CornerRadius="3" Cursor="Hand"
+                            Background="{StaticResource ToolbarBg}"
+                            MouseLeftButtonDown="OnServiceIndicatorClick"
+                            Tag="MusicGen">
+                        <Border.ToolTip>
+                            <StackPanel MaxWidth="280">
+                                <TextBlock Text="MusicGen (AudioCraft)" FontWeight="Bold" />
+                                <TextBlock Text="{Binding ServiceManager.MusicGen.StatusText}" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding ServiceManager.MusicGen.DetailText}" TextWrapping="Wrap"
+                                           Foreground="{StaticResource DimFg}" />
+                                <TextBlock Text="Click for setup · Double-click to start"
+                                           Foreground="{StaticResource DimFg}" FontSize="8" Margin="0,4,0,0" />
+                            </StackPanel>
+                        </Border.ToolTip>
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse x:Name="MusicGenIndicator" Width="8" Height="8" Margin="0,0,4,0"
+                                     Fill="{Binding ServiceManager.MusicGen.Phase,
+                                            Converter={StaticResource PhaseToBrush}}" />
+                            <TextBlock Text="MusicGen" FontSize="9" />
+                        </StackPanel>
+                    </Border>
+
+                </StackPanel>
+
                 <StackPanel Grid.Column="2" Orientation="Horizontal">
                     <Button Content="✨ New" Command="{Binding NewProjectCommand}"
                             Style="{StaticResource ToolbarBtn}" Margin="0,0,4,0" ToolTip="Create a new project with the wizard" />
@@ -69,6 +143,12 @@
         </TabControl>
     </Grid>
 </Window>
+
+
+
+
+
+
 
 
 

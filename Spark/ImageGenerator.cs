@@ -1,9 +1,9 @@
 using System.IO;
 using System.Net.Http;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using Common.Core.Net;
 ///////////////////////////////////////////////
 namespace Spark;
 
@@ -133,37 +133,38 @@ sealed class GenerateResult
     public string? Error { get; init; }
 }
 
-sealed class ImageGenerator : IDisposable
+sealed class ImageGenerator : HttpServiceClient
 {
-    readonly HttpClient m_http;
-    readonly string m_apiBase;
-    readonly string m_baseUrl;
+    readonly Uri m_apiBase;
     List<LoraInfo>? m_cachedLoras;
 
-    public ImageGenerator(string baseUrl = "http://127.0.0.1:7860")
+    public ImageGenerator(ServiceUri<StableDiffusionApi> endpoint)
+        : base(endpoint.Value, TimeSpan.FromMinutes(10))
     {
-        m_baseUrl = baseUrl.TrimEnd('/');
-        m_apiBase = m_baseUrl + "/sdapi/v1";
-        m_http = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
+        m_apiBase = new Uri(endpoint.Value, "sdapi/v1/");
     }
 
-    // Returns true if the A1111/Forge API endpoint is reachable.
+    Uri Api(string path) => new(m_apiBase, path);
+
     public async Task<bool> IsAvailableAsync()
     {
+        if (!await IsReachableAsync()) return false;
         try
         {
-            HttpResponseMessage resp = await m_http.GetAsync($"{m_apiBase}/options");
+            using HttpResponseMessage resp = await GetAsync(Api("options"));
             return resp.IsSuccessStatusCode;
         }
         catch { return false; }
     }
 
-    // Returns the checkpoint title currently loaded in Forge.
     public async Task<string> GetCurrentCheckpointAsync()
     {
+        if (!await IsReachableAsync()) return "";
         try
         {
-            string json = await m_http.GetStringAsync($"{m_apiBase}/options");
+            using HttpResponseMessage resp = await GetAsync(Api("options"));
+            if (!resp.IsSuccessStatusCode) return "";
+            string json = await resp.Content.ReadAsStringAsync();
             return JsonNode.Parse(json)?["sd_model_checkpoint"]?.GetValue<string>() ?? "";
         }
         catch { return ""; }
@@ -173,9 +174,12 @@ sealed class ImageGenerator : IDisposable
     {
         if (m_cachedLoras is not null && !forceRefresh)
             return m_cachedLoras;
+        if (!await IsReachableAsync()) return m_cachedLoras ?? [];
         try
         {
-            string json = await m_http.GetStringAsync($"{m_apiBase}/loras");
+            using HttpResponseMessage resp = await GetAsync(Api("loras"));
+            resp.EnsureSuccessStatusCode();
+            string json = await resp.Content.ReadAsStringAsync();
             JsonArray? arr = JsonNode.Parse(json)?.AsArray();
             m_cachedLoras = [];
             if (arr is null) return m_cachedLoras;
@@ -196,10 +200,10 @@ sealed class ImageGenerator : IDisposable
 
     public async Task RefreshLoras()
     {
+        if (!await IsReachableAsync()) return;
         try
         {
-            StringContent body = new("{}", Encoding.UTF8, "application/json");
-            await m_http.PostAsync($"{m_apiBase}/refresh-loras", body);
+            using HttpResponseMessage _ = await PostJsonAsync("sdapi/v1/refresh-loras", "{}");
             m_cachedLoras = null;
         }
         catch { /* non-fatal */ }
@@ -220,27 +224,12 @@ sealed class ImageGenerator : IDisposable
                 return true;
             }
 
-            // Download to a temp file first, then rename — avoids Forge seeing a partial file
             string tempDest = dest + ".downloading";
-            long fileSize;
-
-            using (HttpResponseMessage resp = await m_http.GetAsync(url,
-                HttpCompletionOption.ResponseHeadersRead, ct))
-            {
-                resp.EnsureSuccessStatusCode();
-
-                using Stream stream = await resp.Content.ReadAsStreamAsync(ct);
-                using FileStream fs = File.Create(tempDest);
-                await stream.CopyToAsync(fs, ct);
-                await fs.FlushAsync(ct);
-                fileSize = fs.Length;
-            }
-            // All handles closed here before we rename
-
+            await DownloadToFileAsync(new Uri(url), tempDest, ct);
+            long fileSize = new FileInfo(tempDest).Length;
             File.Move(tempDest, dest);
             onStatus?.Invoke($"Downloaded LoRA: {fileName} ({fileSize / 1024 / 1024}MB)");
 
-            // Brief delay so the OS fully releases the file handle before Forge reads it
             await Task.Delay(500, ct);
             await RefreshLoras();
             return true;
@@ -252,10 +241,6 @@ sealed class ImageGenerator : IDisposable
         }
     }
 
-    /// <summary>
-    /// Generates one image. The <paramref name="runIndex"/> differentiates multiple
-    /// runs of the same prompt (appended to filename as _r01, _r02, etc.).
-    /// </summary>
     public async Task<GenerateResult> GenerateAsync(
         ArtPrompt prompt,
         ImageGeneratorSettings settings,
@@ -313,8 +298,8 @@ sealed class ImageGenerator : IDisposable
 
         try
         {
-            StringContent body = new(payload.ToJsonString(), Encoding.UTF8, "application/json");
-            HttpResponseMessage resp = await m_http.PostAsync($"{m_apiBase}/txt2img", body, ct);
+            using HttpResponseMessage resp = await PostJsonAsync(
+                "sdapi/v1/txt2img", payload.ToJsonString(), ct);
             string responseJson = await resp.Content.ReadAsStringAsync(ct);
 
             if (!resp.IsSuccessStatusCode)
@@ -353,6 +338,4 @@ sealed class ImageGenerator : IDisposable
             return new GenerateResult { Success = false, Error = ex.Message };
         }
     }
-
-    public void Dispose() => m_http.Dispose();
 }

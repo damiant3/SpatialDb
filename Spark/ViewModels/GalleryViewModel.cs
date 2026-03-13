@@ -74,6 +74,15 @@ sealed class GalleryViewModel : ObservableObject
         }
     }
 
+    public void RefreshStack(int promptNumber, ImageCatalog? catalog)
+    {
+        if (catalog is null) return;
+        PromptStack? stack = Stacks.FirstOrDefault(s => s.PromptNumber == promptNumber);
+        if (stack is null) return;
+        stack.Cards = catalog.GetStack(promptNumber);
+        stack.RefreshCards();
+    }
+
     void OnStackSelected(PromptStack stack)
     {
         SelectedStack = stack;

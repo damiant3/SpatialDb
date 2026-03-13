@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using Spark.Services;
 ///////////////////////////////////////////////
 namespace Spark.Wizard;
 
@@ -18,7 +19,7 @@ partial class WizardWindow : Window
     public WizardWindow()
     {
         InitializeComponent();
-        m_vm = new WizardViewModel();
+        m_vm = new WizardViewModel(ServiceHost.Instance.Require<OllamaClient>());
         DataContext = m_vm;
 
         m_steps = [Step0, Step1, Step2, Step3, Step4];

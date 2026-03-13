@@ -1,0 +1,18 @@
+[
+  {
+    "id": 1,
+    "title": "UI error buzzer, short",
+    "prompt": "UI error buzzer, short harsh digital rejection sound, wrong action",
+    "category": "UI",
+    "filePath": "D:\\Projects\\SpatialDb\\Spark\\SoundFX\\sfx_001_ui_error_buzzer__short.wav",
+    "duration": 2,
+    "temperature": 1,
+    "cfgCoeff": 3.5,
+    "createdUtc": "2026-03-13T22:44:36.987254Z",
+    "vibeTag": "soft onset, moderate, deep/bassy",
+    "parentId": 0,
+    "rating": 0,
+    "saved": false,
+    "deleted": false
+  }
+]

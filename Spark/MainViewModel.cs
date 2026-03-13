@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using Common.Wpf.Input;
+using Spark.Services;
 using Spark.ViewModels;
 ////////////////
 namespace Spark;
@@ -19,6 +20,7 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     readonly StatusViewModel m_status;
     readonly MusicViewModel m_music;
     readonly SfxViewModel m_sfx;
+    readonly LocalServiceManager m_serviceManager;
 
     SparkProject m_project;
     DocumentStore m_docs;
@@ -37,6 +39,7 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public StatusViewModel Status => m_status;
     public MusicViewModel Music => m_music;
     public SfxViewModel Sfx => m_sfx;
+    public LocalServiceManager ServiceManager => m_serviceManager;
 
     // ── Properties that remain on the root VM ───────────────────
 
@@ -65,7 +68,8 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         GalleryViewModel gallery,
         StatusViewModel status,
         MusicViewModel music,
-        SfxViewModel sfx)
+        SfxViewModel sfx,
+        LocalServiceManager serviceManager)
     {
         m_genService = genService;
         m_loraService = loraService;
@@ -77,6 +81,7 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         m_status = status;
         m_music = music;
         m_sfx = sfx;
+        m_serviceManager = serviceManager;
 
         // Wire service events
         m_genService.LogMessage += msg => m_log.Log(msg);
@@ -143,9 +148,17 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
         RebuildStacks();
         UpdatePreferencesSummary();
+
+        // Select the first prompt on project load
+        if (m_gallery.Stacks.Count > 0)
+            m_gallery.SelectedStack = m_gallery.Stacks[0];
+
         m_lora.LoadLoras();
         m_music.LoadProject(m_project.ProjectDir);
         m_sfx.LoadProject(m_project.ProjectDir);
+
+        // Start background service health monitoring
+        _ = m_serviceManager.StartAsync();
     }
 
     // ── Story context ───────────────────────────────────────────
@@ -528,6 +541,9 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 int r = runIdx;
                 string? capturedLoraTag = loraTag;
                 string capturedContext = contextPrefix;
+                string queueLabel = $"[{p.Number:D2}] {p.Title} run {r}";
+                m_status.QueueItems.Add(queueLabel);
+
                 m_genService.Enqueue(async ct =>
                 {
                     ImageGeneratorSettings runSettings = creative ? ApplyCreativeSettings(settings) : settings;
@@ -557,14 +573,16 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                         promptOverride: finalOverride, loraTag: capturedLoraTag, promptAugment: augment,
                         onStatus: msg => Dispatch(() => m_log.Log(msg)), ct: ct);
 
-                    if (result.Success && result.FilePath is not null && m_catalog is not null)
+                    Dispatch(() =>
                     {
-                        Dispatch(() =>
+                        m_status.QueueItems.Remove(queueLabel);
+                        if (result.Success && result.FilePath is not null && m_catalog is not null)
                         {
                             m_gallery.AddResultToStacks(result, p, runSettings, preset, capturedLoraTag, augment, m_catalog, modifiedPrompt);
-                            RebuildStacks();
-                        });
-                    }
+                            m_gallery.RefreshStack(p.Number, m_catalog);
+                        }
+                        UpdateStatus();
+                    });
                 });
             }
         }
@@ -650,6 +668,11 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
         RebuildStacks();
         UpdatePreferencesSummary();
+
+        // Select the first prompt on project load
+        if (m_gallery.Stacks.Count > 0)
+            m_gallery.SelectedStack = m_gallery.Stacks[0];
+
         m_lora.LoadLoras();
         m_music.LoadProject(m_project.ProjectDir);
         m_sfx.LoadProject(m_project.ProjectDir);
@@ -731,6 +754,7 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public void Dispose()
     {
+        m_serviceManager.Dispose();
         m_genService.Dispose();
         m_music.Dispose();
         m_sfx.Dispose();
