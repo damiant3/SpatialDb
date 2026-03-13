@@ -380,3 +380,10 @@ FodyWeavers.xsd
 /SparseLattice.Perf/TestData/Embeddings/sha256-0800cbac9c2064dde519420e75e512a83cb360de3ad5df176185dc69652fc515
 /SparseLattice.Perf/TestData/Embeddings/sha256-970aa74c0a90ef7482477cf803618e776e173c007bf957f635f1015bfcfef0e6
 /Spark/Concept/1344x768_s20_cfg7_DPMpp2M-SDE_karras_seed-1
+/Spark/Concept/1344x768_s23_cfg8.45152623523211_Euler-a_karras_seed-1
+/Spark/Concept/1344x768_s26_cfg5.833505275840382_DPMpp2M-SDE_karras_seed-1
+/Spark/Concept/1984x1152_s20_cfg7_DPMpp2M-SDE_karras_seed1244773863
+/Spark/Concept/1984x1152_s20_cfg7_DPMpp2M-SDE_karras_seed3799196411
+/Spark/Concept/1984x1152_s25_cfg7_DPMpp2M-SDE_karras_seed2710325749
+/Spark/Concept/catalog.json
+/Spark/Concept/preferences.json
