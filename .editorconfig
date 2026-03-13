@@ -1,4 +1,4 @@
-# EditorConfig for SparseLattice and SparseLattice.Test
+﻿# EditorConfig for SparseLattice and SparseLattice.Test
 root = true
 
 [*]
@@ -20,6 +20,16 @@ dotnet_style_qualification_for_method = false:suggestion
 dotnet_style_qualification_for_event = false:suggestion
 
 # naming: keep the project's convention where private instance fields use 'm_' and static fields use 's_'
+# const fields are exempt from s_ and use PascalCase.
+# const fields -> PascalCase, no prefix (overrides static rule for const)
+dotnet_naming_rule.const_fields_pascal.severity = warning
+dotnet_naming_rule.const_fields_pascal.symbols = const_fields
+dotnet_naming_rule.const_fields_pascal.style = pascal_case_style
+dotnet_naming_symbols.const_fields.applicable_kinds = field
+dotnet_naming_symbols.const_fields.applicable_accessibilities = *
+dotnet_naming_symbols.const_fields.required_modifiers = const
+dotnet_naming_style.pascal_case_style.capitalization = pascal_case
+
 
 # private instance fields -> m_ prefix, camelCase
 dotnet_naming_rule.private_instance_fields_m_prefix.severity = warning
