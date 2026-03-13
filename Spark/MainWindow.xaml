@@ -1,4 +1,5 @@
 <Window x:Class="Spark.MainWindow"
+        x:ClassModifier="internal"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:Spark.Controls"
@@ -42,18 +43,26 @@
             </Grid>
         </Border>
 
-        <!-- ── Main panels ── -->
-        <Grid Grid.Row="1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="280" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="350" />
-            </Grid.ColumnDefinitions>
+        <!-- ── Tabbed workspace ── -->
+        <TabControl Grid.Row="1">
+            <TabItem Header="🎨 Concept Art">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="280" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="350" />
+                    </Grid.ColumnDefinitions>
 
-            <controls:ControlPanel Grid.Column="0" />
-            <controls:GalleryPanel Grid.Column="1" />
-            <controls:DetailPanel  Grid.Column="2" />
-        </Grid>
+                    <controls:ControlPanel Grid.Column="0" />
+                    <controls:GalleryPanel Grid.Column="1" />
+                    <controls:DetailPanel  Grid.Column="2" />
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="🎵 Music Director">
+                <controls:MusicPanel />
+            </TabItem>
+        </TabControl>
     </Grid>
 </Window>
 

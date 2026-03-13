@@ -17,6 +17,7 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     readonly DetailViewModel m_detail;
     readonly GalleryViewModel m_gallery;
     readonly StatusViewModel m_status;
+    readonly MusicViewModel m_music;
 
     SparkProject m_project;
     DocumentStore m_docs;
@@ -33,6 +34,7 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public DetailViewModel Detail => m_detail;
     public GalleryViewModel Gallery => m_gallery;
     public StatusViewModel Status => m_status;
+    public MusicViewModel Music => m_music;
 
     // ── Properties that remain on the root VM ───────────────────
 
@@ -59,7 +61,8 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         LoraViewModel lora,
         DetailViewModel detail,
         GalleryViewModel gallery,
-        StatusViewModel status)
+        StatusViewModel status,
+        MusicViewModel music)
     {
         m_genService = genService;
         m_loraService = loraService;
@@ -69,6 +72,7 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         m_detail = detail;
         m_gallery = gallery;
         m_status = status;
+        m_music = music;
 
         // Wire service events
         m_genService.LogMessage += msg => m_log.Log(msg);
@@ -136,6 +140,7 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         RebuildStacks();
         UpdatePreferencesSummary();
         m_lora.LoadLoras();
+        m_music.LoadProject(m_project.ProjectDir);
     }
 
     // ── Story context ───────────────────────────────────────────
@@ -641,6 +646,7 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         RebuildStacks();
         UpdatePreferencesSummary();
         m_lora.LoadLoras();
+        m_music.LoadProject(m_project.ProjectDir);
     }
 
     void EditPrompts()
@@ -717,5 +723,9 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     #endregion
 
-    public void Dispose() => m_genService.Dispose();
+    public void Dispose()
+    {
+        m_genService.Dispose();
+        m_music.Dispose();
+    }
 }

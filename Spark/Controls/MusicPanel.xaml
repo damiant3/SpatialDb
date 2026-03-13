@@ -1,0 +1,231 @@
+<UserControl x:Class="Spark.Controls.MusicPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:Spark.Controls"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="280" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="300" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ═══════════════════════════════════════════════════ -->
+        <!--  LEFT: Controls + prompt + track list              -->
+        <!-- ═══════════════════════════════════════════════════ -->
+        <Border Grid.Column="0" Style="{StaticResource PanelBorder}" BorderThickness="0,0,1,0">
+            <DockPanel>
+                <!-- Log (bottom) -->
+                <DockPanel DockPanel.Dock="Bottom" Margin="10,0,10,10" MaxHeight="120">
+                    <TextBlock DockPanel.Dock="Top" Text="LOG" Style="{StaticResource SectionHeader}" Margin="0,6,0,2" />
+                    <Border Background="{StaticResource DeepBg}" CornerRadius="3">
+                        <ListBox ItemsSource="{Binding Log.LogLines}" />
+                    </Border>
+                </DockPanel>
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="10,10,10,0">
+
+                        <!-- Branding -->
+                        <TextBlock Text="🎵 MUSIC DIRECTOR" FontSize="16" FontWeight="Bold"
+                                   Foreground="{StaticResource AccentBrush}" Margin="0,0,0,2" />
+                        <TextBlock Text="AI Music &amp; Sound FX Generator" Margin="0,0,0,10" />
+
+                        <!-- ── PROMPT ── -->
+                        <TextBlock Text="PROMPT" Style="{StaticResource SectionHeader}" Margin="0,0,0,4" />
+                        <TextBox Text="{Binding Music.Prompt, UpdateSourceTrigger=PropertyChanged}"
+                                 TextWrapping="Wrap" AcceptsReturn="True" Height="60"
+                                 VerticalScrollBarVisibility="Auto"
+                                 FontFamily="Consolas" FontSize="10" />
+
+                        <!-- Mood presets -->
+                        <TextBlock Text="MOOD PRESETS" Style="{StaticResource SectionHeader}" Margin="0,8,0,3" />
+                        <ItemsControl ItemsSource="{Binding Music.MoodPresets}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Content="{Binding}" FontSize="7" Padding="4,2" Margin="0,0,3,3"
+                                            Command="{Binding DataContext.Music.ApplyMoodPresetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- ── SETTINGS ── -->
+                        <TextBlock Text="SETTINGS" Style="{StaticResource SectionHeader}" Margin="0,6,0,3" />
+
+                        <!-- Duration -->
+                        <Grid Margin="0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="72" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="32" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Duration:" />
+                            <Slider Grid.Column="1" Minimum="3" Maximum="30"
+                                    Value="{Binding Music.Duration}"
+                                    IsSnapToTickEnabled="True" TickFrequency="1" />
+                            <TextBlock Grid.Column="2" Text="{Binding Music.Duration, StringFormat={}{0}s}"
+                                       Style="{StaticResource AccentValue}" FontSize="10" />
+                        </Grid>
+
+                        <!-- Temperature -->
+                        <Grid Margin="0,3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="72" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="32" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Temperature:" />
+                            <Slider Grid.Column="1" Minimum="0.1" Maximum="2.0"
+                                    Value="{Binding Music.Temperature}"
+                                    LargeChange="0.1" SmallChange="0.05" />
+                            <TextBlock Grid.Column="2" Text="{Binding Music.Temperature, StringFormat=F1}"
+                                       HorizontalAlignment="Center" />
+                        </Grid>
+
+                        <!-- CFG -->
+                        <Grid Margin="0,3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="72" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="32" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="CFG:" />
+                            <Slider Grid.Column="1" Minimum="1.0" Maximum="10.0"
+                                    Value="{Binding Music.CfgCoefficient}"
+                                    LargeChange="0.5" SmallChange="0.25" />
+                            <TextBlock Grid.Column="2" Text="{Binding Music.CfgCoefficient, StringFormat=F1}"
+                                       HorizontalAlignment="Center" />
+                        </Grid>
+
+                        <!-- Generate buttons -->
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Button Content="🎵 Generate" Command="{Binding Music.GenerateCommand}"
+                                    Style="{StaticResource AccentBtn}" />
+                            <Button Grid.Column="1" Content="⏹" Command="{Binding Music.CancelGenerateCommand}"
+                                    Margin="4,0,0,0" />
+                        </Grid>
+
+                        <!-- Status -->
+                        <Border Style="{StaticResource StatusBorder}" Margin="0,6,0,0">
+                            <TextBlock Text="{Binding Music.StatusText}"
+                                       Foreground="{StaticResource AccentBrush}" FontSize="9"
+                                       TextWrapping="Wrap" />
+                        </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+
+        <!-- ═══════════════════════════════════════════════════ -->
+        <!--  CENTER: Visualizer + transport controls           -->
+        <!-- ═══════════════════════════════════════════════════ -->
+        <Grid Grid.Column="1" Background="{StaticResource CenterBg}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- Waveform Visualizer -->
+            <controls:WaveformVisualizer
+                Analysis="{Binding Music.Analysis}"
+                PlaybackPosition="{Binding Music.PlaybackPosition}"
+                IsPlaying="{Binding Music.IsPlaying}" />
+
+            <!-- Transport controls -->
+            <Border Grid.Row="1" Background="{StaticResource ToolbarBg}" Padding="10,6">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Button Content="⏯ Play / Pause" Command="{Binding Music.PlayPauseCommand}"
+                            Style="{StaticResource AccentBtn}" Padding="12,4" />
+                    <Button Grid.Column="1" Content="⏹ Stop" Command="{Binding Music.StopCommand}"
+                            Margin="6,0,0,0" Padding="8,4" />
+
+                    <!-- Now playing info -->
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Margin="12,0">
+                        <TextBlock Text="{Binding Music.SelectedTrack.DisplayName}"
+                                   Foreground="{StaticResource AccentBrush}" FontWeight="Bold"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Music.SelectedTrack.VibeTag}"
+                                   FontSize="8" Foreground="{StaticResource DimFg}" />
+                    </StackPanel>
+
+                    <Button Grid.Column="3" Content="🔄 Variant"
+                            Command="{Binding Music.RegenerateVariantCommand}"
+                            Padding="8,4" />
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- ═══════════════════════════════════════════════════ -->
+        <!--  RIGHT: Track library                              -->
+        <!-- ═══════════════════════════════════════════════════ -->
+        <Border Grid.Column="2" Style="{StaticResource PanelBorder}" BorderThickness="1,0,0,0">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="TRACK LIBRARY" Style="{StaticResource SectionHeader}"
+                           Margin="10,10,10,6" />
+
+                <!-- Track list -->
+                <ListBox ItemsSource="{Binding Music.Tracks}"
+                         SelectedItem="{Binding Music.SelectedTrack}"
+                         Margin="6" Background="Transparent" BorderThickness="0">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Border Padding="6,4" Margin="0,1"
+                                    Background="{StaticResource DeepBg}" CornerRadius="4">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock Text="{Binding DisplayName}"
+                                               Foreground="{StaticResource AccentBrush}"
+                                               FontWeight="Bold" FontSize="10"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="1" Text="{Binding DurationLabel}"
+                                               FontSize="9" Foreground="{StaticResource DimFg}" />
+
+                                    <TextBlock Grid.Row="1" Grid.ColumnSpan="2"
+                                               Text="{Binding Prompt}" FontSize="7"
+                                               Foreground="{StaticResource DimFg}"
+                                               TextTrimming="CharacterEllipsis" MaxHeight="14" />
+
+                                    <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,2,0,0">
+                                        <TextBlock Text="{Binding RatingStars}" FontSize="9"
+                                                   Foreground="{StaticResource GoldBrush}" />
+                                        <TextBlock Text="  •  " Foreground="{StaticResource DimFg}" FontSize="7" />
+                                        <TextBlock Text="{Binding VibeTag}" FontSize="7"
+                                                   Foreground="{StaticResource SecondAccent}" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+        </Border>
+    </Grid>
+</UserControl>

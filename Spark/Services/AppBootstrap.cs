@@ -25,6 +25,7 @@ static class AppBootstrap
         host.RegisterFactory(() => new DetailViewModel(host.Require<LogViewModel>()));
         host.RegisterFactory(() => new GalleryViewModel(host.Require<DetailViewModel>()));
         host.RegisterType<StatusViewModel>();
+        host.RegisterFactory(() => new MusicViewModel(host.Require<LogViewModel>()));
 
         // MainViewModel is the root coordinator — resolves everything
         host.RegisterFactory(() => new MainViewModel(
@@ -35,7 +36,8 @@ static class AppBootstrap
             host.Require<LoraViewModel>(),
             host.Require<DetailViewModel>(),
             host.Require<GalleryViewModel>(),
-            host.Require<StatusViewModel>()));
+            host.Require<StatusViewModel>(),
+            host.Require<MusicViewModel>()));
 
         return host;
     }
