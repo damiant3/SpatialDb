@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using Spark.ViewModels;
 ///////////////////////////////////////////////
 namespace Spark.Controls;
 
@@ -17,18 +18,18 @@ partial class DetailPanel : UserControl
     {
         if (DataContext is MainViewModel vm)
         {
-            vm.PropertyChanged += (_, e) =>
+            vm.Detail.PropertyChanged += (_, e) =>
             {
-                if (e.PropertyName == nameof(MainViewModel.DetailRating))
-                    UpdateStarDisplay(vm.DetailRating);
+                if (e.PropertyName == nameof(DetailViewModel.DetailRating))
+                    UpdateStarDisplay(vm.Detail.DetailRating);
             };
-            UpdateStarDisplay(vm.DetailRating);
+            UpdateStarDisplay(vm.Detail.DetailRating);
         }
     }
 
     void UpdateStarDisplay(int rating)
     {
-        foreach (var child in StarPanel.Children)
+        foreach (object? child in StarPanel.Children)
         {
             if (child is Button btn && btn.Tag is string tagStr && int.TryParse(tagStr, out int starNum))
             {
@@ -42,6 +43,6 @@ partial class DetailPanel : UserControl
     void OnPreviewDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (e.ClickCount == 2 && DataContext is MainViewModel vm)
-            vm.ShowLightboxCommand.Execute(null);
+            vm.Detail.ShowLightboxCommand.Execute(null);
     }
 }

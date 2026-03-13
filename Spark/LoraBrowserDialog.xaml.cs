@@ -61,9 +61,19 @@ partial class LoraBrowserDialog : Window
     async void OnInstallClick(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: LoraSearchResult item } btn) return;
+
+        // Always persist trigger words — even if direct download fails and
+        // the user has to download manually via browser, the trigger words
+        // will be available when they refresh the LoRA list.
+        string loraBaseName = System.IO.Path.GetFileNameWithoutExtension(item.FileName);
+        if (item.TriggerWords.Length > 0 && loraBaseName.Length > 0)
+            m_loraService.SetTriggerWords(loraBaseName, item.TriggerWords);
+
         if (string.IsNullOrEmpty(item.DownloadUrl))
         {
             StatusLabel.Text = "No download URL — opening CivitAI page…";
+            if (item.TriggerWords.Length > 0)
+                StatusLabel.Text += $"  •  Trigger words saved: {item.TriggerWords}";
             OpenModelPage(item);
             return;
         }
@@ -88,7 +98,7 @@ partial class LoraBrowserDialog : Window
 
         if (ok)
         {
-            InstalledLoraName = System.IO.Path.GetFileNameWithoutExtension(item.FileName);
+            InstalledLoraName = loraBaseName;
             InstalledTriggerWords = item.TriggerWords;
             StatusLabel.Text = $"✓ Installed {item.Name}" +
                 (item.TriggerWords.Length > 0 ? $"  •  Trigger words: {item.TriggerWords}" : "");
@@ -99,6 +109,8 @@ partial class LoraBrowserDialog : Window
         {
             // 401/403 = auth required — fall back to browser
             StatusLabel.Text = "Direct download failed (auth required) — opening CivitAI page…";
+            if (item.TriggerWords.Length > 0)
+                StatusLabel.Text += $"  •  Trigger words saved: {item.TriggerWords}";
             OpenModelPage(item);
             btn.Content = "🌐 Opened";
             btn.IsEnabled = true;

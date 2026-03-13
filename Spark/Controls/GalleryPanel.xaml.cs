@@ -16,17 +16,13 @@ partial class GalleryPanel : UserControl
     void OnCardMouseDown(object sender, MouseButtonEventArgs e)
     {
         if (sender is not FrameworkElement card) return;
-        // Select on click
         if (card.DataContext is PromptStack stack)
             stack.SelectCommand.Execute(null);
         m_dragStart = e.GetPosition(card);
         card.CaptureMouse();
     }
 
-    void OnCardMouseMove(object sender, MouseEventArgs e)
-    {
-        // Handled on MouseUp for cleaner swipe detection
-    }
+    void OnCardMouseMove(object sender, MouseEventArgs e) { }
 
     void OnCardMouseUp(object sender, MouseButtonEventArgs e)
     {
@@ -42,21 +38,20 @@ partial class GalleryPanel : UserControl
             else if (dx < -SwipeThreshold)
                 stack.CycleBackCommand.Execute(null);
 
-            // Double-click opens lightbox
             if (Math.Abs(dx) < 5 && e.ClickCount == 2)
             {
                 if (DataContext is MainViewModel vm)
-                    vm.ShowLightboxCommand.Execute(null);
+                    vm.Detail.ShowLightboxCommand.Execute(null);
             }
         }
-        else if (m_dragStart is not null && card.DataContext is PromptStack s2)
+        else if (m_dragStart is not null)
         {
             Point end = e.GetPosition(card);
             double dx = end.X - m_dragStart.Value.X;
             if (Math.Abs(dx) < 5 && e.ClickCount == 2)
             {
                 if (DataContext is MainViewModel vm)
-                    vm.ShowLightboxCommand.Execute(null);
+                    vm.Detail.ShowLightboxCommand.Execute(null);
             }
         }
 
@@ -83,7 +78,7 @@ partial class GalleryPanel : UserControl
                 MenuItem dirItem = new()
                 {
                     Header = dir.Label,
-                    Command = vm.DirectedRegenCommand,
+                    Command = vm.Detail.DirectedRegenCommand,
                     CommandParameter = dir.Label,
                 };
                 groupItem.Items.Add(dirItem);
@@ -95,7 +90,7 @@ partial class GalleryPanel : UserControl
         menu.Items.Add(new MenuItem
         {
             Header = "🧬 Mutate",
-            Command = vm.CreativeRegenCommand,
+            Command = vm.Detail.CreativeRegenCommand,
             FontWeight = FontWeights.Bold,
         });
 

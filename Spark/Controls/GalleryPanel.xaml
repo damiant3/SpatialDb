@@ -8,7 +8,7 @@
              Background="{StaticResource CenterBg}">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <ItemsControl ItemsSource="{Binding Stacks}" Margin="6">
+        <ItemsControl ItemsSource="{Binding Gallery.Stacks}" Margin="6">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
                     <UniformGrid Columns="4" />

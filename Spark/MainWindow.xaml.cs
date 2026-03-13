@@ -1,21 +1,21 @@
 using System.Windows;
+using Spark.Services;
 ///////////////////////////////////////////////
 namespace Spark;
 
 partial class MainWindow : Window
 {
-    MainViewModel m_viewModel;
-
     public MainWindow()
     {
         InitializeComponent();
-        m_viewModel = new MainViewModel();
-        DataContext = m_viewModel;
+        ServiceHost host = AppBootstrap.Configure();
+        DataContext = host.Require<MainViewModel>();
     }
 
     protected override void OnClosed(EventArgs e)
     {
-        m_viewModel.Dispose();
+        if (ServiceHost.IsInitialized)
+            ServiceHost.Instance.Dispose();
         base.OnClosed(e);
     }
 }

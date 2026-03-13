@@ -7,11 +7,11 @@
 
     <Border Style="{StaticResource PanelBorder}" BorderThickness="0,0,1,0">
         <DockPanel>
-            <!-- ── Log (docked bottom, fills remaining space) ── -->
-            <DockPanel DockPanel.Dock="Bottom" Margin="10,0,10,10">
+            <!-- ── Log (docked bottom, fixed max height) ── -->
+            <DockPanel DockPanel.Dock="Bottom" Margin="10,0,10,10" MaxHeight="160">
                 <TextBlock DockPanel.Dock="Top" Text="LOG" Style="{StaticResource SectionHeader}" Margin="0,6,0,2" />
                 <Border Background="{StaticResource DeepBg}" CornerRadius="3">
-                    <ListBox ItemsSource="{Binding LogLines}" />
+                    <ListBox ItemsSource="{Binding Log.LogLines}" />
                 </Border>
             </DockPanel>
 
@@ -37,9 +37,9 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="Width:" />
-                        <TextBox   Grid.Column="1" Text="{Binding Width}" />
+                        <TextBox   Grid.Column="1" Text="{Binding Settings.Width}" />
                         <TextBlock Grid.Column="3" Text="Height:" />
-                        <TextBox   Grid.Column="4" Text="{Binding Height}" />
+                        <TextBox   Grid.Column="4" Text="{Binding Settings.Height}" />
                     </Grid>
 
                     <!-- Steps / CFG -->
@@ -52,9 +52,9 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="Steps:" />
-                        <TextBox   Grid.Column="1" Text="{Binding Steps}" />
+                        <TextBox   Grid.Column="1" Text="{Binding Settings.Steps}" />
                         <TextBlock Grid.Column="3" Text="CFG:" />
-                        <TextBox   Grid.Column="4" Text="{Binding CfgScale}" />
+                        <TextBox   Grid.Column="4" Text="{Binding Settings.CfgScale}" />
                     </Grid>
 
                     <!-- Sampler -->
@@ -65,8 +65,8 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="Sampler:" />
                         <ComboBox  Grid.Column="1"
-                                   ItemsSource="{Binding Samplers}"
-                                   SelectedItem="{Binding Sampler}" />
+                                   ItemsSource="{Binding Settings.Samplers}"
+                                   SelectedItem="{Binding Settings.Sampler}" />
                     </Grid>
 
                     <!-- Scheduler -->
@@ -77,8 +77,8 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="Sched:" />
                         <ComboBox  Grid.Column="1"
-                                   ItemsSource="{Binding Schedulers}"
-                                   SelectedItem="{Binding Scheduler}" />
+                                   ItemsSource="{Binding Settings.Schedulers}"
+                                   SelectedItem="{Binding Settings.Scheduler}" />
                     </Grid>
 
                     <!-- Seed -->
@@ -88,7 +88,7 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="Seed:" />
-                        <TextBox   Grid.Column="1" Text="{Binding Seed}" />
+                        <TextBox   Grid.Column="1" Text="{Binding Settings.Seed}" />
                     </Grid>
 
                     <!-- ── RUNS PER PROMPT ── -->
@@ -99,9 +99,9 @@
                             <ColumnDefinition Width="30" />
                         </Grid.ColumnDefinitions>
                         <Slider Minimum="1" Maximum="50"
-                                Value="{Binding RunsPerPrompt}"
+                                Value="{Binding Settings.RunsPerPrompt}"
                                 IsSnapToTickEnabled="True" TickFrequency="1" />
-                        <TextBlock Grid.Column="1" Text="{Binding RunsPerPrompt}"
+                        <TextBlock Grid.Column="1" Text="{Binding Settings.RunsPerPrompt}"
                                    Style="{StaticResource AccentValue}" />
                     </Grid>
 
@@ -113,17 +113,17 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="Refine:" />
                         <ComboBox  Grid.Column="1"
-                                   ItemsSource="{Binding RefinePresets}"
-                                   SelectedItem="{Binding RefinePreset}" />
+                                   ItemsSource="{Binding Settings.RefinePresets}"
+                                   SelectedItem="{Binding Settings.RefinePreset}" />
                     </Grid>
 
                     <!-- Checkboxes -->
                     <CheckBox Content=" Use preference learning"
-                              IsChecked="{Binding UsePreferences}" Margin="0,5,0,0" />
+                              IsChecked="{Binding Settings.UsePreferences}" Margin="0,5,0,0" />
                     <CheckBox Content=" Mutate mode (max variance)"
-                              IsChecked="{Binding CreativeMode}" Margin="0,3,0,0" />
+                              IsChecked="{Binding Settings.CreativeMode}" Margin="0,3,0,0" />
                     <CheckBox Content=" Inject story context"
-                              IsChecked="{Binding InjectStoryContext}" Margin="0,3,0,0" />
+                              IsChecked="{Binding Settings.InjectStoryContext}" Margin="0,3,0,0" />
 
                     <!-- ── LORA FOR GENERATION ── -->
                     <TextBlock Text="LORA" Style="{StaticResource SectionHeader}" Margin="0,8,0,2" />
@@ -133,10 +133,10 @@
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <ComboBox ItemsSource="{Binding AvailableLoras}" SelectedItem="{Binding SelectedLora}" />
-                        <Button Grid.Column="1" Content="↻" Command="{Binding RefreshLorasCommand}"
+                        <ComboBox ItemsSource="{Binding Lora.AvailableLoras}" SelectedItem="{Binding Lora.SelectedLora}" />
+                        <Button Grid.Column="1" Content="↻" Command="{Binding Lora.RefreshLorasCommand}"
                                 FontSize="12" Padding="4,2" Margin="3,0,0,0" ToolTip="Refresh LoRA list" />
-                        <Button Grid.Column="2" Content="🌐" Command="{Binding BrowseLoraSiteCommand}"
+                        <Button Grid.Column="2" Content="🌐" Command="{Binding Lora.BrowseLoraSiteCommand}"
                                 FontSize="12" Padding="4,2" Margin="3,0,0,0" ToolTip="Browse CivitAI LoRAs" />
                     </Grid>
                     <Grid Margin="0,3,0,0">
@@ -147,10 +147,26 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="Weight:" />
                         <Slider Grid.Column="1" Minimum="0" Maximum="2"
-                                Value="{Binding LoraWeight}" LargeChange="0.1" SmallChange="0.05" />
-                        <TextBlock Grid.Column="2" Text="{Binding LoraWeight, StringFormat=F1}"
+                                Value="{Binding Lora.LoraWeight}" LargeChange="0.1" SmallChange="0.05" />
+                        <TextBlock Grid.Column="2" Text="{Binding Lora.LoraWeight, StringFormat=F1}"
                                    HorizontalAlignment="Center" />
                     </Grid>
+
+                    <!-- Trigger words -->
+                    <Grid Margin="0,3,0,0"
+                          Visibility="{Binding Lora.HasLoraTriggerWords, Converter={StaticResource BoolToVis}}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding Lora.LoraTriggerWords}" FontSize="8"
+                                   Foreground="{StaticResource GoldBrush}" TextWrapping="Wrap"
+                                   TextTrimming="CharacterEllipsis" MaxHeight="28" />
+                        <Button Grid.Column="1" Content="➕" Command="{Binding Lora.InjectTriggerWordsCommand}"
+                                FontSize="10" Padding="4,2" Margin="3,0,0,0"
+                                ToolTip="Inject trigger words into Prompt Augment" />
+                    </Grid>
+
                     <TextBlock Text="Per-prompt: add LORA: name:weight in ArtPrompts.txt" Style="{StaticResource HintText}" Margin="0,1,0,0" />
 
                     <!-- ── ACTION BUTTONS ── -->
@@ -171,16 +187,16 @@
 
                     <!-- Status -->
                     <Border Style="{StaticResource StatusBorder}" Margin="0,6,0,0">
-                        <TextBlock Text="{Binding StatusText}"
+                        <TextBlock Text="{Binding Status.StatusText}"
                                    Foreground="{StaticResource AccentBrush}" FontSize="9"
                                    TextWrapping="Wrap" />
                     </Border>
 
                     <!-- ── QUEUE ── -->
                     <TextBlock Text="QUEUE" Style="{StaticResource SectionHeader}" Margin="0,6,0,2"
-                               Visibility="{Binding IsGenerating, Converter={StaticResource BoolToVis}}" />
-                    <ItemsControl ItemsSource="{Binding QueueItems}"
-                                  Visibility="{Binding IsGenerating, Converter={StaticResource BoolToVis}}">
+                               Visibility="{Binding Status.IsGenerating, Converter={StaticResource BoolToVis}}" />
+                    <ItemsControl ItemsSource="{Binding Status.QueueItems}"
+                                  Visibility="{Binding Status.IsGenerating, Converter={StaticResource BoolToVis}}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <TextBlock Text="{Binding}" FontSize="8"
@@ -192,7 +208,7 @@
                     <!-- ── PREFERENCES ── -->
                     <TextBlock Text="PREFERENCES" Style="{StaticResource SectionHeader}" Margin="0,6,0,2" />
                     <Border Style="{StaticResource InsetBorder}">
-                        <TextBlock Text="{Binding PreferencesSummary}" Style="{StaticResource CodeText}" />
+                        <TextBlock Text="{Binding Status.PreferencesSummary}" Style="{StaticResource CodeText}" />
                     </Border>
 
                 </StackPanel>
