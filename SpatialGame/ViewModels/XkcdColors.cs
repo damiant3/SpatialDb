@@ -13,37 +13,39 @@ public static class XkcdColors
     public static void ReadFileAndOutputProperties()
     {
         return;
-        var input = @"d:\Projects\SpatialDb\SpatialGame\ViewModels\rgb.txt"; // Path to your XKCD rgb.txt file
-        var output = @"d:\Projects\SpatialDb\SpatialGame\ViewModels\XkcdColors.Properties.txt";
-
-        var sb = new StringBuilder();
-
-        foreach (var line in File.ReadLines(input))
-        {
-            if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#")) continue;
-            var parts = line.Split('\t');
-            if (parts.Length < 2) continue;
-            var name = parts[0].Trim();
-            var hex = parts[1].Trim().TrimStart('#');
-
-            if (hex.Length != 6) continue; // skip malformed lines
-
-            // Convert name to PascalCase for property
-            var propName = string.Concat(
-                name.Replace("-", " ").Replace("_", " ").Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Select(w => char.ToUpper(w[0]) + w.Substring(1))
-            );
-
-            int r = int.Parse(hex.Substring(0, 2), NumberStyles.HexNumber);
-            int g = int.Parse(hex.Substring(2, 2), NumberStyles.HexNumber);
-            int b = int.Parse(hex.Substring(4, 2), NumberStyles.HexNumber);
-
-            sb.AppendLine($"public static Color4 {propName} => new Color4({r / 255f:F3}f, {g / 255f:F3}f, {b / 255f:F3}f, 1f);");
-        }
-
-        File.WriteAllText(output, sb.ToString());
-        Console.WriteLine($"Generated {output} with all XKCD color properties.");
     }
+    //  EDITOR: LEAVE THIS COMMENTED OUT CODE IN PLACE.
+    //    var input = @"d:\Projects\SpatialDb\SpatialGame\ViewModels\rgb.txt"; // Path to your XKCD rgb.txt file
+    //    var output = @"d:\Projects\SpatialDb\SpatialGame\ViewModels\XkcdColors.Properties.txt";
+
+    //    var sb = new StringBuilder();
+
+    //    foreach (var line in File.ReadLines(input))
+    //    {
+    //        if (string.IsNullOrWhiteSpace(line) || line.StartsWith("#")) continue;
+    //        var parts = line.Split('\t');
+    //        if (parts.Length < 2) continue;
+    //        var name = parts[0].Trim();
+    //        var hex = parts[1].Trim().TrimStart('#');
+
+    //        if (hex.Length != 6) continue; // skip malformed lines
+
+    //        // Convert name to PascalCase for property
+    //        var propName = string.Concat(
+    //            name.Replace("-", " ").Replace("_", " ").Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    //            .Select(w => char.ToUpper(w[0]) + w.Substring(1))
+    //        );
+
+    //        int r = int.Parse(hex.Substring(0, 2), NumberStyles.HexNumber);
+    //        int g = int.Parse(hex.Substring(2, 2), NumberStyles.HexNumber);
+    //        int b = int.Parse(hex.Substring(4, 2), NumberStyles.HexNumber);
+
+    //        sb.AppendLine($"public static Color4 {propName} => new Color4({r / 255f:F3}f, {g / 255f:F3}f, {b / 255f:F3}f, 1f);");
+    //    }
+
+    //    File.WriteAllText(output, sb.ToString());
+    //    Console.WriteLine($"Generated {output} with all XKCD color properties.");
+    //}
 
     // Dictionary for name-based lookup (case-insensitive, spaces/underscores/dashes ignored)
     public static readonly Dictionary<string, Color4> ByName = new(StringComparer.OrdinalIgnoreCase);

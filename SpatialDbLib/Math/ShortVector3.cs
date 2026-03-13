@@ -1,4 +1,4 @@
-﻿using SystemMath = System.Math;
+using SystemMath = System.Math;
 ////////////////////////////
 namespace SpatialDbLib.Math;
 
@@ -28,7 +28,6 @@ public readonly struct ShortVector3(short x, short y, short z)
     public static ShortVector3 operator -(ShortVector3 a)
         => new((short)-a.X, (short)-a.Y, (short)-a.Z);
 
-    // For accumulator overflow: promote to int during calc
     public static LongVector3 operator +(ShortVector3 velocity, LongVector3 position)
         => new(position.X + velocity.X, position.Y + velocity.Y, position.Z + velocity.Z);
 

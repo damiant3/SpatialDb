@@ -1,6 +1,7 @@
-﻿#if DIAGNOSTIC
+#if DIAGNOSTIC
 using System.Collections.Concurrent;
 
+//////////////////////////////////
 namespace SpatialDbLib.Diagnostic;
 
 public class HookSet : ConcurrentDictionary<string, ManualResetEventSlim>
@@ -26,10 +27,8 @@ public class HookSet : ConcurrentDictionary<string, ManualResetEventSlim>
     }
     public void RestetAll()
     {
-        foreach (var kvp in this)
-        {
+        foreach (KeyValuePair<string, ManualResetEventSlim> kvp in this)
             kvp.Value.Reset();
-        }
     }
 }
 

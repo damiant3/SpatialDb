@@ -1,4 +1,4 @@
-﻿using SpatialDbLib.Math;
+using SpatialDbLib.Math;
 using SpatialDbLib.Synchronize;
 ///////////////////////////////
 namespace SpatialDbLib.Lattice;
@@ -32,41 +32,41 @@ public class SpatialObject(IList<LongVector3> initialPosition)
     IList<LongVector3> m_positionStack = [.. initialPosition];
     public IList<LongVector3> GetPositionStack()
     {
-        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Read, "SpatialObject.GetPositionStack");
+        using SlimSyncer s = new(Sync, SlimSyncer.LockMode.Read, "SpatialObject.GetPositionStack");
         return [.. m_positionStack];
     }
     public void AppendPosition(LongVector3 newPosition)
     {
-        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "SpatialObject.AppendPosition");
+        using SlimSyncer s = new(Sync, SlimSyncer.LockMode.Write, "SpatialObject.AppendPosition");
         m_positionStack.Add(newPosition);
     }
     public void SetLocalPosition(LongVector3 newLocalPos)
     {
-        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "SpatialObject.SetLocalPosition");
+        using SlimSyncer s = new(Sync, SlimSyncer.LockMode.Write, "SpatialObject.SetLocalPosition");
         m_positionStack[^1] = newLocalPos;
     }
     public void SetPositionStack(IList<LongVector3> newStack)
     {
-        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "SpatialObject.SetPositionStack");
+        using SlimSyncer s = new(Sync, SlimSyncer.LockMode.Write, "SpatialObject.SetPositionStack");
         m_positionStack = [.. newStack];
     }
     public int PositionStackDepth
     {
         get
         {
-            using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Read, "SpatialObject.PositionStackDepth");
+            using SlimSyncer s = new(Sync, SlimSyncer.LockMode.Read, "SpatialObject.PositionStackDepth");
             return m_positionStack.Count;
         }
     }
     public bool HasPositionAtDepth(int depth)
     {
         if (depth < 0) return false;
-        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Read, "SpatialObject.HasPositionAtDepth");
+        using SlimSyncer s = new(Sync, SlimSyncer.LockMode.Read, "SpatialObject.HasPositionAtDepth");
         return depth < m_positionStack.Count;
     }
     public LongVector3 GetPositionAtDepth(int depth)
     {
-        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Read, "SpatialObject.GetPositionAtDepth");
+        using SlimSyncer s = new(Sync, SlimSyncer.LockMode.Read, "SpatialObject.GetPositionAtDepth");
         if ((uint)depth >= (uint)m_positionStack.Count)
             throw new ArgumentOutOfRangeException(nameof(depth));
         return m_positionStack[depth];
@@ -75,7 +75,7 @@ public class SpatialObject(IList<LongVector3> initialPosition)
     {
         get
         {
-            using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Read, "SpatialObject.LocalPosition");
+            using SlimSyncer s = new(Sync, SlimSyncer.LockMode.Read, "SpatialObject.LocalPosition");
             return m_positionStack[^1];
         }
     }
@@ -115,29 +115,21 @@ public class ProxyCommitCoordinator<TOriginal, TProxy>(TOriginal originalObject,
     public void Commit(Action<TOriginal> transferState, Action clearProxyState, ISpatialObjectProxy proxy)
     {
         if (m_state == ProxyState.Committed) throw new InvalidOperationException("Proxy already committed!");
-        static int CompareBoundsMin(LongVector3 a, LongVector3 b)
-        {
-            var c = a.X.CompareTo(b.X);
-            if (c != 0) return c;
-            c = a.Y.CompareTo(b.Y);
-            if (c != 0) return c;
-            return a.Z.CompareTo(b.Z);
-        }
         while (true)
         {
-            var target = TargetLeaf ?? throw new InvalidOperationException("TargetLeaf is null in ProxyCommitCoordinator.Commit.");
-            var source = SourceLeaf;
+            VenueLeafNode target = TargetLeaf ?? throw new InvalidOperationException("TargetLeaf is null in ProxyCommitCoordinator.Commit.");
+            VenueLeafNode? source = SourceLeaf;
             VenueLeafNode first = target;
             VenueLeafNode? second = source;
-            if (second != null && CompareBoundsMin(first.Bounds.Min, second.Bounds.Min) > 0)
+            if (second != null && LongVector3.CompareLexicographic(first.Bounds.Min, second.Bounds.Min) > 0)
             {
                 first = target;
                 second = source;
             }
-            var locks = new MultiSyncerScope();
+            MultiSyncerScope locks = new();
             locks.Add(new SlimSyncer(((ISync)first).Sync, SlimSyncer.LockMode.Write, "ProxyCommitCoordinator.Commit: first"));
             if (second != null) locks.Add(new SlimSyncer(((ISync)second).Sync, SlimSyncer.LockMode.Write, "ProxyCommitCoordinator.Commit: second"));
-            using var _ = locks;
+            using IDisposable _ = locks;
             if (target.IsRetired || (source != null && source.IsRetired)) continue;
             source?.Vacate(OriginalObject);
             transferState(OriginalObject);

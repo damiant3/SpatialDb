@@ -1,4 +1,4 @@
-﻿using System.Numerics;
+using System.Numerics;
 ////////////////////////////
 namespace SpatialDbLib.Math;
 public static class LatticeUniverse
@@ -30,13 +30,13 @@ public class ParentToSubLatticeTransform(Region outerBounds)
         => InnerLatticeBounds.Contains(innerPosition);
     public IntVector3 OuterToInnerVelocity(IntVector3 outerVelocity)
     {
-        var innerSize = InnerLatticeBounds.Size;
-        var outerSize = OuterLatticeBounds.Size;
+        ULongVector3 innerSize = InnerLatticeBounds.Size;
+        ULongVector3 outerSize = OuterLatticeBounds.Size;
         if (innerSize == outerSize)
             return outerVelocity;
-        var scaleX = innerSize.X / outerSize.X;
-        var scaleY = innerSize.Y / outerSize.Y;
-        var scaleZ = innerSize.Z / outerSize.Z;
+        ulong scaleX = innerSize.X / outerSize.X;
+        ulong scaleY = innerSize.Y / outerSize.Y;
+        ulong scaleZ = innerSize.Z / outerSize.Z;
         return new IntVector3(
             (int)(outerVelocity.X * (long)scaleX),
             (int)(outerVelocity.Y * (long)scaleY),
@@ -44,13 +44,13 @@ public class ParentToSubLatticeTransform(Region outerBounds)
     }
     public IntVector3 InnerToOuterVelocity(IntVector3 innerVelocity)
     {
-        var innerSize = InnerLatticeBounds.Size;
-        var outerSize = OuterLatticeBounds.Size;
+        ULongVector3 innerSize = InnerLatticeBounds.Size;
+        ULongVector3 outerSize = OuterLatticeBounds.Size;
         if (innerSize == outerSize)
             return innerVelocity;
-        var scaleX = innerSize.X / outerSize.X;
-        var scaleY = innerSize.Y / outerSize.Y;
-        var scaleZ = innerSize.Z / outerSize.Z;
+        ulong scaleX = innerSize.X / outerSize.X;
+        ulong scaleY = innerSize.Y / outerSize.Y;
+        ulong scaleZ = innerSize.Z / outerSize.Z;
         return new IntVector3(
             (int)(innerVelocity.X / (long)scaleX),
             (int)(innerVelocity.Y / (long)scaleY),
@@ -59,13 +59,14 @@ public class ParentToSubLatticeTransform(Region outerBounds)
     public LongVector3 OuterToInnerInsertion(LongVector3 outer, Guid guid)
     {
         if (!ContainsOuter(outer)) throw new ArgumentOutOfRangeException(nameof(outer));
-        var innerSize = InnerLatticeBounds.Size;
-        var outerSize = OuterLatticeBounds.Size;
+        ULongVector3 innerSize = InnerLatticeBounds.Size;
+        ULongVector3 outerSize = OuterLatticeBounds.Size;
         if (innerSize == outerSize)
             return outer;
         return outerSize.X == 1
             ? OuterToInnerFromSizeOne(guid)
             : OuterToInnerFromLarge(outer, guid.GetDiscriminator(), innerSize, outerSize);
+        // bit-shift mixing for deterministic position mapping from guid
         static ulong SplitMix64(ref ulong x)
         {
             x += 0x9E3779B97F4A7C15UL;
@@ -93,16 +94,16 @@ public class ParentToSubLatticeTransform(Region outerBounds)
     }
     public LongVector3 OuterToInnerFromLarge(LongVector3 outer, ulong discriminator, ULongVector3 innerSize, ULongVector3 outerSize)
     {
-        var outerOffset = outer.OffsetFrom(OuterLatticeBounds.Min);
-        var scaleX = innerSize.X / outerSize.X;
-        var scaleY = innerSize.Y / outerSize.Y;
-        var scaleZ = innerSize.Z / outerSize.Z;
-        var baseX = (ulong)InnerLatticeBounds.Min.X + outerOffset.X * scaleX;
-        var baseY = (ulong)InnerLatticeBounds.Min.Y + outerOffset.Y * scaleY;
-        var baseZ = (ulong)InnerLatticeBounds.Min.Z + outerOffset.Z * scaleZ;
-        var repX = baseX + discriminator % scaleX;
-        var repY = baseY + (discriminator >> 21) % scaleY;
-        var repZ = baseZ + (discriminator >> 42) % scaleZ;
+        ULongVector3 outerOffset = outer.OffsetFrom(OuterLatticeBounds.Min);
+        ulong scaleX = innerSize.X / outerSize.X;
+        ulong scaleY = innerSize.Y / outerSize.Y;
+        ulong scaleZ = innerSize.Z / outerSize.Z;
+        ulong baseX = (ulong)InnerLatticeBounds.Min.X + outerOffset.X * scaleX;
+        ulong baseY = (ulong)InnerLatticeBounds.Min.Y + outerOffset.Y * scaleY;
+        ulong baseZ = (ulong)InnerLatticeBounds.Min.Z + outerOffset.Z * scaleZ;
+        ulong repX = baseX + discriminator % scaleX;
+        ulong repY = baseY + (discriminator >> 21) % scaleY;
+        ulong repZ = baseZ + (discriminator >> 42) % scaleZ;
         return new LongVector3(unchecked((long)repX), unchecked((long)repY), unchecked((long)repZ));
     }
     public LongVector3 OuterToInnerCanonical(LongVector3 outerPosition)
@@ -110,9 +111,9 @@ public class ParentToSubLatticeTransform(Region outerBounds)
         if (!ContainsOuter(outerPosition)) throw new ArgumentOutOfRangeException(nameof(outerPosition));
         if (OuterLatticeBounds.Size == InnerLatticeBounds.Size)
             return outerPosition;
-        var outerOffset = outerPosition.OffsetFrom(OuterLatticeBounds.Min);
-        var outerSize = OuterLatticeBounds.Size;
-        var innerSize = InnerLatticeBounds.Size;
+        ULongVector3 outerOffset = outerPosition.OffsetFrom(OuterLatticeBounds.Min);
+        ULongVector3 outerSize = OuterLatticeBounds.Size;
+        ULongVector3 innerSize = InnerLatticeBounds.Size;
         return new LongVector3(
             InnerLatticeBounds.Min.X + (long)(outerOffset.X * (innerSize.X / outerSize.X)),
             InnerLatticeBounds.Min.Y + (long)(outerOffset.Y * (innerSize.Y / outerSize.Y)),
@@ -123,12 +124,12 @@ public class ParentToSubLatticeTransform(Region outerBounds)
         if (!ContainsInner(innerPosition)) throw new ArgumentOutOfRangeException(nameof(innerPosition));
         if (OuterLatticeBounds.Size == InnerLatticeBounds.Size)
             return innerPosition;
-        var innerOffset = innerPosition.OffsetFrom(InnerLatticeBounds.Min);
-        var outerSize = OuterLatticeBounds.Size;
-        var innerSize = InnerLatticeBounds.Size;
-        var scaleX = innerSize.X / outerSize.X;
-        var scaleY = innerSize.Y / outerSize.Y;
-        var scaleZ = innerSize.Z / outerSize.Z;
+        ULongVector3 innerOffset = innerPosition.OffsetFrom(InnerLatticeBounds.Min);
+        ULongVector3 outerSize = OuterLatticeBounds.Size;
+        ULongVector3 innerSize = InnerLatticeBounds.Size;
+        ulong scaleX = innerSize.X / outerSize.X;
+        ulong scaleY = innerSize.Y / outerSize.Y;
+        ulong scaleZ = innerSize.Z / outerSize.Z;
         return new LongVector3(
             OuterLatticeBounds.Min.X + (long)(innerOffset.X / scaleX),
             OuterLatticeBounds.Min.Y + (long)(innerOffset.Y / scaleY),
@@ -157,12 +158,12 @@ public readonly struct Region
         && position.Y >= Min.Y && position.Y < Max.Y
         && position.Z >= Min.Z && position.Z < Max.Z;
     public bool IntersectsSphere_SimpleImpl(LongVector3 center, ulong radius)
-    {   // there is probably a better way to do this, but hey its 2026 and we vibing, baby.
-        var closest = new LongVector3(
+    {
+        LongVector3 closest = new(
             System.Math.Max(Min.X, System.Math.Min(center.X, Max.X)),
             System.Math.Max(Min.Y, System.Math.Min(center.Y, Max.Y)),
             System.Math.Max(Min.Z, System.Math.Min(center.Z, Max.Z)));
-        var distSq = (closest - center).MagnitudeSquaredBig;
+        BigInteger distSq = (closest - center).MagnitudeSquaredBig;
         return distSq <= (BigInteger)radius * radius;
     }
     public override string ToString() => $"Min={Min}, Max={Max}";

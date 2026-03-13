@@ -8,25 +8,24 @@ public class SpatialTicker
     {
         if (maxThreads <= 0) maxThreads = Environment.ProcessorCount;
 
-        var root = lattice.GetRootNode() as TickableOctetParentNode;
+        TickableOctetParentNode? root = lattice.GetRootNode() as TickableOctetParentNode;
         if (root == null) return;
 
-        var children = root.Children;
-        var tasks = new List<Task>();
+        IInternalChildNode[] children = root.Children;
+        List<Task> tasks = new();
 
-        // Partition children across threads
         int threadsUsed = System.Math.Min(maxThreads, children.Length);
-        var partitions = PartitionChildren(children, threadsUsed);
+        List<List<IChildNode<OctetParentNode>>> partitions = PartitionChildren(children, threadsUsed);
 
-        foreach (var partition in partitions)
+        foreach (List<IChildNode<OctetParentNode>> partition in partitions)
         {
             tasks.Add(Task.Run(() =>
             {
-                foreach (var child in partition)
+                foreach (IChildNode<OctetParentNode> child in partition)
                 {
                     if (child is ITickableChildNode tickableChild)
                     {
-                        using var depthScope = SpatialLattice.PushLatticeDepth(lattice.LatticeDepth);
+                        using IDisposable depthScope = SpatialLattice.PushLatticeDepth(lattice.LatticeDepth);
                         tickableChild.Tick();
                     }
                 }
@@ -41,16 +40,14 @@ public class SpatialTicker
         TickParallelAsync(lattice, maxThreads).Wait();
     }
 
-    private static List<List<IChildNode<OctetParentNode>>> PartitionChildren(IChildNode<OctetParentNode>[] children, int numPartitions)
+    private static List<List<IChildNode<OctetParentNode>>> PartitionChildren(IInternalChildNode[] children, int numPartitions)
     {
-        var partitions = new List<List<IChildNode<OctetParentNode>>>();
+        List<List<IChildNode<OctetParentNode>>> partitions = new();
         for (int i = 0; i < numPartitions; i++)
             partitions.Add([]);
 
         for (int i = 0; i < children.Length; i++)
-        {
             partitions[i % numPartitions].Add(children[i]);
-        }
 
         return partitions;
     }

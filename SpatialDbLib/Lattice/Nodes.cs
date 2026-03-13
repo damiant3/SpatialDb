@@ -1,6 +1,5 @@
-﻿using SpatialDbLib.Math;
+using SpatialDbLib.Math;
 using SpatialDbLib.Synchronize;
-using System.Numerics;
 ///////////////////////////////
 namespace SpatialDbLib.Lattice;
 public interface ISpatialNode
@@ -33,8 +32,6 @@ public interface IParentNode : ISpatialNode
     public abstract VenueLeafNode? ResolveOccupyingLeaf(ISpatialObject obj);
     public abstract VenueLeafNode? ResolveLeaf(ISpatialObject obj);
 }
-
-// public child contract to allow parent-side fast calls without exposing members widely
 public interface IInternalChildNode : IChildNode<OctetParentNode>
 {
     void MigrateInternal(IList<ISpatialObject> objs);
@@ -93,7 +90,6 @@ public class OctetBranchNode
     }
     public OctetParentNode Parent { get; }
 
-    // explicit internal forwarding
     void IInternalChildNode.MigrateInternal(IList<ISpatialObject> objs) => Migrate(objs);
 }
 public abstract class LeafNode(Region bounds, OctetParentNode parent)
@@ -116,12 +112,12 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
     public bool IsRetired => m_isRetired;
     public bool Contains(ISpatialObject obj)
     {
-        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Read, "Venue.Contains: Leaf");
+        using SlimSyncer s = new(Sync, SlimSyncer.LockMode.Read, "Venue.Contains: Leaf");
         return Occupants.Contains(obj);
     }
     public bool HasAnyOccupants()
     {
-        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Read, "Venue.HasAnyOccupants: Leaf");
+        using SlimSyncer s = new(Sync, SlimSyncer.LockMode.Read, "Venue.HasAnyOccupants: Leaf");
         return Occupants.Count > 0;
     }
     internal void Vacate(ISpatialObject obj)
@@ -143,8 +139,8 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
     }
     public virtual void Replace(ISpatialObjectProxy proxy)
     {
-        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "VenueLeafNode.Replace");
-        var originalObject = proxy.OriginalObject;
+        using SlimSyncer s = new(Sync, SlimSyncer.LockMode.Write, "VenueLeafNode.Replace");
+        ISpatialObject originalObject = proxy.OriginalObject;
         int index = Occupants.IndexOf(proxy);
 
         if (index == -1)
@@ -156,7 +152,7 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
         => Occupants.Count + toAdd > Capacity;
     public override void Migrate(IList<ISpatialObject> objs)
     {
-        foreach (var obj in objs)
+        foreach (ISpatialObject obj in objs)
         {
             if (obj is SpatialObjectProxy proxy)
                 proxy.TargetLeaf = this;
@@ -164,13 +160,12 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
         }
     }
 
-    // explicit internal forwarding
     void IInternalChildNode.MigrateInternal(IList<ISpatialObject> objs) => Migrate(objs);
 
     public override AdmitResult Admit(ISpatialObject obj, LongVector3 proposedPosition)
     {
         if (!Bounds.Contains(proposedPosition)) return AdmitResult.EscalateRequest();
-        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "Venue.Admit: Leaf");
+        using SlimSyncer s = new(Sync, SlimSyncer.LockMode.Write, "Venue.Admit: Leaf");
         if (IsRetired) return AdmitResult.RetryRequest();
         if (IsAtCapacity(1))
         {
@@ -178,13 +173,13 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
                 ? AdmitResult.SubdivideRequest(this)
                 : AdmitResult.DelegateRequest(this);
         }
-        var proxy = CreateProxy((SpatialObject)obj, proposedPosition);
+        ISpatialObjectProxy proxy = CreateProxy((SpatialObject)obj, proposedPosition);
         Occupy(proxy);
         return AdmitResult.Create(proxy);
     }
     public override AdmitResult Admit(Span<ISpatialObject> buffer)
     {
-        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "Venue.AdmitList: Leaf");
+        using SlimSyncer s = new(Sync, SlimSyncer.LockMode.Write, "Venue.AdmitList: Leaf");
         if (IsRetired)
             return AdmitResult.RetryRequest();
         if (IsAtCapacity(buffer.Length))
@@ -193,10 +188,10 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
                 ? AdmitResult.SubdivideRequest(this)
                 : AdmitResult.DelegateRequest(this);
         }
-        var outProxies = new List<ISpatialObjectProxy>();
-        foreach (var obj in buffer)
+        List<ISpatialObjectProxy> outProxies = new();
+        foreach (ISpatialObject obj in buffer)
         {
-            var proxy = CreateProxy((SpatialObject)obj, obj.LocalPosition);
+            ISpatialObjectProxy proxy = CreateProxy((SpatialObject)obj, obj.LocalPosition);
             Occupy(proxy);
             outProxies.Add(proxy);
         }
@@ -204,8 +199,8 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
     }
     public MultiObjectScope<ISpatialObject> LockAndSnapshotForMigration()
     {
-        var snapshot = new List<ISpatialObject>();
-        var locksAcquired = new List<SlimSyncer>();
+        List<ISpatialObject> snapshot = new();
+        List<SlimSyncer> locksAcquired = new();
         try
         {
             for (int i = 0; i < Occupants.Count; i++)
@@ -213,7 +208,7 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
                 SlimSyncer syncer = null!;
                 try
                 {
-                    var occupant = Occupants[i];
+                    ISpatialObject occupant = Occupants[i];
                     if (!occupant.Sync.IsWriteLockHeld)
                     {
                         syncer = new SlimSyncer(occupant.Sync, SlimSyncer.LockMode.Write, "Venue.LockAndSnap: Occupant");
@@ -231,42 +226,16 @@ public abstract class VenueLeafNode(Region bounds, OctetParentNode parent)
         }
         catch
         {
-            foreach (var l in locksAcquired)
+            foreach (SlimSyncer l in locksAcquired)
                 try { l.Dispose(); } catch { }
             throw;
         }
     }
     public IEnumerable<ISpatialObject> QueryNeighbors(LongVector3 center, ulong radius)
     {
-        var results = new List<ISpatialObject>();
-        QueryNeighborsRecursive(this, center, radius, results);
+        List<ISpatialObject> results = [];
+        SpatialQuery.CollectWithinSphere(this, center, radius, results, acquireLeafLock: false);
         return results;
-    }
-    private static void QueryNeighborsRecursive(ISpatialNode node, LongVector3 center, ulong radius, List<ISpatialObject> results)
-    {
-        if (!node.Bounds.IntersectsSphere_SimpleImpl(center, radius)) return;
-        switch (node)
-        {
-            case VenueLeafNode leaf:
-                foreach (var obj in leaf.Occupants)
-                {
-                    var distSq = (obj.LocalPosition - center).MagnitudeSquaredBig;
-                    if (distSq <= (BigInteger)radius * radius) results.Add(obj);
-                }
-                break;
-            case OctetParentNode parent:
-                foreach (var child in parent.Children)
-                    if (child.Bounds.IntersectsSphere_SimpleImpl(center, radius))
-                        QueryNeighborsRecursive(child, center, radius, results);
-                break;
-            case SubLatticeBranchNode sub:
-                var innerCenter = sub.Sublattice.BoundsTransform.OuterToInnerCanonical(center);
-                var scale = LatticeUniverse.RootRegion.Size.X / (double)sub.Sublattice.BoundsTransform.OuterLatticeBounds.Size.X;
-                var innerRadius = (ulong)(radius * scale);
-                var subResults = sub.Sublattice.QueryWithinDistance(innerCenter, innerRadius);
-                results.AddRange(subResults);
-                break;
-        }
     }
 }
 public class LargeLeafNode(Region bounds, OctetParentNode parent)
@@ -289,7 +258,6 @@ public abstract class SubLatticeBranchNode<TLattice>(Region bounds, OctetParentN
     public override void Migrate(IList<ISpatialObject> objs)
         => Sublattice.Migrate(objs);
 
-    // explicit internal forwarding
     void IInternalChildNode.MigrateInternal(IList<ISpatialObject> objs) => Migrate(objs);
 
     public override AdmitResult Admit(ISpatialObject obj, LongVector3 proposedPosition)
@@ -297,10 +265,10 @@ public abstract class SubLatticeBranchNode<TLattice>(Region bounds, OctetParentN
         if (!Bounds.Contains(proposedPosition)) return AdmitResult.EscalateRequest();
         if (!obj.HasPositionAtDepth(Sublattice.LatticeDepth))
         {
-            var sublatticeFramedPosition = Sublattice.BoundsTransform.OuterToInnerInsertion(proposedPosition, obj.Guid);
+            LongVector3 sublatticeFramedPosition = Sublattice.BoundsTransform.OuterToInnerInsertion(proposedPosition, obj.Guid);
             obj.AppendPosition(sublatticeFramedPosition);
         }
-        var subFramePosition = obj.GetPositionAtDepth(Sublattice.LatticeDepth);
+        LongVector3 subFramePosition = obj.GetPositionAtDepth(Sublattice.LatticeDepth);
         return Sublattice.Admit(obj, subFramePosition);
     }
     public VenueLeafNode? ResolveLeafFromOuterLattice(ISpatialObject obj)

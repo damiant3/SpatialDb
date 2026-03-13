@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
 ///////////////////////////////////
@@ -32,17 +32,14 @@ public static class SlimSyncerDiagnostics
         public int Count = 1;
     }
 
-    // For per-thread compression & last-seen tracking
-    private static readonly ConcurrentDictionary<int, ThreadLogState> _perThread = new();
-    // Optional historical log for later analysis / debugging
-    private static readonly ConcurrentDictionary<int, List<LockEvent>> _threadHistory = new();
+    private static readonly ConcurrentDictionary<int, ThreadLogState> s_perThread = new();
+    private static readonly ConcurrentDictionary<int, List<LockEvent>> s_threadHistory = new();
 
     private static void Log(EventKind kind, SlimSyncer.LockMode mode, string resource)
     {
         if (!Enabled) return;
         int tid = Environment.CurrentManagedThreadId;
-        // --- compress repeated events per-thread ---
-        var state = _perThread.GetOrAdd(tid, _ => new ThreadLogState());
+        ThreadLogState state = s_perThread.GetOrAdd(tid, _ => new ThreadLogState());
 
         if (state.Count == 0)
         {
@@ -65,10 +62,10 @@ public static class SlimSyncerDiagnostics
             state.Count = 1;
             PrintFirst(tid, state);
         }
-        var histList = _threadHistory.GetOrAdd(tid, _ => new List<LockEvent>());
+        List<LockEvent> histList = s_threadHistory.GetOrAdd(tid, _ => new List<LockEvent>());
         lock (histList)
         {
-            var last = histList.LastOrDefault();
+            LockEvent? last = histList.LastOrDefault();
             if (last != null &&
                 last.Kind == kind &&
                 last.Mode == mode &&
@@ -93,7 +90,7 @@ public static class SlimSyncerDiagnostics
     {
         if (state.Count != 1) return;
 
-        var prefix = state.Kind switch
+        string prefix = state.Kind switch
         {
             EventKind.Enter => "ENTER",
             EventKind.Exit => "EXIT ",
@@ -106,7 +103,7 @@ public static class SlimSyncerDiagnostics
     {
         if (state.Count < 2) return;
 
-        var prefix = state.Kind switch
+        string prefix = state.Kind switch
         {
             EventKind.Enter => "ENTER",
             EventKind.Exit => "EXIT ",
@@ -114,25 +111,25 @@ public static class SlimSyncerDiagnostics
             _ => "?????"
         };
 
-        var suffix = state.Count > 1 ? $" ({state.Count})" : "";
+        string suffix = state.Count > 1 ? $" ({state.Count})" : "";
         Debug.WriteLine($"{prefix} T{tid} {state.Mode} {state.Resource}{suffix}");
         state.Count = 0;
     }
     public static void FlushAll()
     {
-        foreach (var kv in _perThread)
+        foreach (KeyValuePair<int, ThreadLogState> kv in s_perThread)
             Flush(kv.Key, kv.Value);
     }
     public static string DumpHistory()
     {
-        var sb = new StringBuilder();
-        foreach (var kv in _threadHistory)
+        StringBuilder sb = new();
+        foreach (KeyValuePair<int, List<LockEvent>> kv in s_threadHistory)
         {
             int tid = kv.Key;
-            var list = kv.Value;
+            List<LockEvent> list = kv.Value;
             lock (list)
             {
-                foreach (var ev in list)
+                foreach (LockEvent ev in list)
                 {
                     sb.AppendLine(
                         $"T{tid} {ev.Kind} {ev.Mode} {ev.ResourceName} ({ev.Count}) @ {ev.TimestampTicks}"

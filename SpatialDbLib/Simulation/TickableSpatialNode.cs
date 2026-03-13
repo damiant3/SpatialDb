@@ -1,4 +1,4 @@
-﻿using SpatialDbLib.Lattice;
+using SpatialDbLib.Lattice;
 using SpatialDbLib.Math;
 using SpatialDbLib.Synchronize;
 //////////////////////////////////
@@ -24,8 +24,8 @@ public class TickableOctetParentNode(Region bounds)
         bool branchOrSublattice,
         List<ISpatialObject> occupantsSnapshot)
     {
-        var tickableParent = (TickableOctetParentNode)parent;
-        var tickableLeaf = (TickableVenueLeafNode)subdividingLeaf;
+        TickableOctetParentNode tickableParent = (TickableOctetParentNode)parent;
+        TickableVenueLeafNode tickableLeaf = (TickableVenueLeafNode)subdividingLeaf;
         return branchOrSublattice
             ? new TickableOctetBranchNode(tickableLeaf.Bounds, tickableParent, occupantsSnapshot)
             : new TickableSubLatticeBranchNode(tickableLeaf.Bounds, tickableParent, latticeDepth, occupantsSnapshot);
@@ -59,7 +59,6 @@ public class TickableOctetBranchNode
     TickableOctetParentNode IChildNode<TickableOctetParentNode>.Parent => Parent;
     OctetParentNode IChildNode<OctetParentNode>.Parent => Parent;
 
-    // forward internal contract
     void IInternalChildNode.MigrateInternal(IList<ISpatialObject> objs) => Migrate(objs);
 }
 public partial class TickableVenueLeafNode(Region bounds, TickableOctetParentNode parent)
@@ -80,7 +79,7 @@ public partial class TickableVenueLeafNode(Region bounds, TickableOctetParentNod
     public override void Migrate(IList<ISpatialObject> objs)
     {
         base.Migrate(objs);
-        foreach (var obj in objs)
+        foreach (ISpatialObject obj in objs)
         {
             if (obj is TickableSpatialObjectBase tickable)
             {
@@ -103,13 +102,13 @@ public partial class TickableVenueLeafNode(Region bounds, TickableOctetParentNod
     }
     public void RegisterForTicks(ITickableObject obj)
     {
-        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "TickableSpatialNode: RegisterForTicks");
+        using SlimSyncer s = new(Sync, SlimSyncer.LockMode.Write, "TickableSpatialNode: RegisterForTicks");
         if (!m_tickableObjects.Contains(obj))
             m_tickableObjects.Add(obj);
     }
     public void UnregisterForTicks(ITickableObject obj)
     {
-        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "TickableSpatialNode: UnregisterForTicks");
+        using SlimSyncer s = new(Sync, SlimSyncer.LockMode.Write, "TickableSpatialNode: UnregisterForTicks");
         m_tickableObjects.Remove(obj);
     }
     private void HandleTickResult(TickResult result)
@@ -129,9 +128,9 @@ public partial class TickableVenueLeafNode(Region bounds, TickableOctetParentNod
     }
     private void HandleBoundaryCrossing(SpatialObject obj, LongVector3 newPosition)
     {
-        var tickableObj = obj as TickableSpatialObjectBase;
+        TickableSpatialObjectBase? tickableObj = obj as TickableSpatialObjectBase;
         if (tickableObj != null) UnregisterForTicks(tickableObj);
-        var currentParent = Parent;
+        OctetParentNode currentParent = Parent;
         AdmitResult admitResult;
         while (true)
         {
@@ -157,15 +156,9 @@ public partial class TickableVenueLeafNode(Region bounds, TickableOctetParentNod
         {
             case AdmitResult.Created created:
             {
-                // Atomic move: try to acquire source and target leaf write locks in a deterministic order,
-                // verify neither leaf is retired *after* locking, then commit the proxy into the target leaf
-                // while both locks are held, then vacate the source. If target/source is retired during
-                // the attempt, release locks and retry a bounded number of times, then fall back to
-                // the regular commit/vacate path.
-                var sourceLeaf = this;
-                var rawTarget = created.Proxy.TargetLeaf;
+                TickableVenueLeafNode sourceLeaf = this;
+                VenueLeafNode rawTarget = created.Proxy.TargetLeaf;
 
-                // If the target is not a tickable leaf or the target equals source, fall back to simple commit/vacate
                 if (rawTarget is not TickableVenueLeafNode targetLeaf || ReferenceEquals(targetLeaf, sourceLeaf))
                 {
                     created.Proxy.Commit();
@@ -173,19 +166,10 @@ public partial class TickableVenueLeafNode(Region bounds, TickableOctetParentNod
                         Vacate(obj);
                     break;
                 }
-                static int CompareBoundsMin(LongVector3 a, LongVector3 b)
-                {
-                    var c = a.X.CompareTo(b.X);
-                    if (c != 0) return c;
-                    c = a.Y.CompareTo(b.Y);
-                    if (c != 0) return c;
-                    return a.Z.CompareTo(b.Z);
-                }
 
-                // Deterministic ordering to avoid new deadlocks
                 VenueLeafNode first = sourceLeaf;
                 VenueLeafNode second = targetLeaf;
-                if (CompareBoundsMin(sourceLeaf.Bounds.Min, targetLeaf.Bounds.Min) > 0)
+                if (LongVector3.CompareLexicographic(sourceLeaf.Bounds.Min, targetLeaf.Bounds.Min) > 0)
                 {
                     first = targetLeaf;
                     second = sourceLeaf;
@@ -193,17 +177,13 @@ public partial class TickableVenueLeafNode(Region bounds, TickableOctetParentNod
                 while (true)
                 {
 
-                    using var l1 = new SlimSyncer(((ISync)first).Sync, SlimSyncer.LockMode.Write, "HandleBoundaryCrossing: move-first");
-                    using var l2 = new SlimSyncer(((ISync)second).Sync, SlimSyncer.LockMode.Write, "HandleBoundaryCrossing: move-second");
-                    // Double-check retirement while holding both leaf locks.
+                    using SlimSyncer l1 = new(((ISync)first).Sync, SlimSyncer.LockMode.Write, "HandleBoundaryCrossing: move-first");
+                    using SlimSyncer l2 = new(((ISync)second).Sync, SlimSyncer.LockMode.Write, "HandleBoundaryCrossing: move-second");
                     if (sourceLeaf.IsRetired || targetLeaf.IsRetired)
                     {
-                        // Something changed while acquiring locks; retry after a tiny backoff.
-                        // Release locks by exiting using-scope and loop to retry.
                         Thread.Yield();
                         continue;
                     }
-                    // With both leaf locks held and neither retired, commit then vacate.
                     created.Proxy.Commit();
                     Vacate(obj);
                     break;
@@ -225,9 +205,8 @@ public partial class TickableVenueLeafNode(Region bounds, TickableOctetParentNod
 
     public override AdmitResult Admit(ISpatialObject obj, LongVector3 proposedPosition)
     {
-        // Use same containment logic but attach the object's current occupying leaf (if tickable)
         if (!Bounds.Contains(proposedPosition)) return AdmitResult.EscalateRequest();
-        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "Venue.Admit: Leaf");
+        using SlimSyncer s = new(Sync, SlimSyncer.LockMode.Write, "Venue.Admit: Leaf");
         if (IsRetired) return AdmitResult.RetryRequest();
         if (IsAtCapacity(1))
         {
@@ -236,13 +215,10 @@ public partial class TickableVenueLeafNode(Region bounds, TickableOctetParentNod
                 : AdmitResult.DelegateRequest(this);
         }
 
-        var proxy = CreateProxy((SpatialObject)obj, proposedPosition);
+        ISpatialObjectProxy proxy = CreateProxy((SpatialObject)obj, proposedPosition);
 
-        // If the original object is tickable, record its current occupying leaf as the source on the proxy.
         if (proxy is SpatialObjectProxy sp && obj is TickableSpatialObjectBase tickableOriginal)
-        {
             sp.SourceLeaf = tickableOriginal.GetOccupyingLeaf();
-        }
 
         Occupy(proxy);
         return AdmitResult.Create(proxy);

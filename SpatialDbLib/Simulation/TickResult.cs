@@ -1,5 +1,7 @@
-﻿using SpatialDbLib.Lattice;
+using SpatialDbLib.Lattice;
 using SpatialDbLib.Math;
+
+//////////////////////////////////
 
 namespace SpatialDbLib.Simulation;
 

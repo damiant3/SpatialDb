@@ -1,4 +1,4 @@
-﻿using SystemMath = System.Math;
+using SystemMath = System.Math;
 ////////////////////////////
 namespace SpatialDbLib.Math;
 
@@ -34,8 +34,7 @@ public readonly struct IntVector3(int x, int y, int z)
     public static IntVector3 operator -(IntVector3 a)
         => new(-a.X, -a.Y, -a.Z);
 
-    // Acceleration: scale by delta-time if you ever need fractional ticks
-    // Uses long to avoid overflow during intermediate calc
+    // long intermediate to avoid overflow when numerator * component exceeds Int32 range
     public IntVector3 ScaledBy(int numerator, int denominator)
         => new(
             (int)((long)X * numerator / denominator),

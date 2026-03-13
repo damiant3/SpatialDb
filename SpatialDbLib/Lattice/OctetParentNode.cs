@@ -1,6 +1,6 @@
-﻿using SpatialDbLib.Math;
-using SpatialDbLib.Synchronize;
 using System.Buffers;
+using SpatialDbLib.Math;
+using SpatialDbLib.Synchronize;
 ///////////////////////////////
 namespace SpatialDbLib.Lattice;
 
@@ -31,16 +31,16 @@ public abstract partial class OctetParentNode
 
     public void CreateChildLeafNodes()
     {
-        var min = Bounds.Min;
-        var max = Bounds.Max;
-        var mid = Bounds.Mid;
+        LongVector3 min = Bounds.Min;
+        LongVector3 max = Bounds.Max;
+        LongVector3 mid = Bounds.Mid;
         for (int i = 0; i < 8; i++)
         {
-            var childMin = new LongVector3(
+            LongVector3 childMin = new(
                 (i & 4) != 0 ? mid.X : min.X,
                 (i & 2) != 0 ? mid.Y : min.Y,
                 (i & 1) != 0 ? mid.Z : min.Z);
-            var childMax = new LongVector3(
+            LongVector3 childMax = new(
                 (i & 4) != 0 ? max.X : mid.X,
                 (i & 2) != 0 ? max.Y : mid.Y,
                 (i & 1) != 0 ? max.Z : mid.Z);
@@ -49,12 +49,11 @@ public abstract partial class OctetParentNode
     }
     public virtual VenueLeafNode CreateNewVenueNode(int i, LongVector3 childMin, LongVector3 childMax)
         => LeafPool<LargeLeafNode>.Rent(new(childMin, childMax), this, (bounds, parent) => new LargeLeafNode(bounds, parent));
-    // => new LargeLeafNode(new (childMin, childMax), this);
 
     public SelectChildResult? SelectChild(LongVector3 pos)
     {
         if (!Bounds.Contains(pos)) return null;
-        var mid = Bounds.Mid;
+        LongVector3 mid = Bounds.Mid;
         byte index = (byte)(
             ((pos.X >= mid.X) ? 4 : 0) |
             ((pos.Y >= mid.Y) ? 2 : 0) |
@@ -63,7 +62,7 @@ public abstract partial class OctetParentNode
     }
     public VenueLeafNode? ResolveOccupyingLeaf(ISpatialObject obj)
     {
-        var resolveleaf = ResolveLeaf(obj);
+        VenueLeafNode? resolveleaf = ResolveLeaf(obj);
         if (resolveleaf == null) return null;
         if (!resolveleaf.Contains(obj))
             return null;
@@ -81,14 +80,14 @@ public abstract partial class OctetParentNode
                     return sublatticebranch.GetSublattice().ResolveLeafFromOuterLattice(obj);
                 case OctetParentNode parent:
                 {
-                    var result = parent.SelectChild(pos)
+                    SelectChildResult? result = parent.SelectChild(pos)
                         ?? throw new InvalidOperationException("Failed to select child during occupation resolution");
-                    current = result.ChildNode;
+                    current = result.Value.ChildNode;
                     break;
                 }
                 case VenueLeafNode venue:
                 {
-                    using var s3 = new SlimSyncer(((ISync)venue).Sync, SlimSyncer.LockMode.Read, "SpatialLattice.ResolveLeaf: venue");
+                    using SlimSyncer s3 = new(((ISync)venue).Sync, SlimSyncer.LockMode.Read, "SpatialLattice.ResolveLeaf: venue");
                     return venue;
                 }
                 default:
@@ -121,7 +120,7 @@ public abstract partial class OctetParentNode
                 continue;
             }
             if (current is not LeafNode leaf) throw new InvalidOperationException("Current node is not a LeafNode during Admit");
-            var admitResult = current is VenueLeafNode venue && obj.PositionStackDepth > SpatialLattice.CurrentThreadLatticeDepth + 1 // deep insert
+            AdmitResult admitResult = current is VenueLeafNode venue && obj.PositionStackDepth > SpatialLattice.CurrentThreadLatticeDepth + 1
                 ? venue.CanSubdivide() ? AdmitResult.SubdivideRequest(venue) : AdmitResult.DelegateRequest(venue)
                 : leaf.Admit(obj, proposedPosition);
             switch (admitResult)
@@ -183,11 +182,11 @@ public abstract partial class OctetParentNode
         }
         void PartitionInPlace(Span<ISpatialObject> span, byte latticeDepth)
         {
-            var mid = Parent.Bounds.Mid;
-            using var s = RentArray<byte>(span.Length, out var octants);
+            LongVector3 mid = Parent.Bounds.Mid;
+            using ArrayRentalContract<byte> s = RentArray<byte>(span.Length, out byte[] octants);
             for (int i = 0; i < span.Length; i++)
             {
-                var pos = span[i].GetPositionAtDepth(latticeDepth);
+                LongVector3 pos = span[i].GetPositionAtDepth(latticeDepth);
                 octants[i] = (byte)(
                     ((pos.X >= mid.X) ? 4 : 0) |
                     ((pos.Y >= mid.Y) ? 2 : 0) |
@@ -235,38 +234,38 @@ public abstract partial class OctetParentNode
     }
     public override AdmitResult Admit(Span<ISpatialObject> buffer)
     {
-        var stack = new Stack<AdmitWorkFrame>();
+        Stack<AdmitWorkFrame> stack = new();
         stack.Push(new AdmitWorkFrame(this, buffer, new BufferSlice(0, buffer.Length), SpatialLattice.CurrentThreadLatticeDepth));
         AdmitResult.BulkCreated? topResult = null;
         try
         {
             while (stack.Count > 0)
             {
-                var frame = stack.Peek();
+                AdmitWorkFrame frame = stack.Peek();
                 if (frame.NextBucket == frame.BucketCount)
                 {
                     stack.Pop();
                     if (stack.Count > 0)
                     {
-                        var parentFrame = stack.Peek();
+                        AdmitWorkFrame parentFrame = stack.Peek();
                         parentFrame.Proxies.AddRange(frame.Proxies);
                         continue;
                     }
                     topResult = new AdmitResult.BulkCreated(frame.Proxies);
                     break;
                 }
-                var bucket = frame.Buckets[frame.NextBucket];
+                BufferSlice bucket = frame.Buckets[frame.NextBucket];
                 if (bucket.Length == 0) { frame.NextBucket++; continue; }
-                var child = frame.Parent.Children[frame.BucketChildIndex[frame.NextBucket]];
+                IInternalChildNode child = frame.Parent.Children[frame.BucketChildIndex[frame.NextBucket]];
                 if (child is OctetParentNode parent)
                 {
                     stack.Push(new AdmitWorkFrame(parent, buffer, bucket, SpatialLattice.CurrentThreadLatticeDepth));
                     frame.NextBucket++;
                     continue;
                 }
-                var slice = bucket.GetSpan(buffer);
-                var leaf = (LeafNode)child ?? throw new InvalidOperationException("Child is not a LeafNode");
-                var result = leaf is VenueLeafNode venue && NeedsDeeper(slice) // deep insert
+                Span<ISpatialObject> slice = bucket.GetSpan(buffer);
+                LeafNode leaf = (LeafNode)child ?? throw new InvalidOperationException("Child is not a LeafNode");
+                AdmitResult result = leaf is VenueLeafNode venue && NeedsDeeper(slice)
                     ? venue.CanSubdivide() ? AdmitResult.SubdivideRequest(venue) : AdmitResult.DelegateRequest(venue)
                     : leaf.Admit(slice);
                 switch (result)
@@ -280,7 +279,7 @@ public abstract partial class OctetParentNode
                     case AdmitResult.Subdivide:
                     case AdmitResult.Delegate:
                     {
-                        var venue2 = leaf as VenueLeafNode ?? throw new InvalidOperationException("Subdivision requested by non-venueleaf");
+                        VenueLeafNode venue2 = leaf as VenueLeafNode ?? throw new InvalidOperationException("Subdivision requested by non-venueleaf");
                         if (!venue2.IsRetired)
                             Subdivide(
                                 frame.Parent,
@@ -298,15 +297,15 @@ public abstract partial class OctetParentNode
         }
         catch
         {
-            foreach (var frame in stack)
-                foreach (var proxy in frame.Proxies)
+            foreach (AdmitWorkFrame frame in stack)
+                foreach (ISpatialObjectProxy proxy in frame.Proxies)
                     proxy.Rollback();
             throw;
         }
 
         bool NeedsDeeper(Span<ISpatialObject> slice)
         {
-            foreach (var obj in slice)
+            foreach (ISpatialObject obj in slice)
                 if (obj.PositionStackDepth > SpatialLattice.CurrentThreadLatticeDepth + 1)
                     return true;
             return false;
@@ -317,22 +316,22 @@ public abstract partial class OctetParentNode
         if (Children.All(IsChildEmpty))
             if (this is IChildNode<OctetParentNode> child)
             {
-                var parent = child.Parent;
+                OctetParentNode parent = child.Parent;
                 int index = Array.IndexOf(parent.Children, this);
                 if (index >= 0)
                 {
-                    using var s = new SlimSyncer(parent.Sync, SlimSyncer.LockMode.Write, "PruneIfEmpty: Parent");
+                    using SlimSyncer s = new(parent.Sync, SlimSyncer.LockMode.Write, "PruneIfEmpty: Parent");
                     parent.Children[index] = parent.CreateNewVenueNode((byte)index, Bounds.Min, Bounds.Max);
                     parent.PruneIfEmpty();
                 }
             }
     }
-    public void PruneChild(int index)  /// who calls this?
+    public void PruneChild(int index)
     {
-        var child = Children[index];
+        IInternalChildNode child = Children[index];
         if (IsChildEmpty(child))
         {
-            using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "OctetParentNode.PruneChild");
+            using SlimSyncer s = new(Sync, SlimSyncer.LockMode.Write, "OctetParentNode.PruneChild");
             Children[index] = CreateNewVenueNode(index, child.Bounds.Min, child.Bounds.Max);
         }
     }

@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
 ///////////////////////////////////
@@ -17,8 +17,8 @@ public static class LockTracker
 
     public static void TrackLockEnter(ReaderWriterLockSlim sync, string resourceName)
     {
-        var threadId = Environment.CurrentManagedThreadId;
-        var acquired = false;
+        int threadId = Environment.CurrentManagedThreadId;
+        bool acquired = false;
         while (!acquired)
         {
             acquired = Monitor.TryEnter(sync, TimeSpan.FromSeconds(5));
@@ -39,9 +39,9 @@ public static class LockTracker
     {
         if (HeldLocks.IsEmpty)
             return "";
-        var sb = new StringBuilder();
+        StringBuilder sb = new();
         sb.AppendLine("=== Currently held locks ===");
-        foreach (var kv in HeldLocks)
+        foreach (KeyValuePair<ReaderWriterLockSlim, LockInfo> kv in HeldLocks)
             sb.AppendLine($"Thread {kv.Value.ThreadId} holds {kv.Value.ResourceName} since {kv.Value.AcquiredAt:HH:mm:ss.fff}");
         sb.AppendLine("===========================");
         return sb.ToString();

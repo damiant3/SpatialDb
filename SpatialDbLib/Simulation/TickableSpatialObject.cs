@@ -1,4 +1,4 @@
-﻿using SpatialDbLib.Lattice;
+using SpatialDbLib.Lattice;
 using SpatialDbLib.Math;
 using SpatialDbLib.Synchronize;
 //////////////////////////////////
@@ -38,13 +38,13 @@ public abstract class TickableSpatialObjectBase(IList<LongVector3> position)
     {
         get
         {
-            using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Read, "TickableSpatialObjectBase.LocalVelocity");
+            using SlimSyncer s = new(Sync, SlimSyncer.LockMode.Read, "TickableSpatialObjectBase.LocalVelocity");
             return m_velocityStack[^1];
         }
         set
         {
-            using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "TickableSpatialObjectBase.LocalVelocity");
-            var enforced = SimulationPolicy.EnforceMovementThreshold(value);
+            using SlimSyncer s = new(Sync, SlimSyncer.LockMode.Write, "TickableSpatialObjectBase.LocalVelocity");
+            IntVector3 enforced = SimulationPolicy.EnforceMovementThreshold(value);
             m_velocityStack[^1] = enforced;
         }
     }
@@ -55,12 +55,12 @@ public abstract class TickableSpatialObjectBase(IList<LongVector3> position)
     }
     public IList<IntVector3> GetVelocityStack()
     {
-        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Read, "TickableSpatialObjectBase.LocalVelocity");
+        using SlimSyncer s = new(Sync, SlimSyncer.LockMode.Read, "TickableSpatialObjectBase.LocalVelocity");
         return [.. m_velocityStack];
     }
     public void SetVelocityStack(IList<IntVector3> newStack)
     {
-        using var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Write, "TickableSpatialObjectBase.LocalVelocity");
+        using SlimSyncer s = new(Sync, SlimSyncer.LockMode.Write, "TickableSpatialObjectBase.LocalVelocity");
         m_velocityStack = newStack;
     }
     public void Accelerate(IntVector3 acceleration)
@@ -84,21 +84,19 @@ public abstract class TickableSpatialObjectBase(IList<LongVector3> position)
     public static int MillisecondTicks32 => unchecked((int)((DateTime.Now.Ticks * 429497L) >> 32));
     public virtual TickResult? Tick()
     {
-        // Avoid int overflow by performing scaling in 64-bit and producing a LongVector3 target.
         if (LocalVelocity.IsZero) return null;
-        var currentMs = MillisecondTicks32;
-        var deltaMs = currentMs - m_lastMsTick;
-        // Guard against zero or negative deltas (including wrap) — treat as no-op
+        int currentMs = MillisecondTicks32;
+        int deltaMs = currentMs - m_lastMsTick;
         if (deltaMs <= 0) return null;
         m_lastMsTick = currentMs;
 
-        // Scale using 64-bit arithmetic to avoid overflow when velocity * deltaMs exceeds Int32 range
+        // 64-bit arithmetic to avoid overflow when velocity * deltaMs exceeds Int32 range
         long dx = LocalVelocity.X * (long)deltaMs;
         long dy = LocalVelocity.Y * (long)deltaMs;
         long dz = LocalVelocity.Z * (long)deltaMs;
 
-        var pos = LocalPosition;
-        var target = new LongVector3(pos.X + dx, pos.Y + dy, pos.Z + dz);
+        LongVector3 pos = LocalPosition;
+        LongVector3 target = new(pos.X + dx, pos.Y + dy, pos.Z + dz);
         return TickResult.Move(this, target);
     }
 }

@@ -1,4 +1,4 @@
-﻿using System.Numerics;
+using System.Numerics;
 ////////////////////////////
 namespace SpatialDbLib.Math;
 
@@ -77,6 +77,15 @@ public readonly struct LongVector3(long x, long y, long z)
     }
 
     public static readonly LongVector3 Zero = new(0);
+
+    public static int CompareLexicographic(LongVector3 a, LongVector3 b)
+    {
+        int c = a.X.CompareTo(b.X);
+        if (c != 0) return c;
+        c = a.Y.CompareTo(b.Y);
+        if (c != 0) return c;
+        return a.Z.CompareTo(b.Z);
+    }
 }
 
 public readonly struct ULongVector3(ulong x, ulong y, ulong z)
@@ -117,15 +126,7 @@ public readonly struct ULongVector3(ulong x, ulong y, ulong z)
 public class LongVector3Comparer : IComparer<LongVector3>
 {
     public int Compare(LongVector3 a, LongVector3 b)
-    {
-        int cmp = a.X.CompareTo(b.X);
-        if (cmp != 0) return cmp;
-
-        cmp = a.Y.CompareTo(b.Y);
-        if (cmp != 0) return cmp;
-
-        return a.Z.CompareTo(b.Z);
-    }
+        => LongVector3.CompareLexicographic(a, b);
 }
 
 sealed class OctantComparer(LongVector3 midPoint)

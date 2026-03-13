@@ -1,6 +1,6 @@
-﻿using SpatialDbLib.Math;
 using System.Buffers;
 using System.Collections.Concurrent;
+using SpatialDbLib.Math;
 ///////////////////////////////
 namespace SpatialDbLib.Lattice;
 public abstract class AdmitResult
@@ -63,7 +63,7 @@ internal static class LeafPool<T> where T : VenueLeafNode
     private static readonly ConcurrentBag<T> s_pool = [];
     public static T Rent(Region bounds, OctetParentNode parent, Func<Region, OctetParentNode, T> factory)
     {
-        if (s_pool.TryTake(out var leaf))
+        if (s_pool.TryTake(out T? leaf))
         {
             leaf.Reinitialize(bounds, parent);
             return leaf;

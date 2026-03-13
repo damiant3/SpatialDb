@@ -1,22 +1,21 @@
-﻿#if !DIAGNOSTIC
+#if !DIAGNOSTIC
 using SpatialDbLib.Synchronize;
 //////////////////////////////////
 namespace SpatialDbLib.Simulation;
 
 public partial class TickableVenueLeafNode
 {
-    // Production build: Tick implementation without diagnostic hooks.
     public partial void Tick()
     {
         List<ITickableObject> tickables;
-        using (var s = new SlimSyncer(Sync, SlimSyncer.LockMode.Read, "TickableVenueLeaf: Tick"))
+        using (SlimSyncer s = new(Sync, SlimSyncer.LockMode.Read, "TickableVenueLeaf: Tick"))
         {
             tickables = [.. m_tickableObjects];
         }
 
-        foreach (var obj in tickables)
+        foreach (ITickableObject obj in tickables)
         {
-            var result = obj.Tick();
+            TickResult? result = obj.Tick();
             if (result.HasValue)
                 HandleTickResult(result.Value);
         }
