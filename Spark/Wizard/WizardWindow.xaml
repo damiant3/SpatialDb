@@ -1,0 +1,231 @@
+<Window x:Class="Spark.Wizard.WizardWindow"
+        x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="✨ New Spark Project" Width="800" Height="620"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- ── Header ── -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+            <TextBlock Text="{Binding StepTitle}" FontSize="18" FontWeight="Bold"
+                       Foreground="{StaticResource AccentBrush}" />
+            <TextBlock Text="{Binding StepSubtitle}" FontSize="10"
+                       Foreground="{StaticResource DimFg}" Margin="0,4,0,0" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <!-- ── Step Pages (visibility-switched) ── -->
+        <Grid Grid.Row="1">
+
+            <!-- ═══ Step 0: Project Setup ═══ -->
+            <StackPanel x:Name="Step0" Visibility="Visible">
+                <TextBlock Text="Project Name" Style="{StaticResource SectionHeader}" Margin="0,0,0,4" />
+                <TextBox Text="{Binding ProjectName, UpdateSourceTrigger=PropertyChanged}" FontSize="14" />
+
+                <TextBlock Text="Project Folder" Style="{StaticResource SectionHeader}" Margin="0,12,0,4" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox Text="{Binding ProjectFolder, UpdateSourceTrigger=PropertyChanged}" FontSize="10" />
+                    <Button Grid.Column="1" Content="📂 Browse" Command="{Binding BrowseFolderCommand}"
+                            Margin="6,0,0,0" />
+                </Grid>
+
+                <TextBlock Margin="0,8,0,0" FontSize="9" Foreground="{StaticResource DimFg}" TextWrapping="Wrap">
+                    A subfolder will be created with your project name. All configuration files,
+                    prompts, and generated images will be stored there.
+                </TextBlock>
+
+                <!-- Ollama status -->
+                <Border Style="{StaticResource StatusBorder}" Margin="0,20,0,0">
+                    <StackPanel>
+                        <TextBlock Text="{Binding OllamaStatus}" FontSize="9"
+                                   Foreground="{StaticResource AccentBrush}" />
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0"
+                                    Visibility="{Binding OllamaAvailable, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="Model:" Margin="0,0,6,0" />
+                            <ComboBox ItemsSource="{Binding AvailableModels}"
+                                      SelectedItem="{Binding SelectedModel}"
+                                      MinWidth="200" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ═══ Step 1: Story & Setting ═══ -->
+            <StackPanel x:Name="Step1" Visibility="Collapsed">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Story / Setting Synopsis" Style="{StaticResource SectionHeader}" />
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <Button Content="🤖 Generate with Ollama" Command="{Binding GenerateStoryCommand}"
+                                Padding="8,3" FontSize="9"
+                                Visibility="{Binding OllamaAvailable, Converter={StaticResource BoolToVis}}" />
+                        <Button Content="⏹ Stop" Command="{Binding CancelGenerationCommand}"
+                                Padding="8,3" FontSize="9" Margin="4,0,0,0"
+                                Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
+                    </StackPanel>
+                </Grid>
+
+                <TextBox Text="{Binding StorySynopsis, UpdateSourceTrigger=PropertyChanged}"
+                         TextWrapping="Wrap" AcceptsReturn="True" Height="220"
+                         VerticalScrollBarVisibility="Auto" Margin="0,6,0,0"
+                         FontFamily="Consolas" FontSize="11" />
+
+                <TextBlock Text="Paste your game synopsis above, or type a brief description and let Ollama expand it. You can also leave this blank and fill in prompts manually."
+                           Style="{StaticResource HintText}" Margin="0,4,0,0" TextWrapping="Wrap" />
+
+                <TextBlock Text="Key Terms / Proper Nouns" Style="{StaticResource SectionHeader}" Margin="0,12,0,4" />
+                <TextBox Text="{Binding GlossaryTerms, UpdateSourceTrigger=PropertyChanged}"
+                         FontSize="10" TextWrapping="Wrap" />
+                <TextBlock Text="Comma-separated names of characters, places, factions. Auto-extracted from the synopsis."
+                           Style="{StaticResource HintText}" Margin="0,2,0,0" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <!-- ═══ Step 2: Art Style ═══ -->
+            <StackPanel x:Name="Step2" Visibility="Collapsed">
+                <TextBlock Text="Style Template" Style="{StaticResource SectionHeader}" Margin="0,0,0,6" />
+                <ListBox ItemsSource="{Binding StyleTemplates}"
+                         SelectedItem="{Binding SelectedStyleTemplate}"
+                         MaxHeight="200" />
+
+                <TextBlock Text="Additional Style Notes" Style="{StaticResource SectionHeader}" Margin="0,14,0,4" />
+                <TextBox Text="{Binding CustomStyleNotes, UpdateSourceTrigger=PropertyChanged}"
+                         TextWrapping="Wrap" AcceptsReturn="True" Height="80"
+                         VerticalScrollBarVisibility="Auto"
+                         FontFamily="Consolas" FontSize="11" />
+                <TextBlock Text="Optional: describe specific visual references, color palettes, or artists to emulate."
+                           Style="{StaticResource HintText}" Margin="0,2,0,0" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <!-- ═══ Step 3: Art Prompts ═══ -->
+            <StackPanel x:Name="Step3" Visibility="Collapsed">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Art Prompts" Style="{StaticResource SectionHeader}" />
+                        <TextBlock Text="  •  " Foreground="{StaticResource DimFg}" />
+                        <TextBlock Text="{Binding PromptCount, StringFormat='{}{0} prompts'}" FontSize="9" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <TextBlock Text="Count:" Margin="0,0,4,0" />
+                        <Slider Minimum="3" Maximum="30" Value="{Binding PromptCount}"
+                                Width="80" IsSnapToTickEnabled="True" TickFrequency="1" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="8,0,0,0">
+                        <Button Content="🤖 Generate Prompts" Command="{Binding GeneratePromptsCommand}"
+                                Padding="8,3" FontSize="9" />
+                        <Button Content="⏹ Stop" Command="{Binding CancelGenerationCommand}"
+                                Padding="8,3" FontSize="9" Margin="4,0,0,0"
+                                Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
+                    </StackPanel>
+                </Grid>
+
+                <TextBox Text="{Binding GeneratedPrompts, UpdateSourceTrigger=PropertyChanged}"
+                         TextWrapping="Wrap" AcceptsReturn="True"
+                         VerticalScrollBarVisibility="Auto" Margin="0,6,0,0"
+                         FontFamily="Consolas" FontSize="10"
+                         MaxHeight="400" />
+
+                <TextBlock Style="{StaticResource HintText}" Margin="0,4,0,0" TextWrapping="Wrap">
+                    Generate prompts with Ollama, or paste/write your own. Uses the PROMPT NN — "Title" format.
+                    You can always edit these later from the main window.
+                </TextBlock>
+            </StackPanel>
+
+            <!-- ═══ Step 4: Generation Settings ═══ -->
+            <StackPanel x:Name="Step4" Visibility="Collapsed">
+                <TextBlock Text="Resolution" Style="{StaticResource SectionHeader}" Margin="0,0,0,6" />
+                <ComboBox ItemsSource="{Binding ResolutionPresets}"
+                          SelectedItem="{Binding SelectedResolution}" />
+
+                <Grid Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="Steps" Style="{StaticResource SectionHeader}" Margin="0,0,0,4" />
+                        <TextBox Text="{Binding Steps}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="CFG Scale" Style="{StaticResource SectionHeader}" Margin="0,0,0,4" />
+                        <TextBox Text="{Binding CfgScale}" />
+                    </StackPanel>
+                </Grid>
+
+                <TextBlock Text="Summary" Style="{StaticResource SectionHeader}" Margin="0,20,0,6" />
+                <Border Style="{StaticResource InsetBorder}" Padding="10">
+                    <StackPanel>
+                        <TextBlock FontSize="11">
+                            <Run Text="Project: " Foreground="{StaticResource DimFg}" />
+                            <Run Text="{Binding ProjectName, Mode=OneWay}" Foreground="{StaticResource BrightFg}" FontWeight="Bold" />
+                        </TextBlock>
+                        <TextBlock FontSize="10" Margin="0,3,0,0">
+                            <Run Text="Folder: " Foreground="{StaticResource DimFg}" />
+                            <Run Text="{Binding ProjectFolder, Mode=OneWay}" />
+                        </TextBlock>
+                        <TextBlock FontSize="10" Margin="0,3,0,0">
+                            <Run Text="Style: " Foreground="{StaticResource DimFg}" />
+                            <Run Text="{Binding SelectedStyleTemplate, Mode=OneWay}" Foreground="{StaticResource AccentBrush}" />
+                        </TextBlock>
+                        <TextBlock FontSize="10" Margin="0,3,0,0">
+                            <Run Text="Resolution: " Foreground="{StaticResource DimFg}" />
+                            <Run Text="{Binding Width, Mode=OneWay}" />
+                            <Run Text="×" />
+                            <Run Text="{Binding Height, Mode=OneWay}" />
+                            <Run Text="  •  " />
+                            <Run Text="{Binding Steps, Mode=OneWay}" />
+                            <Run Text=" steps  •  CFG " />
+                            <Run Text="{Binding CfgScale, Mode=OneWay}" />
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Style="{StaticResource HintText}" Margin="0,8,0,0" TextWrapping="Wrap">
+                    Click "✨ Create Project" to generate all configuration files and open the project.
+                    You can change any setting later from the main window.
+                </TextBlock>
+            </StackPanel>
+        </Grid>
+
+        <!-- ── Footer / Navigation ── -->
+        <Grid Grid.Row="2" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Text="{Binding ProgressText}" FontSize="9"
+                       Foreground="{StaticResource DimFg}" VerticalAlignment="Center" />
+
+            <TextBlock Grid.Column="1" Text="{Binding OllamaStatus}" FontSize="8"
+                       Foreground="{StaticResource DimFg}" VerticalAlignment="Center"
+                       HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+
+            <Button Grid.Column="2" Content="← Back" Command="{Binding BackCommand}"
+                    Padding="12,5" Margin="0,0,6,0" />
+            <Button Grid.Column="3" Content="{Binding NextLabel}" Command="{Binding NextCommand}"
+                    Style="{StaticResource AccentBtn}" Padding="16,5" />
+        </Grid>
+    </Grid>
+</Window>

@@ -43,6 +43,7 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public ICommand GenerateAllCommand { get; }
     public ICommand CancelCommand { get; }
     public ICommand RefreshCommand { get; }
+    public ICommand NewProjectCommand { get; }
     public ICommand SwitchProjectCommand { get; }
     public ICommand EditPromptsCommand { get; }
     public ICommand EditStoryCommand { get; }
@@ -84,6 +85,7 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         GenerateAllCommand = new RelayCommand(_ => GenerateAll(), _ => !m_status.IsGenerating);
         CancelCommand = new RelayCommand(_ => m_genService.Cancel(), _ => m_status.IsGenerating);
         RefreshCommand = new RelayCommand(_ => RebuildStacks());
+        NewProjectCommand = new RelayCommand(_ => NewProject());
         SwitchProjectCommand = new RelayCommand(_ => SwitchProject());
         EditPromptsCommand = new RelayCommand(_ => EditPrompts());
         EditStoryCommand = new RelayCommand(_ => EditDocuments());
@@ -567,6 +569,20 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     // ── Toolbar actions ─────────────────────────────────────────
 
+    void NewProject()
+    {
+        Wizard.WizardWindow wizard = new();
+        if (wizard.ShowDialog() == true && wizard.CreatedProjectPath is not null)
+        {
+            SparkProject? proj = SparkProject.Load(wizard.CreatedProjectPath);
+            if (proj is not null)
+            {
+                LoadProject(proj);
+                m_log.Log($"✨ Created new project: {m_project.Name}");
+            }
+        }
+    }
+
     void SwitchProject()
     {
         Microsoft.Win32.OpenFileDialog dlg = new()
@@ -589,10 +605,23 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
         if (newProj is null) { m_log.Log("Failed to load project."); return; }
 
-        m_project = newProj;
+        LoadProject(newProj);
+        m_log.Log($"Switched to project: {m_project.Name}");
+    }
+
+    void LoadProject(SparkProject proj)
+    {
+        m_project = proj;
         m_docs = new DocumentStore(m_project.ProjectDir);
         OnPropertyChanged(nameof(ProjectName));
-        m_log.Log($"Switched to project: {m_project.Name}");
+
+        // Apply project defaults to settings
+        m_settings.ApplyDefaults(m_project.DefaultSettings);
+
+        // Reload data-driven configs
+        StoryContext.Reload();
+        ArtDirections.Reload();
+        CreativeEngine.Reload();
 
         string[] docPatterns = m_project.StoryFiles.Length > 0
             ? m_project.StoryFiles : ["*.txt", "*.md"];
@@ -611,6 +640,7 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
         RebuildStacks();
         UpdatePreferencesSummary();
+        m_lora.LoadLoras();
     }
 
     void EditPrompts()

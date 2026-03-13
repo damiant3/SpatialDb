@@ -32,8 +32,8 @@ sealed class SparkProject
 
     // ── Runtime (not serialized) ────────────────────────────────
 
-    [JsonIgnore] public string ProjectDir { get; private set; } = "";
-    [JsonIgnore] public string ProjectFilePath { get; private set; } = "";
+    [JsonIgnore] public string ProjectDir { get; internal set; } = "";
+    [JsonIgnore] public string ProjectFilePath { get; internal set; } = "";
 
     // ── Resolved paths ──────────────────────────────────────────
 
