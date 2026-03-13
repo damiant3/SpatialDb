@@ -1,8 +1,8 @@
-﻿using SpatialDbLib.Lattice;
-using SpatialDbLib.Synchronize;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
+using Common.Core.Sync;
+using SpatialDbLib.Lattice;
 
 namespace SpatialDbLibTest.Helpers;
 

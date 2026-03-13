@@ -1,10 +1,10 @@
 #if DIAGNOSTIC
+using Common.Core.Sync;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SpatialDbLib.Diagnostic;
 using SpatialDbLib.Lattice;
 using SpatialDbLib.Math;
 using SpatialDbLib.Simulation;
-using SpatialDbLib.Synchronize;
 using SpatialDbLibTest.Helpers;
 
 namespace SpatialDbLibTest.Diagnostic
@@ -311,20 +311,20 @@ namespace SpatialDbLibTest.Diagnostic
 
                         if (!completed)
                         {
-                            TestContext.WriteLine($"[DETECTED] {variant} / perm(dSub={delaySubdivider},dMig={delayMigration}): {explanation} — tasks timed out.");
+                            TestContext.WriteLine($"[DETECTED] {variant} / perm(dSub={delaySubdivider},dMig={delayMigration}): {explanation} â€” tasks timed out.");
                         }
                         else if (all.IsFaulted)
                         {
                             var exMsg = all.Exception?.Flatten().InnerException?.Message ?? "aggregate exception";
-                            TestContext.WriteLine($"[DETECTED] {variant} / perm(dSub={delaySubdivider},dMig={delayMigration}): {explanation} — task faulted: {exMsg}");
+                            TestContext.WriteLine($"[DETECTED] {variant} / perm(dSub={delaySubdivider},dMig={delayMigration}): {explanation} â€” task faulted: {exMsg}");
                         }
                         else if (!string.IsNullOrEmpty(diag))
                         {
-                            TestContext.WriteLine($"[DETECTED] {variant} / perm(dSub={delaySubdivider},dMig={delayMigration}): {explanation} — diagnostic: {firstDiagLine}");
+                            TestContext.WriteLine($"[DETECTED] {variant} / perm(dSub={delaySubdivider},dMig={delayMigration}): {explanation} â€” diagnostic: {firstDiagLine}");
                         }
                         else if (held?.Contains("holds") ?? false)
                         {
-                            TestContext.WriteLine($"[DETECTED] {variant} / perm(dSub={delaySubdivider},dMig={delayMigration}): {explanation} — LockTracker shows held locks");
+                            TestContext.WriteLine($"[DETECTED] {variant} / perm(dSub={delaySubdivider},dMig={delayMigration}): {explanation} â€” LockTracker shows held locks");
                         }
                         else
                         {

@@ -1,5 +1,5 @@
-﻿///////////////////////////////////
-namespace SpatialDbLib.Synchronize;
+////////////////////////////
+namespace Common.Core.Sync;
 
 public class SlimSyncer : IDisposable
 {
@@ -51,7 +51,7 @@ public class SlimSyncer : IDisposable
             default:
                 throw new InvalidOperationException("Unknown SyncMode");
         }
-        if (SpatialLatticeOptions.TrackLocks)
+        if (SyncOptions.TrackLocks)
             LockTracker.TrackLockEnter(m_lock, m_resourceName);
     }
 
@@ -79,7 +79,7 @@ public class SlimSyncer : IDisposable
         if (m_isNoOp)
             return;
 
-        if (SpatialLatticeOptions.TrackLocks)
+        if (SyncOptions.TrackLocks)
             LockTracker.TrackLockExit(m_lock);
 
         if (m_writeUpgraded)

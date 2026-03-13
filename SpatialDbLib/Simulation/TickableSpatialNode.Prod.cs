@@ -1,5 +1,5 @@
 #if !DIAGNOSTIC
-using SpatialDbLib.Synchronize;
+using Common.Core.Sync;
 //////////////////////////////////
 namespace SpatialDbLib.Simulation;
 

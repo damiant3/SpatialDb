@@ -1,6 +1,6 @@
-using System.Buffers;
+using Common.Core.Rentals;
+using Common.Core.Sync;
 using SpatialDbLib.Math;
-using SpatialDbLib.Synchronize;
 ///////////////////////////////
 namespace SpatialDbLib.Lattice;
 
@@ -10,12 +10,6 @@ public abstract partial class OctetParentNode
 {
     partial void Subdivide_Impl(OctetParentNode parent, VenueLeafNode subdividingleaf, byte latticeDepth, int childIndex, bool branchOrSublattice);
     partial void Migrate_Impl(IList<ISpatialObject> objs);
-    protected static ArrayRentalContract<T> RentArray<T>(int length, out T[] array)
-    {
-        array = ArrayPool<T>.Shared.Rent(length);
-        for (int i = 0; i < length; i++) array[i] = default!;
-        return new ArrayRentalContract<T>(array);
-    }
     public void Subdivide(OctetParentNode parent, VenueLeafNode subdividingleaf, byte latticeDepth, int childIndex, bool branchOrSublattice)
     => Subdivide_Impl(parent, subdividingleaf, latticeDepth, childIndex, branchOrSublattice);
     public override void Migrate(IList<ISpatialObject> objs)
@@ -183,7 +177,7 @@ public abstract partial class OctetParentNode
         void PartitionInPlace(Span<ISpatialObject> span, byte latticeDepth)
         {
             LongVector3 mid = Parent.Bounds.Mid;
-            using ArrayRentalContract<byte> s = RentArray<byte>(span.Length, out byte[] octants);
+            using ArrayRentalContract<byte> s = ArrayRental.Rent<byte>(span.Length, out byte[] octants);
             for (int i = 0; i < span.Length; i++)
             {
                 LongVector3 pos = span[i].GetPositionAtDepth(latticeDepth);

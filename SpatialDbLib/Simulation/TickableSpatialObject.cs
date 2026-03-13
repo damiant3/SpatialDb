@@ -1,6 +1,6 @@
+using Common.Core.Sync;
 using SpatialDbLib.Lattice;
 using SpatialDbLib.Math;
-using SpatialDbLib.Synchronize;
 //////////////////////////////////
 namespace SpatialDbLib.Simulation;
 public interface ITickableObject

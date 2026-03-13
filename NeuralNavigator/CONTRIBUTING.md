@@ -31,6 +31,18 @@ Key rules and project-specific additions:
   `.Loading.cs`, `.Rendering.cs`, `.Selection.cs`, `.Trace.cs`, `.Weights.cs`
 - No file should exceed ~500 lines
 
+## Disposables
+- Always `using` declaration (`using Resource r = new(...);`), never raw `try/finally` in business code
+- `try/finally` belongs exclusively inside `Dispose()` implementations and finalizers
+- Stack `using` declarations for multiple disposables; no manual list-and-cleanup patterns outside composite disposables
+
+## Null contracts
+- Non-nullable = caller's contract. Don't null-check what the type system guarantees.
+- Never test-then-throw for contractually non-null values. Let `NullReferenceException` surface naturally.
+- Never `x ?? throw new ...` for non-nullable types. That's intercepting to re-label.
+- Pattern matching for control flow (`is SomeType typed`), not null guards.
+- `T?` means "may be absent" — handle it. `T` means "trust it."
+
 ## Usings
 - Omit what `ImplicitUsings` provides
 - Sort: System.*, Microsoft.*, External.*, NeuralNavigator.*

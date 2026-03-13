@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
-///////////////////////////////////
-namespace SpatialDbLib.Synchronize;
+////////////////////////////
+namespace Common.Core.Sync;
 
 public static class LockTracker
 {
@@ -13,7 +13,7 @@ public static class LockTracker
         public string ResourceName = "";
     }
 
-    private static readonly ConcurrentDictionary<ReaderWriterLockSlim, LockInfo> HeldLocks = new();
+    private static readonly ConcurrentDictionary<ReaderWriterLockSlim, LockInfo> s_heldLocks = new();
 
     public static void TrackLockEnter(ReaderWriterLockSlim sync, string resourceName)
     {
@@ -26,22 +26,22 @@ public static class LockTracker
                 Debug.WriteLine($"Thread {threadId} waiting >5s on {resourceName}...");
         }
 
-        HeldLocks[sync] = new LockInfo { ThreadId = threadId, AcquiredAt = DateTime.UtcNow, ResourceName = resourceName };
+        s_heldLocks[sync] = new LockInfo { ThreadId = threadId, AcquiredAt = DateTime.UtcNow, ResourceName = resourceName };
     }
 
     public static void TrackLockExit(ReaderWriterLockSlim sync)
     {
-        HeldLocks.TryRemove(sync, out _);
+        s_heldLocks.TryRemove(sync, out _);
         Monitor.Exit(sync);
     }
 
     public static string DumpHeldLocks()
     {
-        if (HeldLocks.IsEmpty)
+        if (s_heldLocks.IsEmpty)
             return "";
         StringBuilder sb = new();
         sb.AppendLine("=== Currently held locks ===");
-        foreach (KeyValuePair<ReaderWriterLockSlim, LockInfo> kv in HeldLocks)
+        foreach (KeyValuePair<ReaderWriterLockSlim, LockInfo> kv in s_heldLocks)
             sb.AppendLine($"Thread {kv.Value.ThreadId} holds {kv.Value.ResourceName} since {kv.Value.AcquiredAt:HH:mm:ss.fff}");
         sb.AppendLine("===========================");
         return sb.ToString();

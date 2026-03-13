@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Collections.Concurrent;
 using SpatialDbLib.Math;
 ///////////////////////////////
@@ -32,20 +31,6 @@ public abstract class AdmitResult
     public static AdmitResult RetryRequest() => new Retry();
     public static AdmitResult SubdivideRequest(LeafNode leaf) => new Subdivide(leaf);
     public static AdmitResult DelegateRequest(LeafNode leaf) => new Delegate(leaf);
-}
-public class ArrayRentalContract<T>(T[] array)
-    : IDisposable
-{
-    private bool m_disposed = false;
-    private readonly T[] m_array = array;
-    public void Dispose()
-    {
-        if (m_disposed) return;
-        m_disposed = true;
-        if (m_array != null)
-            ArrayPool<T>.Shared.Return(m_array, clearArray: false);
-        GC.SuppressFinalize(this);
-    }
 }
 internal sealed class BufferSlice(int start, int length)
 {

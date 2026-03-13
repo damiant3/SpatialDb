@@ -1,7 +1,7 @@
 #if DIAGNOSTIC
-using SpatialDbLib.Lattice;
-using SpatialDbLib.Synchronize;
+using Common.Core.Sync;
 using SpatialDbLib.Diagnostic;
+using SpatialDbLib.Lattice;
 //////////////////////////////////
 namespace SpatialDbLib.Simulation;
 

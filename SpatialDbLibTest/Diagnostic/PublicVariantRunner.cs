@@ -1,9 +1,9 @@
-﻿#if DIAGNOSTIC
+#if DIAGNOSTIC
+using Common.Core.Sync;
 using SpatialDbLib.Diagnostic;
 using SpatialDbLib.Lattice;
-using SpatialDbLib.Synchronize;
-using SpatialDbLib.Simulation;
 using SpatialDbLib.Math;
+using SpatialDbLib.Simulation;
 //////////////////////////////////////
 namespace SpatialDbLibTest.Diagnostic;
 public static class PublicVariantRunner

@@ -45,10 +45,6 @@ Any conflict between this document and automated style tools (such as .editorcon
 - Never swallow exceptions silently. Empty `catch { }` blocks are forbidden. Do not catch exceptions only to ignore them. If a catch is required, handle it explicitly by logging and returning a concrete error value or object. Avoid unnecessary try/catch wrappers that only hide errors; prefer Try-patterns (e.g., `int.TryParse`) and explicit error returns for expected failures.
 - Avoid adding try/catch wrappers around code solely to suppress or translate exceptions. Do not add a try/catch block unless you will handle the exception (log, map to an error result, retry/backoff, or rethrow).
 - Never add comments that describe the steps of an algorithm or function. Use expressive type, value, and method names so the code reads like English. Only comment non-obvious behavior (bit-shift magic, interop contracts, unexpected dependency expectations).
-- Prefer pattern matching instead of unnecessary null checks. Avoid fallbacks like `string x = maybeNull ?? ""` followed by `if (!string.IsNullOrWhiteSpace(x))` — prefer matching the original value where applicable.
-- Prefer returning null/false or a concrete error result object for expected failure conditions. Reserve throwing exceptions for truly exceptional conditions (OOM, corrupted memory, catastrophic failures).
-- Do not add defensive fallback and excessive null-checking when the project is built with nullable enabled. If a parameter or field may be null, declare it as nullable in the API (e.g., `string?`) and handle it there. Otherwise assume non-null and allow natural exceptions at the point of use.
-- Do not re-throw different exceptions to intercept eventual null reference errors. Let the natural exception occur at the appropriate domain level.
 - Field naming convention: prefix instance fields with m_ (e.g., m_names), static fields with s_ (e.g., s_singleton), thread-static with t_ (e.g., t_context). Do not use a bare _ prefix. const fields are exempt from the s_ prefix and should use PascalCase (e.g., DefaultFracBits), matching standard C# convention for compile-time constants.
 - Do not add `using` declarations that are provided by the project's implicit/global usings. Rely on the project's `ImplicitUsings` setting. When in doubt, perform a test build first without the using import.
 - Sort `using` statements into groups in this order: `System.*`, `Microsoft.*`, `OtherExternalPackageName.*`, `LocalVisualStudioCopilot.*` (or the app's root namespace). Within each group sort alphabetically.
@@ -56,6 +52,18 @@ Any conflict between this document and automated style tools (such as .editorcon
 - A single comment line consisting of a repeated comment character / between the usings/imports section and the file-scoped namespace declaration for readability. This separator should be the same number of characters as the namespace declaration on the following line.
 - Never use block comments `/* */` or `#regions`.
 - Use expressive names, never abbreviations or initialisms unless they are widely recognized (e.g., `Id`). Avoid generic names like `data`, `info`, `temp` in domain models.
+
+### Disposable discipline
+- Always acquire disposable resources with a `using` declaration (`using SlimSyncer s = new(...);`). Never use raw `try/finally` to manage disposable lifetimes in business logic. The `try/finally` pattern belongs exclusively inside `Dispose()` implementations and finalizers — nowhere else.
+- If a method needs to acquire multiple disposables, stack `using` declarations. Do not accumulate disposables in a list with manual `try/finally` cleanup unless you are implementing a composite disposable (e.g., `MultiSyncerScope`).
+- Disposable fields that outlive a single method should implement `IDisposable` on the owning type. Do not rely on callers to remember cleanup — the type owns the lifetime.
+
+### Null contract discipline
+- Nullable analysis is enabled project-wide. A non-nullable parameter or field is a contract: the caller guarantees it is not null. The callee must not second-guess that contract with defensive null checks.
+- Never test for null then throw. If a value is contractually non-null, use it directly. A `NullReferenceException` at the point of use is the correct signal that a caller violated the contract. Wrapping it in `ArgumentNullException` or `InvalidOperationException` adds noise without information.
+- Never intercept a null to throw a different exception. Do not write `x ?? throw new InvalidOperationException(...)` or `if (x == null) throw ...` for values the type system already declares non-null. Let the natural exception surface at the domain-appropriate call site.
+- Use pattern matching for control flow, not null guards. Prefer `if (result is SomeType typed)` over `if (result != null && result is SomeType)`. Prefer `switch` expressions with type patterns over chains of `is`/`as` checks followed by null tests.
+- Nullable return types and parameters (`T?`, `string?`) are the explicit opt-in for "this may be absent." When you see `T?`, handle the null case. When you see `T`, trust it and move on.
 
 ### NO GOTCHAS
 - Pay attention to runtimes. O(n^2) algorithms must include Slow in the method name and be highlighted if unavoidable. For example "SortSlow()" if you must implement nested iterative loops like selection or insertion sorts. Expect O(n log n) for sorting, O(log n) for searching. Be judicious using hash tables. Use ConcurrentDictionary for shared/cached/long-lived dictionaries rather than plain Dictionary, even when current callers are single-threaded. Method-local lookup tables and hot-path numerics are exempt — use the simplest collection that fits.

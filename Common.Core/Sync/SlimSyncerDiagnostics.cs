@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
-///////////////////////////////////
-namespace SpatialDbLib.Synchronize;
+////////////////////////////
+namespace Common.Core.Sync;
 
 public static class SlimSyncerDiagnostics
 {
@@ -65,7 +65,7 @@ public static class SlimSyncerDiagnostics
         List<LockEvent> histList = s_threadHistory.GetOrAdd(tid, _ => new List<LockEvent>());
         lock (histList)
         {
-            LockEvent? last = histList.LastOrDefault();
+            LockEvent? last = histList.Count > 0 ? histList[histList.Count - 1] : null;
             if (last != null &&
                 last.Kind == kind &&
                 last.Mode == mode &&

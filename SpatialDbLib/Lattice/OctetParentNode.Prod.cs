@@ -1,6 +1,6 @@
 #if !DIAGNOSTIC
-using SpatialDbLib.Synchronize;
-using System.Runtime.CompilerServices;
+using Common.Core.Rentals;
+using Common.Core.Sync;
 ///////////////////////////////
 namespace SpatialDbLib.Lattice;
 public abstract partial class OctetParentNode
@@ -19,7 +19,7 @@ public abstract partial class OctetParentNode
     }
     partial void Migrate_Impl(IList<ISpatialObject> objs)
     {
-        using ArrayRentalContract<List<ISpatialObject>> s = RentArray<List<ISpatialObject>>(8, out List<ISpatialObject>[] buckets);
+        using ArrayRentalContract<List<ISpatialObject>> s = ArrayRental.Rent<List<ISpatialObject>>(8, out List<ISpatialObject>[] buckets);
         for (int i = 0; i < objs.Count; i++)
         {
             ISpatialObject obj = objs[i];
