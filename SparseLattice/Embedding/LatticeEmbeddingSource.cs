@@ -3,47 +3,18 @@ using SparseLattice.Math;
 ///////////////////////////////////////////////
 namespace SparseLattice.Embedding;
 
-/// <summary>
-/// Embedding source that uses the GGUF token embedding table indexed in the lattice
-/// to produce <see cref="SparseVector"/> embeddings without running the transformer
-/// forward pass.
-///
-/// On construction the token embedding table (<c>token_embd.weight</c>) is loaded from
-/// the GGUF file, each row is quantized to a <see cref="SparseVector"/>, and the full
-/// vocabulary is stored in a direct-lookup array. At embed time, the WordPiece tokenizer
-/// splits text into token IDs, the corresponding pre-quantized vectors are looked up
-/// (O(1) per token), mean-pooled in the integer domain, and L2-normalized.
-///
-/// Cost per embed: tokenization + O(T × nnz) integer arithmetic for pooling.
-/// No matrix multiplications, no attention, no floats at inference time.
-/// </summary>
 public sealed class LatticeEmbeddingSource : IEmbeddingSource, IDisposable
 {
-    private readonly WordPieceTokenizer m_tokenizer;
-    private readonly SparseVector[] m_tokenVectors;
-    private readonly int m_embeddingDimensions;
-    private readonly long m_scale;
-    private readonly int m_outputSparsityBudget;   // max nnz per output vector, 0 = no cap
-    private bool m_disposed;
+    readonly WordPieceTokenizer m_tokenizer;
+    readonly SparseVector[] m_tokenVectors;
+    readonly int m_embeddingDimensions;
+    readonly long m_scale;
+    readonly int m_outputSparsityBudget;
+    bool m_disposed;
 
     public string ModelName { get; }
     public int Dimensions => m_embeddingDimensions;
 
-    // -----------------------------------------------------------------------
-    // Construction — from GGUF path
-    // -----------------------------------------------------------------------
-
-    /// <summary>
-    /// Loads the token embedding table from a GGUF file and quantizes each vocabulary
-    /// row into a <see cref="SparseVector"/> for direct integer-domain lookup at embed time.
-    /// </summary>
-    /// <param name="ggufPath">Path to the GGUF model file.</param>
-    /// <param name="quantizationOptions">
-    /// Controls threshold and scale for quantization. Defaults to a scale of
-    /// <c>1_000_000</c> (not <c>long.MaxValue</c>) to keep pooled sums within
-    /// <c>long</c> range when summing across tokens.
-    /// </param>
-    /// <param name="onProgress">Optional progress callback: (step, total, name).</param>
     public static LatticeEmbeddingSource Load(
         string ggufPath,
         QuantizationOptions? quantizationOptions = null,
@@ -53,9 +24,6 @@ public sealed class LatticeEmbeddingSource : IEmbeddingSource, IDisposable
         return LoadFromReader(reader, quantizationOptions, onProgress);
     }
 
-    /// <summary>
-    /// Resolves a model via <see cref="OllamaModelLocator"/> and loads it.
-    /// </summary>
     public static LatticeEmbeddingSource LoadFromModelDir(
         string modelName,
         string modelDir,
@@ -69,7 +37,7 @@ public sealed class LatticeEmbeddingSource : IEmbeddingSource, IDisposable
         return Load(ggufPath, quantizationOptions, onProgress);
     }
 
-    private LatticeEmbeddingSource(
+    LatticeEmbeddingSource(
         string modelName,
         WordPieceTokenizer tokenizer,
         SparseVector[] tokenVectors,
@@ -84,10 +52,6 @@ public sealed class LatticeEmbeddingSource : IEmbeddingSource, IDisposable
         m_scale = scale;
         m_outputSparsityBudget = outputSparsityBudget;
     }
-
-    // -----------------------------------------------------------------------
-    // IEmbeddingSource — float[] interface for pipeline compatibility
-    // -----------------------------------------------------------------------
 
     public Task<float[]> EmbedAsync(string text, CancellationToken ct = default)
     {
@@ -109,15 +73,6 @@ public sealed class LatticeEmbeddingSource : IEmbeddingSource, IDisposable
         return results;
     }
 
-    // -----------------------------------------------------------------------
-    // Core: text → SparseVector, integer domain, no floats
-    // -----------------------------------------------------------------------
-
-    /// <summary>
-    /// Embeds text directly into a <see cref="SparseVector"/> using token embedding
-    /// lookup, integer mean-pooling, and L2 normalization in the integer domain.
-    /// No floating-point arithmetic on the hot path.
-    /// </summary>
     public SparseVector EmbedSparse(string text)
     {
         if (string.IsNullOrEmpty(text))
@@ -130,7 +85,6 @@ public sealed class LatticeEmbeddingSource : IEmbeddingSource, IDisposable
         return PoolTokenVectors(tokenIds);
     }
 
-    /// <summary>Batch version for efficiency.</summary>
     public SparseVector[] EmbedSparseBatch(IReadOnlyList<string> texts)
     {
         SparseVector[] results = new SparseVector[texts.Count];
@@ -141,11 +95,7 @@ public sealed class LatticeEmbeddingSource : IEmbeddingSource, IDisposable
 
     public void Dispose() => m_disposed = true;
 
-    // -----------------------------------------------------------------------
-    // Integer mean-pool across token vectors
-    // -----------------------------------------------------------------------
-
-    private SparseVector PoolTokenVectors(int[] tokenIds)
+    SparseVector PoolTokenVectors(int[] tokenIds)
     {
         long[] accumulator = System.Buffers.ArrayPool<long>.Shared.Rent(m_embeddingDimensions);
         accumulator.AsSpan(0, m_embeddingDimensions).Clear();
@@ -216,11 +166,7 @@ public sealed class LatticeEmbeddingSource : IEmbeddingSource, IDisposable
         return new SparseVector(entries, m_embeddingDimensions);
     }
 
-    // -----------------------------------------------------------------------
-    // Load: GGUF → quantized token embedding table
-    // -----------------------------------------------------------------------
-
-    private static LatticeEmbeddingSource LoadFromReader(
+    static LatticeEmbeddingSource LoadFromReader(
         GgufReader reader,
         QuantizationOptions? quantizationOptions,
         Action<int, int, string>? onProgress)
@@ -248,7 +194,6 @@ public sealed class LatticeEmbeddingSource : IEmbeddingSource, IDisposable
         int step = 0;
         void Report(string name) { step++; onProgress?.Invoke(step, totalSteps, name); }
 
-        // Step 1: read token embedding table + token type embedding + input LayerNorm
         float[] tokenEmbeddings = reader.ReadTensorF32("token_embd.weight");
         Report("token_embd.weight");
 
@@ -267,10 +212,7 @@ public sealed class LatticeEmbeddingSource : IEmbeddingSource, IDisposable
             : new float[embeddingDimensions];
         Report("token_embd_norm");
 
-        // Step 2: quantize each vocabulary row into a SparseVector
-        // Apply: token_embd + token_type → LayerNorm → quantize
-        // This is the same first step the full transformer does, but we do it once
-        // per vocab entry at load time (not per inference call).
+        // token_embd + token_type → LayerNorm → quantize per vocab entry at load time
         SparseVector[] tokenVectors = new SparseVector[vocabSize];
         float[] rowBuffer = new float[embeddingDimensions];
 
@@ -309,11 +251,7 @@ public sealed class LatticeEmbeddingSource : IEmbeddingSource, IDisposable
             effectiveOptions.SparsityBudget ?? 0);
     }
 
-    // -----------------------------------------------------------------------
-    // Minimal LayerNorm for a single row (used once per vocab entry at load)
-    // -----------------------------------------------------------------------
-
-    private static void ApplyLayerNormSingle(float[] row, float[] weight, float[] bias)
+    static void ApplyLayerNormSingle(float[] row, float[] weight, float[] bias)
     {
         int embeddingDimensions = row.Length;
         const float eps = 1e-12f;
@@ -337,7 +275,7 @@ public sealed class LatticeEmbeddingSource : IEmbeddingSource, IDisposable
             row[d] = (row[d] - mean) * invStd * weight[d] + bias[d];
     }
 
-    private static void L2NormalizeSingle(float[] row)
+    static void L2NormalizeSingle(float[] row)
     {
         float norm = 0f;
         for (int i = 0; i < row.Length; i++)
@@ -349,7 +287,7 @@ public sealed class LatticeEmbeddingSource : IEmbeddingSource, IDisposable
             row[i] *= invNorm;
     }
 
-    private static float[] CreateDefaultWeight(int dimensions)
+    static float[] CreateDefaultWeight(int dimensions)
     {
         float[] weight = new float[dimensions];
         for (int i = 0; i < dimensions; i++)

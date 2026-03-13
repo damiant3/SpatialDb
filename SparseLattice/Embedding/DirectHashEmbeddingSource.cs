@@ -2,37 +2,14 @@ using SparseLattice.Math;
 ////////////////////////////////////////////////////
 namespace SparseLattice.Embedding;
 
-/// <summary>
-/// Produces <see cref="SparseVector"/> instances directly from text using a
-/// bag-of-tokens hashing scheme — no floats, no model, no GGUF file.
-///
-/// Each token in the input text is hashed to a dimension index in [0, Dimensions).
-/// A count is accumulated per dimension, then converted to a <c>long</c> by scaling
-/// so that the values occupy a useful range for L2 distance comparisons in the lattice.
-/// The result is sorted ascending by dimension (as required by <see cref="SparseVector"/>)
-/// and zero entries are omitted.
-///
-/// This is deterministic, allocation-light, and suitable as a stand-in corpus source
-/// for benchmarking the lattice itself without any embedding inference cost.
-/// </summary>
 public sealed class DirectHashEmbeddingSource : IEmbeddingSource
 {
-    private static readonly char[] s_separators =
+    static readonly char[] s_separators =
         [' ', '\n', '\r', '\t', '.', ',', '(', ')', '{', '}', '[', ']', ';', ':', '<', '>', '=', '/', '*', '+', '-', '!', '?', '"', '\'', '\\'];
 
-    private readonly int  m_dimensions;
-    private readonly long m_scale;
+    readonly int  m_dimensions;
+    readonly long m_scale;
 
-    /// <param name="dimensions">
-    /// Number of sparse dimensions. Should be >= 64. Larger values reduce collision
-    /// rate but increase sparsity. 768 matches nomic-embed-text for apples-to-apples
-    /// lattice benchmarks.
-    /// </param>
-    /// <param name="scale">
-    /// Integer scale applied to token counts before storing as <c>long</c>.
-    /// Defaults to 1_000_000 so that a single-occurrence token has value 1_000_000,
-    /// keeping distances in a numerically comfortable range.
-    /// </param>
     public DirectHashEmbeddingSource(int dimensions = 768, long scale = 1_000_000L)
     {
         if (dimensions < 8)
@@ -43,15 +20,9 @@ public sealed class DirectHashEmbeddingSource : IEmbeddingSource
         m_scale      = scale;
     }
 
-    // IEmbeddingSource — still satisfies the interface for pipeline compatibility,
-    // but the float[] path is intentionally thin (used only if called via the interface).
     public string ModelName  => $"direct-hash-{m_dimensions}d";
     public int    Dimensions => m_dimensions;
 
-    /// <summary>
-    /// Returns a dummy <c>float[]</c> to satisfy <see cref="IEmbeddingSource"/>.
-    /// Prefer <see cref="EmbedSparse"/> for lattice use.
-    /// </summary>
     public Task<float[]> EmbedAsync(string text, CancellationToken ct = default)
     {
         // Project the sparse longs back to floats for interface compatibility.
@@ -71,14 +42,6 @@ public sealed class DirectHashEmbeddingSource : IEmbeddingSource
         return results;
     }
 
-    // -----------------------------------------------------------------------
-    // Core: text → SparseVector, zero floats, zero allocations beyond the entry array
-    // -----------------------------------------------------------------------
-
-    /// <summary>
-    /// Converts <paramref name="text"/> directly into a <see cref="SparseVector"/>
-    /// using token-hashing. No floating-point arithmetic is performed.
-    /// </summary>
     public SparseVector EmbedSparse(string text)
     {
         // Use a stack-allocated accumulator for small dimension counts,
@@ -97,7 +60,6 @@ public sealed class DirectHashEmbeddingSource : IEmbeddingSource
         }
     }
 
-    /// <summary>Batch version — avoids redundant renting per item.</summary>
     public SparseVector[] EmbedSparseBatch(IReadOnlyList<string> texts)
     {
         SparseVector[] results = new SparseVector[texts.Count];
@@ -118,11 +80,7 @@ public sealed class DirectHashEmbeddingSource : IEmbeddingSource
         return results;
     }
 
-    // -----------------------------------------------------------------------
-    // Internals
-    // -----------------------------------------------------------------------
-
-    private void Tokenize(string text, long[] counts)
+    void Tokenize(string text, long[] counts)
     {
         if (string.IsNullOrEmpty(text)) return;
 
@@ -147,7 +105,7 @@ public sealed class DirectHashEmbeddingSource : IEmbeddingSource
         }
     }
 
-    private static bool IsSeparator(char c)
+    static bool IsSeparator(char c)
     {
         // Inline the check — faster than IndexOf on the separators array.
         return c is ' ' or '\n' or '\r' or '\t'
@@ -156,16 +114,16 @@ public sealed class DirectHashEmbeddingSource : IEmbeddingSource
             or '!' or '?' or '"' or '\'' or '\\';
     }
 
-    private static int HashToken(ReadOnlySpan<char> token)
+    // djb2 variant over chars
+    static int HashToken(ReadOnlySpan<char> token)
     {
-        // djb2 variant over chars — stable, fast, well-distributed.
         uint h = 5381u;
         foreach (char c in token)
             h = ((h << 5) + h) ^ c;
         return (int)h;
     }
 
-    private SparseVector BuildSparseVector(long[] counts)
+    SparseVector BuildSparseVector(long[] counts)
     {
         // Count nonzeros first to size the entry array exactly.
         int nnz = 0;

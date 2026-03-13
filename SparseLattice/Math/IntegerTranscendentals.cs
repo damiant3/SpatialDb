@@ -2,21 +2,14 @@ using System.Runtime.CompilerServices;
 ///////////////////////////////////////////////
 namespace SparseLattice.Math;
 
-/// <summary>
-/// Fixed-point transcendental functions for integer transformer inference.
-/// All values are scaled by <c>2^fracBits</c>. Intermediate arithmetic uses
-/// Int128 to prevent overflow. Results are deterministic and bit-identical.
-/// </summary>
+// All values scaled by 2^fracBits. Int128 intermediates prevent overflow.
+// Results are deterministic and bit-identical across platforms.
 public static class IntegerTranscendentals
 {
-    /// <summary>Default fractional bits for fixed-point representation.</summary>
     public const int DefaultFracBits = 30;
 
-    /// <summary>
-    /// Fixed-point <c>exp(x)</c> via range reduction (x = k·ln2 + r) and
-    /// 14-term Taylor series on the remainder. Saturates at long.MaxValue / 0
-    /// for extreme inputs.
-    /// </summary>
+    // exp(x) via range reduction (x = k·ln2 + r) and 14-term Taylor series.
+    // Saturates at long.MaxValue / 0 for extreme inputs.
     public static long FixedExp(long x, int fracBits = DefaultFracBits)
     {
         long ln2 = FixedFromDouble(0.6931471805599453, fracBits);
@@ -53,7 +46,6 @@ public static class IntegerTranscendentals
         }
     }
 
-    /// <summary>Fixed-point <c>sigmoid(x) = 1 / (1 + exp(-x))</c>.</summary>
     public static long FixedSigmoid(long x, int fracBits = DefaultFracBits)
     {
         long one = 1L << fracBits;
@@ -70,17 +62,12 @@ public static class IntegerTranscendentals
         return (long)((Int128)one * one / denom);
     }
 
-    /// <summary>Fixed-point <c>SiLU(x) = x × sigmoid(x)</c>.</summary>
     public static long FixedSiLU(long x, int fracBits = DefaultFracBits)
     {
         long sig = FixedSigmoid(x, fracBits);
         return (long)((Int128)x * sig >> fracBits);
     }
 
-    /// <summary>
-    /// In-place softmax over <paramref name="scores"/>[rowBase .. rowBase+len).
-    /// Output is fixed-point probabilities summing to <c>2^fracBits</c>.
-    /// </summary>
     public static void FixedSoftmax(long[] scores, int rowBase, int len, int fracBits = DefaultFracBits)
     {
         long one = 1L << fracBits;
@@ -109,12 +96,10 @@ public static class IntegerTranscendentals
             scores[rowBase + i] = (long)((Int128)scores[rowBase + i] * one / sum);
     }
 
-    /// <summary>Converts a double to fixed-point.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static long FixedFromDouble(double value, int fracBits = DefaultFracBits)
         => (long)(value * (1L << fracBits));
 
-    /// <summary>Converts fixed-point back to double (for testing).</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static double FixedToDouble(long value, int fracBits = DefaultFracBits)
         => value / (double)(1L << fracBits);

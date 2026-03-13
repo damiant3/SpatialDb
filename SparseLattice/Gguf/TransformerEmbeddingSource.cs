@@ -3,84 +3,44 @@ using SparseLattice.Embedding;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using SystemMath = System.Math;
-//////////////////////////////////////////////////////////////
 namespace SparseLattice.Gguf;
 
-/// <summary>
-/// CPU-only <see cref="IEmbeddingSource"/> that runs a BERT-family encoder forward
-/// pass directly from a GGUF file. No external process or NuGet dependencies beyond
-/// <c>System.Numerics</c>.
-/// </summary>
-/// <remarks>
-/// <para>
-/// All quantized weight tensors are dequantized to <c>float[]</c> once on load.
-/// For nomic-embed-text (768 dimensions, 12 layers) this is approximately 1 GB
-/// resident memory — acceptable for a dev/test workload.
-/// </para>
-/// <para>
-/// Supported architectures: <c>nomic-bert</c> (primary), <c>bert</c> (secondary).
-/// Causal architectures (llama, gemma) are not supported and will throw on load.
-/// </para>
-/// </remarks>
 public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
 {
-    // -----------------------------------------------------------------------
-    // Loaded model weights
-    // -----------------------------------------------------------------------
-
     internal sealed class LayerWeights
     {
-        // Fused QKV projection: shape [n_embd, 3*n_embd]
         public required float[] AttnQkv     { get; init; }
-        // Attention output projection: shape [n_embd, n_embd]
         public required float[] AttnOutput  { get; init; }
-        // Post-attention LayerNorm
         public required float[] AttnNormW   { get; init; }
         public required float[] AttnNormB   { get; init; }
-        // FFN gated projection (SwiGLU): value branch [n_embd, n_ff]
         public required float[] FfnUp       { get; init; }
-        // FFN gated projection: gate branch [n_embd, n_ff]
         public required float[] FfnGate     { get; init; }
-        // FFN down projection: [n_ff, n_embd]
         public required float[] FfnDown     { get; init; }
-        // Post-FFN LayerNorm
         public required float[] LayerNormW  { get; init; }
         public required float[] LayerNormB  { get; init; }
     }
 
-    // -----------------------------------------------------------------------
-    // Fields
-    // -----------------------------------------------------------------------
-
-    private readonly WordPieceTokenizer m_tokenizer;
-    private readonly LayerWeights[]     m_layers;
+    readonly WordPieceTokenizer m_tokenizer;
+    readonly LayerWeights[]     m_layers;
 
     // Embedding tables
-    private readonly float[]    m_tokenEmbeddings;    // [vocab_size * n_embd]
-    private readonly float[]    m_tokenTypeEmbedding; // [n_embd] — row 0 of token_types.weight
+    readonly float[]    m_tokenEmbeddings;
+    readonly float[]    m_tokenTypeEmbedding;
 
     // Input embedding LayerNorm (token_embd_norm)
-    private readonly float[]    m_embdNormW;
-    private readonly float[]    m_embdNormB;
+    readonly float[]    m_embdNormW;
+    readonly float[]    m_embdNormB;
 
-    private readonly int        m_nEmbd;
-    private readonly int        m_nHeads;
-    private readonly int        m_nFf;
-    private readonly float      m_ropeFreqBase;
-    private readonly float      m_layerNormEps;  // unused?
+    readonly int        m_nEmbd;
+    readonly int        m_nHeads;
+    readonly int        m_nFf;
+    readonly float      m_ropeFreqBase;
+    readonly float      m_layerNormEps;  // unused?
 
-    private bool m_disposed;
-
-    // -----------------------------------------------------------------------
-    // Public properties
-    // -----------------------------------------------------------------------
+    bool m_disposed;
 
     public string ModelName  { get; }
     public int    Dimensions => m_nEmbd;
-
-    // -----------------------------------------------------------------------
-    // Construction — from GGUF path
-    // -----------------------------------------------------------------------
 
     /// <summary>Loads model weights from a GGUF file at <paramref name="ggufPath"/>.</summary>
     public static TransformerEmbeddingSource Load(string ggufPath,
@@ -143,11 +103,6 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
         m_layerNormEps       = layerNormEps;
     }
 
-    // -----------------------------------------------------------------------
-    // IEmbeddingSource
-    // -----------------------------------------------------------------------
-
-    /// <inheritdoc/>
     public Task<float[]> EmbedAsync(string text, CancellationToken ct = default)
     {
         ObjectDisposedException.ThrowIf(m_disposed, this);
@@ -155,7 +110,6 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
         return Task.FromResult(Forward(text));
     }
 
-    /// <inheritdoc/>
     public async Task<float[][]> EmbedBatchAsync(
         IReadOnlyList<string> texts, CancellationToken ct = default)
     {
@@ -165,17 +119,9 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
         return results;
     }
 
-    // -----------------------------------------------------------------------
-    // Dispose
-    // -----------------------------------------------------------------------
-
     public void Dispose() => m_disposed = true;
 
-    // -----------------------------------------------------------------------
-    // Forward pass
-    // -----------------------------------------------------------------------
-
-    private float[] Forward(string text)
+    float[] Forward(string text)
     {
         int[] tokenIds = m_tokenizer.Encode(text, addSpecialTokens: true);
         int sequenceLen = tokenIds.Length;
@@ -199,7 +145,7 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
     }
 
     // Build the initial embedding matrix by summing token + token-type embeddings.
-    private float[] BuildEmbeddings(int[] tokenIds, int sequenceLen)
+    float[] BuildEmbeddings(int[] tokenIds, int sequenceLen)
     {
         float[] x = new float[sequenceLen * m_nEmbd];
 
@@ -220,17 +166,7 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
         return x;
     }
 
-    // Applies a single transformer block in-place on x [T, n_embd].
-    //
-    // nomic-bert (llama.cpp build_bert, NOMIC_BERT path):
-    //   1. QKV projected from raw x (NO pre-attention LayerNorm)
-    //   2. RoPE on Q and K
-    //   3. Attention output + residual (raw x)
-    //   4. attn_out_norm applied post-residual   ← attn_output_norm weights
-    //   5. FFN (SiLU gate, parallel up/gate) from normed post-attn output
-    //   6. FFN output + residual (normed post-attn output)
-    //   7. layer_out_norm applied post-residual  ← layer_output_norm weights
-    private void ApplyTransformerBlock(float[] x, int seqLen, int layerIdx, LayerWeights layer)
+    void ApplyTransformerBlock(float[] x, int seqLen, int layerIdx, LayerWeights layer)
     {
         int embd = m_nEmbd;
 
@@ -290,13 +226,9 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
         }
     }
 
-    // -----------------------------------------------------------------------
-    // RoPE sin/cos cache  (immutable after first use, safe for concurrent reads)
-    // -----------------------------------------------------------------------
-
-    private sealed class RopeCache
+    // Immutable after first use, safe for concurrent reads
+    sealed class RopeCache
     {
-        // cos[t, i] and sin[t, i] for t in [0, maxSeqLen), i in [0, headDim/2)
         public readonly float[] Cos;
         public readonly float[] Sin;
         public readonly int     MaxSeqLen;
@@ -321,11 +253,10 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
         }
     }
 
-    // Built lazily on first Forward() call; covers any sequence up to 512 tokens.
-    private RopeCache? m_ropeCache;
-    private const int  RopeMaxSeqLen = 512;
+    RopeCache? m_ropeCache;
+    const int RopeMaxSeqLen = 512;
 
-    private RopeCache GetRopeCache()
+    RopeCache GetRopeCache()
     {
         if (m_ropeCache is not null) return m_ropeCache;
         int headDim = m_nEmbd / m_nHeads;
@@ -333,8 +264,7 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
         return m_ropeCache;
     }
 
-    // Apply RoPE using the pre-computed sin/cos cache.
-    private void ApplyRope(float[] x, int seqLen, int embd, int nHeads, float freqBase)
+    void ApplyRope(float[] x, int seqLen, int embd, int nHeads, float freqBase)
     {
         RopeCache cache   = GetRopeCache();
         int       headDim = embd / nHeads;
@@ -359,10 +289,8 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
         }
     }
 
-    // Multiply activation A [rowsA, nIn] by GGUF weight W stored column-major,
-    // producing C [rowsA, nOut].
-    // Uses Span<float> + MemoryMarshal to avoid per-iteration Vector<float> allocations.
-    private static float[] MatMulGguf(float[] a, int rowsA, int nIn, float[] w, int nOut)
+    // SIMD dot via Span + MemoryMarshal — no per-iteration Vector<float> allocation
+    static float[] MatMulGguf(float[] a, int rowsA, int nIn, float[] w, int nOut)
     {
         float[] c      = new float[rowsA * nOut];
         int     vecLen = Vector<float>.Count;
@@ -383,7 +311,6 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
 
                 ReadOnlySpan<float> wCol = wSpan.Slice(wBase, nIn);
 
-                // SIMD dot using ReadOnlySpan — no heap allocation per iteration
                 ref float aRef = ref MemoryMarshal.GetReference(aRow);
                 ref float wRef = ref MemoryMarshal.GetReference(wCol);
 
@@ -407,9 +334,7 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
         return c;
     }
 
-    // Multi-head scaled dot-product attention.
-    // Fixed loop order: innermost loop over headDim is now contiguous on v.
-    private static float[] MultiHeadAttention(
+    static float[] MultiHeadAttention(
         float[] q, float[] k, float[] v,
         int seqLen, int embd, int nHeads)
     {
@@ -453,12 +378,7 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
         return output;
     }
 
-    // -----------------------------------------------------------------------
-    // Math primitives
-    // -----------------------------------------------------------------------
-
-    // LayerNorm in-place over rows of x [T, n_embd].
-    private static void ApplyLayerNorm(float[] x, int seqLen, float[] weight, float[] bias)
+    static void ApplyLayerNorm(float[] x, int seqLen, float[] weight, float[] bias)
     {
         int embd = weight.Length;
         const float eps = 1e-12f;
@@ -489,7 +409,7 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
         }
     }
 
-    private static void AddInPlace(float[] dst, float[] src, int count)
+    static void AddInPlace(float[] dst, float[] src, int count)
     {
         int vecLen = Vector<float>.Count;
         int i      = 0;
@@ -503,7 +423,7 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
             dst[i] += src[i];
     }
 
-    private static float DotProduct(float[] a, int aOffset, float[] b, int bOffset, int length)
+    static float DotProduct(float[] a, int aOffset, float[] b, int bOffset, int length)
     {
         float sum   = 0f;
         int vecLen  = Vector<float>.Count;
@@ -520,8 +440,7 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
         return sum;
     }
 
-    // Softmax in-place on a [seqLen, seqLen] scores matrix, row by row.
-    private static void Softmax(float[] scores, int seqLen)
+    static void Softmax(float[] scores, int seqLen)
     {
         for (int t = 0; t < seqLen; t++)
         {
@@ -542,11 +461,9 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
         }
     }
 
-    // SiLU activation: x * sigmoid(x)  — used by nomic-bert FFN (LLM_FFN_SILU).
-    private static float Silu(float x) => x / (1.0f + MathF.Exp(-x));
+    static float Silu(float x) => x / (1.0f + MathF.Exp(-x));
 
-    // GELU activation (tanh approximation) — kept for reference / BERT variants.
-    private static float Gelu(float x)
+    static float Gelu(float x)
     {
         const float sqrt2OverPi = 0.7978845608f;
         const float c = 0.044715f;
@@ -554,10 +471,7 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
         return 0.5f * x * (1.0f + MathF.Tanh(inner));
     }
 
-    // Mean pool over all token positions 0..T-1 (including CLS and SEP),
-    // matching the nomic-embed-text pooling_type=MEAN behaviour in llama.cpp.
-    // Falls back to CLS position when sequence is empty.
-    private float[] MeanPool(float[] x, int seqLen)
+    float[] MeanPool(float[] x, int seqLen)
     {
         float[] pooled = new float[m_nEmbd];
 
@@ -578,7 +492,7 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
         return pooled;
     }
 
-    private static void L2Normalize(float[] v)
+    static void L2Normalize(float[] v)
     {
         float norm = 0f;
         for (int i = 0; i < v.Length; i++)
@@ -590,11 +504,7 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
             v[i] *= invNorm;
     }
 
-    // -----------------------------------------------------------------------
-    // Private — load weights from GgufReader
-    // -----------------------------------------------------------------------
-
-    private static TransformerEmbeddingSource LoadFromReader(GgufReader reader,
+    static TransformerEmbeddingSource LoadFromReader(GgufReader reader,
         Action<int, int, string>? onProgress = null)
     {
         string arch        = reader.Architecture;
@@ -682,7 +592,7 @@ public sealed class TransformerEmbeddingSource : IEmbeddingSource, IDisposable
             layerNormEps:        layerNormEps);
     }
 
-    private static float GetFloat(GgufReader reader, string key, float defaultValue)
+    static float GetFloat(GgufReader reader, string key, float defaultValue)
     {
         if (!reader.Metadata.TryGetValue(key, out GgufValue? v)) return defaultValue;
         return v.Type switch

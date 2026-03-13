@@ -1,13 +1,8 @@
 ///////////////////////////////////////////////
 namespace SparseLattice.Math;
 
-/// <summary>
-/// Integer SiLU-gated feed-forward network matching the nomic-bert FFN structure:
-/// gate projection, up projection, element-wise SiLU gating, down projection.
-/// </summary>
 public static class IntegerFFN
 {
-    /// <summary>Applies the SiLU-gated FFN in integer arithmetic with Half weights.</summary>
     public static long[] Apply(
         long[] x, int seqLen, int embd,
         Half[] wGate, Half[] wUp, Half[] wDown,
@@ -40,7 +35,6 @@ public static class IntegerFFN
         return IntegerMatMul.MatMul(up, seqLen, nFf, wDown, embd, scaleBits, scaleBits);
     }
 
-    /// <summary>Applies the SiLU-gated FFN in integer arithmetic with float32 weights.</summary>
     public static long[] Apply(
         long[] x, int seqLen, int embd,
         float[] wGate, float[] wUp, float[] wDown,
@@ -73,7 +67,6 @@ public static class IntegerFFN
         return IntegerMatMul.MatMul(up, seqLen, nFf, wDown, embd, scaleBits, scaleBits);
     }
 
-    /// <summary>Applies the SiLU-gated FFN with pre-quantized int64 weights (legacy).</summary>
     public static long[] Apply(
         long[] x, int seqLen, int embd,
         long[] wGate, long[] wUp, long[] wDown,

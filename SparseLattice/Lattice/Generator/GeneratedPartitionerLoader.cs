@@ -5,19 +5,14 @@ using Microsoft.CodeAnalysis.CSharp;
 ///////////////////////////////////////////
 namespace SparseLattice.Lattice.Generator;
 
-/// <summary>
-/// Compiles a generated partitioner source string via Roslyn and loads the resulting
-/// assembly into a <see cref="CollectibleAssemblyLoadContext"/> so it can be unloaded
-/// when the lattice is rebuilt for a new dimensionality.
-/// </summary>
 public sealed class GeneratedPartitionerLoader : IDisposable
 {
-    private readonly CollectibleLoadContext m_alc;
-    private bool m_disposed;
+    readonly CollectibleLoadContext m_alc;
+    bool m_disposed;
 
     public IOptimizedPartitioner Partitioner { get; }
 
-    private GeneratedPartitionerLoader(CollectibleLoadContext alc, IOptimizedPartitioner partitioner)
+    GeneratedPartitionerLoader(CollectibleLoadContext alc, IOptimizedPartitioner partitioner)
     {
         m_alc = alc;
         Partitioner = partitioner;
@@ -86,7 +81,7 @@ public sealed class GeneratedPartitionerLoader : IDisposable
         GC.WaitForPendingFinalizers();
     }
 
-    private static List<MetadataReference> BuildMetadataReferences()
+    static List<MetadataReference> BuildMetadataReferences()
     {
         List<MetadataReference> refs = [];
         foreach (Assembly asm in AppDomain.CurrentDomain.GetAssemblies())
@@ -98,7 +93,7 @@ public sealed class GeneratedPartitionerLoader : IDisposable
         return refs;
     }
 
-    private sealed class CollectibleLoadContext(string name)
+    sealed class CollectibleLoadContext(string name)
         : AssemblyLoadContext(name, isCollectible: true)
     {
         protected override Assembly? Load(AssemblyName assemblyName)

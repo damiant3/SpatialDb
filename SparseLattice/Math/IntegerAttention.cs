@@ -1,16 +1,8 @@
 ///////////////////////////////////////////////
 namespace SparseLattice.Math;
 
-/// <summary>
-/// Integer multi-head self-attention.
-/// QKV projections, RoPE rotation, scaled dot-product scores with fixed-point
-/// softmax, and weighted value summation — all via Int128 accumulators.
-/// </summary>
 public static class IntegerAttention
 {
-    /// <summary>
-    /// Precomputed rotary position embedding tables in fixed-point.
-    /// </summary>
     public sealed class IntegerRoPECache
     {
         public readonly long[] Cos;
@@ -40,7 +32,6 @@ public static class IntegerAttention
         }
     }
 
-    /// <summary>Applies RoPE rotation in-place to Q or K vectors [seqLen × embd].</summary>
     public static void ApplyRoPE(long[] x, int seqLen, int embd, int nHeads, IntegerRoPECache cache)
     {
         int headDim = embd / nHeads;
@@ -66,11 +57,6 @@ public static class IntegerAttention
         }
     }
 
-    /// <summary>
-    /// Multi-head self-attention in integer arithmetic.
-    /// Scores are computed at fixed-point scale, softmax applied per row,
-    /// then V is weighted-summed back to the activation scale.
-    /// </summary>
     public static long[] MultiHeadAttention(
         long[] q, long[] k, long[] v,
         int seqLen, int embd, int nHeads,
@@ -122,7 +108,6 @@ public static class IntegerAttention
         return output;
     }
 
-    /// <summary>Splits fused QKV [seqLen × 3·embd] into separate Q, K, V.</summary>
     public static void SplitQkv(long[] qkv, long[] q, long[] k, long[] v, int seqLen, int embd)
     {
         for (int t = 0; t < seqLen; t++)
@@ -135,11 +120,8 @@ public static class IntegerAttention
         }
     }
 
-    /// <summary>
-    /// GQA multi-head attention: Q has <paramref name="nHeads"/> heads,
-    /// K/V have <paramref name="nKvHeads"/> heads. Each KV head serves
-    /// <c>nHeads/nKvHeads</c> query heads.
-    /// </summary>
+    // GQA: Q has nHeads heads, K/V have nKvHeads heads.
+    // Each KV head serves nHeads/nKvHeads query heads.
     public static long[] GroupedQueryAttention(
         long[] q, long[] k, long[] v,
         int seqLen, int qEmbd, int kvDim,
@@ -180,7 +162,7 @@ public static class IntegerAttention
         return output;
     }
 
-    private static void NonCausalHeadAttention(
+    static void NonCausalHeadAttention(
         long[] q, long[] k, long[] v, long[] output,
         int seqLen, int qEmbd, int kvDim,
         int h, int headDim, int kvHeadDim, int headsPerKv,
@@ -219,10 +201,7 @@ public static class IntegerAttention
         }
     }
 
-    /// <summary>
-    /// Causal GQA: identical to <see cref="GroupedQueryAttention"/> but masks
-    /// future positions (score[t,s] = -∞ for s &gt; t) before softmax.
-    /// </summary>
+    // Masks future positions (score[t,s] = -∞ for s > t) before softmax.
     public static long[] CausalGroupedQueryAttention(
         long[] q, long[] k, long[] v,
         int seqLen, int qEmbd, int kvDim,
@@ -264,7 +243,7 @@ public static class IntegerAttention
         return output;
     }
 
-    private static void CausalHeadAttention(
+    static void CausalHeadAttention(
         long[] q, long[] k, long[] v, long[] output,
         int seqLen, int qEmbd, int kvDim,
         int h, int headDim, int kvHeadDim, int headsPerKv,
@@ -309,12 +288,8 @@ public static class IntegerAttention
         }
     }
 
-    /// <summary>
-    /// Sliding window causal GQA: same as <see cref="CausalGroupedQueryAttention"/> but
-    /// also masks positions further than <paramref name="windowSize"/> away.
-    /// Position t can only attend to positions max(0, t - windowSize + 1) .. t.
-    /// Used by Gemma3's local attention layers.
-    /// </summary>
+    // Also masks positions further than windowSize away.
+    // Position t can only attend to max(0, t - windowSize + 1) .. t.
     public static long[] SlidingWindowCausalGQA(
         long[] q, long[] k, long[] v,
         int seqLen, int qEmbd, int kvDim,
@@ -355,7 +330,7 @@ public static class IntegerAttention
         return output;
     }
 
-    private static void SlidingWindowHeadAttention(
+    static void SlidingWindowHeadAttention(
         long[] q, long[] k, long[] v, long[] output,
         int seqLen, int qEmbd, int kvDim,
         int h, int headDim, int kvHeadDim, int headsPerKv,

@@ -12,6 +12,8 @@ Key rules and project-specific additions:
 - `""` not `string.Empty`
 - Empty collection initializer `[]` on the right-hand side
 - Remove default accessibility modifiers (class members default to `private`)
+- No XML doc comments (`/// <summary>`) — expressive names replace summaries
+- No section-separator comments (`// ---`, `// ===`) — split the file instead
 
 ## Naming
 - Instance fields: `m_` prefix, camelCase

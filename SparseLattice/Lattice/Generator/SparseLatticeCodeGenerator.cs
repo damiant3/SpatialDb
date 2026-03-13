@@ -2,19 +2,14 @@ using System.Text;
 ///////////////////////////////////////////
 namespace SparseLattice.Lattice.Generator;
 
-/// <summary>
-/// Emits C# source for a dimension-specialized, unrolled partition implementation.
-/// The generated class implements <see cref="IOptimizedPartitioner"/> and is designed
-/// to be compiled at runtime via Roslyn and loaded into a CollectibleAssemblyLoadContext.
-/// </summary>
 public static class SparseLatticeCodeGenerator
 {
     /// <summary>
     /// Generates the full C# source for a dimension-specialized partitioner.
     /// The generated class:
-    ///   — implements IOptimizedPartitioner
-    ///   — uses a fixed-size stackalloc buffer sized to MaxNonzeros for value extraction
-    ///   — performs the two-pointer in-place partition with no heap allocation on the hot path
+    ///   â€” implements IOptimizedPartitioner
+    ///   â€” uses a fixed-size stackalloc buffer sized to MaxNonzeros for value extraction
+    ///   â€” performs the two-pointer in-place partition with no heap allocation on the hot path
     /// </summary>
     public static string GeneratePartitionerSource(PartitionerDescriptor descriptor)
     {

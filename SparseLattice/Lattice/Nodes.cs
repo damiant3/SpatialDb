@@ -6,13 +6,42 @@ public interface ISparseNode
 {
 }
 
+public static class SparseNodeExtensions
+{
+    public static bool TryGetBranch(this ISparseNode node, out ushort splitDimension, out long splitValue,
+        out ISparseNode? below, out ISparseNode? above)
+    {
+        if (node is FrozenBranchNode frozen)
+        {
+            splitDimension = frozen.SplitDimension;
+            splitValue     = frozen.SplitValue;
+            below          = frozen.Below;
+            above          = frozen.Above;
+            return true;
+        }
+        if (node is SparseBranchNode mutable)
+        {
+            splitDimension = mutable.SplitDimension;
+            splitValue     = mutable.SplitValue;
+            below          = mutable.Below;
+            above          = mutable.Above;
+            return true;
+        }
+        splitDimension = 0;
+        splitValue     = 0;
+        below          = null;
+        above          = null;
+        return false;
+    }
+}
+
 public sealed class SparseBranchNode : ISparseNode
 {
     public ushort SplitDimension { get; }
     public long SplitValue { get; }
 
-    private ISparseNode? m_below;
-    private ISparseNode? m_above;
+    ISparseNode? m_below;
+    ISparseNode? m_above;
 
     public ISparseNode? Below => m_below;
     public ISparseNode? Above => m_above;
@@ -34,23 +63,19 @@ public sealed class FrozenBranchNode : ISparseNode
 {
     public ushort SplitDimension { get; }
     public long SplitValue { get; }
+    readonly ISparseNode[] m_children;
 
-    // exactly 0, 1 or 2 entries; array length == RealizedChildCount
-    private readonly ISparseNode[] m_children;
+    readonly byte m_childMask;
 
-    // index 0 = Below (if present), index 1 = Above (if present)
-    // use tag bits to record which sides are realized
-    private readonly byte m_childMask;
-
-    private const byte s_BelowMask = 0b01;
-    private const byte s_AboveMask = 0b10;
+    const byte s_belowMask = 0b01;
+    const byte s_aboveMask = 0b10;
 
     public ISparseNode? Below
-        => (m_childMask & s_BelowMask) != 0 ? m_children[0] : null;
+        => (m_childMask & s_belowMask) != 0 ? m_children[0] : null;
 
     public ISparseNode? Above
-        => (m_childMask & s_AboveMask) != 0
-            ? m_children[(m_childMask & s_BelowMask) != 0 ? 1 : 0]
+        => (m_childMask & s_aboveMask) != 0
+            ? m_children[(m_childMask & s_belowMask) != 0 ? 1 : 0]
             : null;
 
     public int RealizedChildCount => m_children.Length;
@@ -62,8 +87,8 @@ public sealed class FrozenBranchNode : ISparseNode
 
         byte mask = 0;
         int count = 0;
-        if (below is not null) { mask |= s_BelowMask; count++; }
-        if (above is not null) { mask |= s_AboveMask; count++; }
+        if (below is not null) { mask |= s_belowMask; count++; }
+        if (above is not null) { mask |= s_aboveMask; count++; }
 
         m_childMask = mask;
         m_children = new ISparseNode[count];
@@ -76,7 +101,7 @@ public sealed class FrozenBranchNode : ISparseNode
 
 public sealed class SparseLeafNode<TPayload> : ISparseNode
 {
-    private SparseOccupant<TPayload>[] m_occupants;
+    SparseOccupant<TPayload>[] m_occupants;
 
     public ReadOnlySpan<SparseOccupant<TPayload>> Occupants => m_occupants.AsSpan();
     public int Count => m_occupants.Length;

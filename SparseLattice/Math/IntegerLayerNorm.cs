@@ -2,12 +2,8 @@ using System.Runtime.CompilerServices;
 ///////////////////////////////////////////////
 namespace SparseLattice.Math;
 
-/// <summary>
-/// LayerNorm in exact integer arithmetic.
-/// Uses Int128 accumulation for mean/variance and <see cref="ISqrt128"/> for
-/// the inverse standard deviation. The only approximation source is the ISqrt
-/// floor (±1 ULP) and right-shift truncation — both deterministic and bounded.
-/// </summary>
+// Int128 accumulation for mean/variance. ISqrt floor (±1 ULP) and
+// right-shift truncation are the only approximation sources.
 public static class IntegerLayerNorm
 {
     /// <summary>

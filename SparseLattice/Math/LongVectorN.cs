@@ -4,7 +4,7 @@ namespace SparseLattice.Math;
 
 public readonly struct LongVectorN : IEquatable<LongVectorN>
 {
-    private readonly long[] m_components;
+    readonly long[] m_components;
 
     public int Dimensions => m_components.Length;
 
@@ -140,7 +140,7 @@ public readonly struct LongVectorN : IEquatable<LongVectorN>
 
     public static LongVectorN Zero(int dimensions) => new(dimensions);
 
-    private static void AssertSameDimensions(LongVectorN a, LongVectorN b)
+    static void AssertSameDimensions(LongVectorN a, LongVectorN b)
     {
         if (a.Dimensions != b.Dimensions)
             throw new InvalidOperationException(

@@ -1,23 +1,12 @@
 using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
 ///////////////////////////////////////////////
 namespace SparseLattice.Math;
 
-/// <summary>
-/// A tensor value paired with a power-of-two scale exponent.
-/// The real-valued interpretation is <c>Data[i] × 2^ScaleExponent</c>.
-/// Scale exponents compose algebraically through operations — no float rounding occurs.
-/// </summary>
+// Real-valued interpretation: Data[i] × 2^ScaleExponent
+// Scale exponents compose algebraically — no float rounding occurs.
 public readonly struct ScaledTensor
 {
-    /// <summary>Row-major int64 data. Shape is tracked by the caller.</summary>
     public readonly long[] Data;
-
-    /// <summary>
-    /// Power-of-two exponent relating <see cref="Data"/> to the true real value.
-    /// Negative means values are scaled UP (carry fractional precision).
-    /// After matmul of tensors with exponents eA and eB, result exponent is <c>eA + eB</c>.
-    /// </summary>
     public readonly int ScaleExponent;
 
     public ScaledTensor(long[] data, int scaleExponent)
@@ -28,10 +17,6 @@ public readonly struct ScaledTensor
 
     public int Length => Data.Length;
 
-    /// <summary>
-    /// Arithmetic right-shift all values, adjusting exponent.
-    /// Primary mechanism for keeping values in <c>long</c> range between layers.
-    /// </summary>
     public ScaledTensor RightShift(int shiftBits)
     {
         if (shiftBits <= 0) return this;
@@ -41,23 +26,14 @@ public readonly struct ScaledTensor
         return new ScaledTensor(shifted, ScaleExponent + shiftBits);
     }
 
-    /// <summary>Dequantizes a single element to <c>double</c> for test comparison.</summary>
     public double DequantizeElement(int index)
         => Data[index] * System.Math.Pow(2.0, ScaleExponent);
 }
 
-/// <summary>
-/// Exact integer matrix multiplication using <see cref="Int128"/> accumulators.
-/// GGUF weight layout: column-major <c>W[col * nIn + k]</c>.
-/// Activations: row-major <c>A[row * nIn + k]</c>.
-/// </summary>
+// GGUF weight layout: column-major W[col * nIn + k], activations row-major A[row * nIn + k].
+// All accumulation via Int128 for exact arithmetic.
 public static class IntegerMatMul
 {
-    /// <summary>
-    /// Multiplies row-major A [rowsA × colsA] by column-major W [colsB × colsA],
-    /// producing row-major C [rowsA × colsB] with Int128 accumulation.
-    /// Parallelizes across output columns for large matrices.
-    /// </summary>
     public static long[] MatMul(
         long[] a, int rowsA, int colsA,
         long[] w, int colsB,
@@ -228,10 +204,7 @@ public static class IntegerMatMul
         return c;
     }
 
-    /// <summary>
-    /// Exact dot product via Int128 accumulation with 4× unroll.
-    /// Each long×long product is a single x64 <c>mul</c> into rdx:rax.
-    /// </summary>
+    // 4× unrolled Int128 dot — each long×long is a single x64 mul into rdx:rax
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Int128 DotInt128(long[] a, int aOffset, long[] b, int bOffset, int length)
     {
@@ -255,10 +228,6 @@ public static class IntegerMatMul
         return acc;
     }
 
-    /// <summary>
-    /// Mixed dot product: int64 activations × float weights quantized on-the-fly.
-    /// 4× unroll for throughput.
-    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Int128 DotInt128Mixed(long[] a, int aOffset, float[] b, int bOffset, int length, double scale)
     {
@@ -282,9 +251,6 @@ public static class IntegerMatMul
         return acc;
     }
 
-    /// <summary>
-    /// Mixed dot product: int64 activations × Half weights quantized on-the-fly.
-    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Int128 DotInt128Mixed(long[] a, int aOffset, Half[] b, int bOffset, int length, double scale)
     {
@@ -308,7 +274,6 @@ public static class IntegerMatMul
         return acc;
     }
 
-    /// <summary>Dot product returning <c>long</c> with optional right-shift.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static long DotLong(long[] a, int aOffset, long[] b, int bOffset, int length, int shift = 0)
     {
@@ -316,14 +281,12 @@ public static class IntegerMatMul
         return shift > 0 ? (long)(acc >> shift) : (long)acc;
     }
 
-    /// <summary>In-place element-wise addition for residual connections.</summary>
     public static void AddInPlace(long[] dst, long[] src, int count)
     {
         for (int i = 0; i < count; i++)
             dst[i] += src[i];
     }
 
-    /// <summary>In-place arithmetic right-shift (floor toward negative infinity).</summary>
     public static void RightShiftInPlace(long[] data, int count, int shift)
     {
         if (shift <= 0) return;
@@ -331,10 +294,6 @@ public static class IntegerMatMul
             data[i] >>= shift;
     }
 
-    /// <summary>
-    /// Quantizes float32 to int64 at <c>2^scaleBits</c> scale.
-    /// Result has <c>ScaleExponent = -scaleBits</c>.
-    /// </summary>
     public static ScaledTensor QuantizeFromFloat(float[] source, int scaleBits = 30)
     {
         double scale = 1L << scaleBits;
@@ -344,7 +303,6 @@ public static class IntegerMatMul
         return new ScaledTensor(data, -scaleBits);
     }
 
-    /// <summary>Dequantizes to float32 for test comparison. Not for hot paths.</summary>
     public static float[] DequantizeToFloat(ScaledTensor tensor)
     {
         double scale = System.Math.Pow(2.0, tensor.ScaleExponent);

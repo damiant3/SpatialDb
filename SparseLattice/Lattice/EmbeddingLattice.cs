@@ -1,18 +1,15 @@
 using System.Numerics;
 using SparseLattice.Math;
-/////////////////////////////////
+////////////////////////////////
 namespace SparseLattice.Lattice;
 
 public sealed class EmbeddingLattice<TPayload>
 {
-    private ISparseNode m_root;
-    private bool m_frozen;
+    ISparseNode m_root;
+    bool m_frozen;
 
     public bool IsFrozen => m_frozen;
 
-    /// <summary>
-    /// Exposes the root node for serialization. Accessible to <see cref="SparseLatticeSerializer"/>.
-    /// </summary>
     internal ISparseNode Root => m_root;
 
     public EmbeddingLattice(SparseOccupant<TPayload>[] occupants, LatticeOptions? options = null)
@@ -21,10 +18,6 @@ public sealed class EmbeddingLattice<TPayload>
         m_frozen = false;
     }
 
-    /// <summary>
-    /// Constructs an already-frozen lattice from a pre-built frozen root node.
-    /// Used exclusively by <see cref="SparseLatticeSerializer.Load{TPayload}"/>.
-    /// </summary>
     internal static EmbeddingLattice<TPayload> FromFrozenRoot(ISparseNode root)
     {
         EmbeddingLattice<TPayload> lattice = new(root);
@@ -32,18 +25,12 @@ public sealed class EmbeddingLattice<TPayload>
         return lattice;
     }
 
-    private EmbeddingLattice(ISparseNode root)
+    EmbeddingLattice(ISparseNode root)
     {
         m_root = root;
         m_frozen = false;
     }
 
-    /// <summary>
-    /// Freezes the lattice. Converts all mutable build-phase <see cref="SparseBranchNode"/>
-    /// instances into compact <see cref="FrozenBranchNode"/> instances backed by fixed-size arrays.
-    /// After freeze the tree is immutable and safe for concurrent lock-free reads.
-    /// Throws <see cref="InvalidOperationException"/> if called more than once.
-    /// </summary>
     public void Freeze()
     {
         if (m_frozen)
@@ -52,16 +39,9 @@ public sealed class EmbeddingLattice<TPayload>
         m_frozen = true;
     }
 
-    /// <summary>
-    /// Collects structural statistics by walking the frozen (or pre-freeze) tree.
-    /// </summary>
     public SparseTreeStats CollectStats()
         => CollectStatsRecursive(m_root, 0);
 
-    /// <summary>
-    /// Collects a full <see cref="SparsityReport"/> by walking the tree.
-    /// Reports nnz distribution, dimension coverage, leaf occupancy, and branch balance.
-    /// </summary>
     public SparsityReport CollectSparsityReport()
     {
         SparsityReportAccumulator acc = new();
@@ -87,11 +67,6 @@ public sealed class EmbeddingLattice<TPayload>
         return results;
     }
 
-    /// <summary>
-    /// Returns the K nearest occupants by L2 distance using a max-heap bounded to K entries.
-    /// The heap's worst distance serves as a live pruning radius, avoiding full tree scans
-    /// once K candidates have been found and the tree can be cut early.
-    /// </summary>
     public List<SparseOccupant<TPayload>> QueryKNearestL2(SparseVector center, int k)
     {
         if (k <= 0)
@@ -101,9 +76,6 @@ public sealed class EmbeddingLattice<TPayload>
         return heap.DrainAscending();
     }
 
-    /// <summary>
-    /// Returns the K nearest occupants by L1 (Manhattan) distance using a max-heap bounded to K entries.
-    /// </summary>
     public List<SparseOccupant<TPayload>> QueryKNearestL1(SparseVector center, int k)
     {
         if (k <= 0)
@@ -113,33 +85,21 @@ public sealed class EmbeddingLattice<TPayload>
         return heap.DrainAscending();
     }
 
-    // --- freeze ---
-
-    private static ISparseNode FreezeNode(ISparseNode node)
+    static ISparseNode FreezeNode(ISparseNode node)
     {
         if (node is SparseLeafNode<TPayload>)
             return node;
 
-        if (node is SparseBranchNode mutable)
-        {
-            ISparseNode? below = mutable.Below is not null ? FreezeNode(mutable.Below) : null;
-            ISparseNode? above = mutable.Above is not null ? FreezeNode(mutable.Above) : null;
-            return new FrozenBranchNode(mutable.SplitDimension, mutable.SplitValue, below, above);
-        }
+        if (!node.TryGetBranch(out ushort splitDimension, out long splitValue,
+                out ISparseNode? below, out ISparseNode? above))
+            return node;
 
-        if (node is FrozenBranchNode frozen)
-        {
-            ISparseNode? below = frozen.Below is not null ? FreezeNode(frozen.Below) : null;
-            ISparseNode? above = frozen.Above is not null ? FreezeNode(frozen.Above) : null;
-            return new FrozenBranchNode(frozen.SplitDimension, frozen.SplitValue, below, above);
-        }
-
-        return node;
+        ISparseNode? frozenBelow = below is not null ? FreezeNode(below) : null;
+        ISparseNode? frozenAbove = above is not null ? FreezeNode(above) : null;
+        return new FrozenBranchNode(splitDimension, splitValue, frozenBelow, frozenAbove);
     }
 
-    // --- stats ---
-
-    private static SparseTreeStats CollectStatsRecursive(ISparseNode node, int depth)
+    static SparseTreeStats CollectStatsRecursive(ISparseNode node, int depth)
     {
         if (node is SparseLeafNode<TPayload> leaf)
             return new SparseTreeStats
@@ -152,26 +112,7 @@ public sealed class EmbeddingLattice<TPayload>
                 AverageLeafOccupancy = leaf.Count,
             };
 
-        ushort splitDimension;
-        long splitValue;
-        ISparseNode? below;
-        ISparseNode? above;
-
-        if (node is FrozenBranchNode frozenBranch)
-        {
-            splitDimension = frozenBranch.SplitDimension;
-            splitValue = frozenBranch.SplitValue;
-            below = frozenBranch.Below;
-            above = frozenBranch.Above;
-        }
-        else if (node is SparseBranchNode mutableBranch)
-        {
-            splitDimension = mutableBranch.SplitDimension;
-            splitValue = mutableBranch.SplitValue;
-            below = mutableBranch.Below;
-            above = mutableBranch.Above;
-        }
-        else
+        if (!node.TryGetBranch(out ushort _, out long _, out ISparseNode? below, out ISparseNode? above))
             return new SparseTreeStats { TotalNodes = 1, MaxDepth = depth };
 
         SparseTreeStats belowStats = below is not null
@@ -198,9 +139,7 @@ public sealed class EmbeddingLattice<TPayload>
         };
     }
 
-    // --- sparsity report ---
-
-    private static void CollectSparsityRecursive(ISparseNode node, SparsityReportAccumulator acc)
+    static void CollectSparsityRecursive(ISparseNode node, SparsityReportAccumulator acc)
     {
         if (node is SparseLeafNode<TPayload> leaf)
         {
@@ -208,20 +147,7 @@ public sealed class EmbeddingLattice<TPayload>
             return;
         }
 
-        ISparseNode? below;
-        ISparseNode? above;
-
-        if (node is FrozenBranchNode frozen)
-        {
-            below = frozen.Below;
-            above = frozen.Above;
-        }
-        else if (node is SparseBranchNode mutable)
-        {
-            below = mutable.Below;
-            above = mutable.Above;
-        }
-        else
+        if (!node.TryGetBranch(out ushort _, out long _, out ISparseNode? below, out ISparseNode? above))
             return;
 
         int realizedCount = (below is not null ? 1 : 0) + (above is not null ? 1 : 0);
@@ -231,35 +157,28 @@ public sealed class EmbeddingLattice<TPayload>
         if (above is not null) CollectSparsityRecursive(above, acc);
     }
 
-    // --- L2 radius query ---
-
-    private static void QueryRecursiveL2(
+    static void QueryRecursiveL2(
         ISparseNode node,
         SparseVector center,
         BigInteger radiusSquared,
         List<SparseOccupant<TPayload>> results)
     {
-        switch (node)
+        if (node is SparseLeafNode<TPayload> leaf)
         {
-            case SparseLeafNode<TPayload> leaf:
-                foreach (SparseOccupant<TPayload> occupant in leaf.Occupants)
-                    if (center.DistanceSquaredL2(occupant.Position) <= radiusSquared)
-                        results.Add(occupant);
-                break;
-
-            case FrozenBranchNode frozen:
-                DescendBranchL2(frozen.SplitDimension, frozen.SplitValue, frozen.Below, frozen.Above,
-                    center, radiusSquared, results);
-                break;
-
-            case SparseBranchNode mutable:
-                DescendBranchL2(mutable.SplitDimension, mutable.SplitValue, mutable.Below, mutable.Above,
-                    center, radiusSquared, results);
-                break;
+            foreach (SparseOccupant<TPayload> occupant in leaf.Occupants)
+                if (center.DistanceSquaredL2(occupant.Position) <= radiusSquared)
+                    results.Add(occupant);
+            return;
         }
+
+        if (!node.TryGetBranch(out ushort splitDimension, out long splitValue,
+                out ISparseNode? below, out ISparseNode? above))
+            return;
+
+        DescendBranchL2(splitDimension, splitValue, below, above, center, radiusSquared, results);
     }
 
-    private static void DescendBranchL2(
+    static void DescendBranchL2(
         ushort splitDimension, long splitValue,
         ISparseNode? below, ISparseNode? above,
         SparseVector center, BigInteger radiusSquared,
@@ -281,35 +200,28 @@ public sealed class EmbeddingLattice<TPayload>
         }
     }
 
-    // --- L1 radius query ---
-
-    private static void QueryRecursiveL1(
+    static void QueryRecursiveL1(
         ISparseNode node,
         SparseVector center,
         BigInteger maxDistance,
         List<SparseOccupant<TPayload>> results)
     {
-        switch (node)
+        if (node is SparseLeafNode<TPayload> leaf)
         {
-            case SparseLeafNode<TPayload> leaf:
-                foreach (SparseOccupant<TPayload> occupant in leaf.Occupants)
-                    if (center.DistanceL1(occupant.Position) <= maxDistance)
-                        results.Add(occupant);
-                break;
-
-            case FrozenBranchNode frozen:
-                DescendBranchL1(frozen.SplitDimension, frozen.SplitValue, frozen.Below, frozen.Above,
-                    center, maxDistance, results);
-                break;
-
-            case SparseBranchNode mutable:
-                DescendBranchL1(mutable.SplitDimension, mutable.SplitValue, mutable.Below, mutable.Above,
-                    center, maxDistance, results);
-                break;
+            foreach (SparseOccupant<TPayload> occupant in leaf.Occupants)
+                if (center.DistanceL1(occupant.Position) <= maxDistance)
+                    results.Add(occupant);
+            return;
         }
+
+        if (!node.TryGetBranch(out ushort splitDimension, out long splitValue,
+                out ISparseNode? below, out ISparseNode? above))
+            return;
+
+        DescendBranchL1(splitDimension, splitValue, below, above, center, maxDistance, results);
     }
 
-    private static void DescendBranchL1(
+    static void DescendBranchL1(
         ushort splitDimension, long splitValue,
         ISparseNode? below, ISparseNode? above,
         SparseVector center, BigInteger maxDistance,
@@ -332,28 +244,23 @@ public sealed class EmbeddingLattice<TPayload>
 
     // --- KNN L2 with heap pruning ---
 
-    private void QueryKNearestRecursiveL2(ISparseNode node, SparseVector center, int k, KnnHeap heap)
+    void QueryKNearestRecursiveL2(ISparseNode node, SparseVector center, int k, KnnHeap heap)
     {
-        switch (node)
+        if (node is SparseLeafNode<TPayload> leaf)
         {
-            case SparseLeafNode<TPayload> leaf:
-                foreach (SparseOccupant<TPayload> occupant in leaf.Occupants)
-                    heap.TryInsert(occupant, center.DistanceSquaredL2Fast(occupant.Position));
-                break;
-
-            case FrozenBranchNode frozen:
-                DescendKnnL2(frozen.SplitDimension, frozen.SplitValue, frozen.Below, frozen.Above,
-                    center, k, heap);
-                break;
-
-            case SparseBranchNode mutable:
-                DescendKnnL2(mutable.SplitDimension, mutable.SplitValue, mutable.Below, mutable.Above,
-                    center, k, heap);
-                break;
+            foreach (SparseOccupant<TPayload> occupant in leaf.Occupants)
+                heap.TryInsert(occupant, center.DistanceSquaredL2Fast(occupant.Position));
+            return;
         }
+
+        if (!node.TryGetBranch(out ushort splitDimension, out long splitValue,
+                out ISparseNode? below, out ISparseNode? above))
+            return;
+
+        DescendKnnL2(splitDimension, splitValue, below, above, center, k, heap);
     }
 
-    private void DescendKnnL2(
+    void DescendKnnL2(
         ushort splitDimension, long splitValue,
         ISparseNode? below, ISparseNode? above,
         SparseVector center, int k, KnnHeap heap)
@@ -378,26 +285,20 @@ public sealed class EmbeddingLattice<TPayload>
 
     private void QueryKNearestRecursiveL1(ISparseNode node, SparseVector center, int k, KnnHeap heap)
     {
-        switch (node)
+        if (node is SparseLeafNode<TPayload> leaf)
         {
-            case SparseLeafNode<TPayload> leaf:
-                foreach (SparseOccupant<TPayload> occupant in leaf.Occupants)
-                    heap.TryInsert(occupant, center.DistanceL1Fast(occupant.Position));
-                break;
-
-            case FrozenBranchNode frozen:
-                DescendKnnL1(frozen.SplitDimension, frozen.SplitValue, frozen.Below, frozen.Above,
-                    center, k, heap);
-                break;
-
-            case SparseBranchNode mutable:
-                DescendKnnL1(mutable.SplitDimension, mutable.SplitValue, mutable.Below, mutable.Above,
-                    center, k, heap);
-                break;
+            foreach (SparseOccupant<TPayload> occupant in leaf.Occupants)
+                heap.TryInsert(occupant, center.DistanceL1Fast(occupant.Position));
+            return;
         }
-    }
 
-    private void DescendKnnL1(
+        if (!node.TryGetBranch(out ushort splitDimension, out long splitValue,
+                out ISparseNode? below, out ISparseNode? above))
+            return;
+
+        DescendKnnL1(splitDimension, splitValue, below, above, center, k, heap);
+    }
+    void DescendKnnL1(
         ushort splitDimension, long splitValue,
         ISparseNode? below, ISparseNode? above,
         SparseVector center, int k, KnnHeap heap)
@@ -417,15 +318,12 @@ public sealed class EmbeddingLattice<TPayload>
                 QueryKNearestRecursiveL1(far, center, k, heap);
         }
     }
-
-    // --- max-heap bounded to K entries ---
-
     private sealed class KnnHeap(int capacity)
     {
-        private readonly (SparseOccupant<TPayload> occupant, ulong distance)[] m_heap
+        readonly (SparseOccupant<TPayload> occupant, ulong distance)[] m_heap
             = new (SparseOccupant<TPayload>, ulong)[capacity];
 
-        private int m_count;
+        int m_count;
 
         public bool IsFull => m_count == capacity;
         public ulong WorstDistance => m_heap[0].distance;
@@ -447,7 +345,6 @@ public sealed class EmbeddingLattice<TPayload>
 
         public List<SparseOccupant<TPayload>> DrainAscending()
         {
-            // sort the backing array in ascending distance order then return occupants
             int count = m_count;
             System.Array.Sort(m_heap, 0, count,
                 Comparer<(SparseOccupant<TPayload>, ulong)>.Create(
@@ -458,7 +355,7 @@ public sealed class EmbeddingLattice<TPayload>
             return result;
         }
 
-        private void SiftUp(int index)
+        void SiftUp(int index)
         {
             while (index > 0)
             {
@@ -470,7 +367,7 @@ public sealed class EmbeddingLattice<TPayload>
             }
         }
 
-        private void SiftDown(int index)
+        void SiftDown(int index)
         {
             while (true)
             {

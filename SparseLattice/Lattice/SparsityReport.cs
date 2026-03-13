@@ -3,82 +3,30 @@ using SparseLattice.Math;
 /////////////////////////////////////
 namespace SparseLattice.Lattice;
 
-/// <summary>
-/// Full diagnostic report on the sparsity and structural balance of an
-/// <see cref="EmbeddingLattice{TPayload}"/>. Produced by
-/// <see cref="EmbeddingLattice{TPayload}.CollectSparsityReport"/>.
-///
-/// Use this to answer: "Is the lattice over- or under-allocated relative to my data?"
-/// </summary>
 public sealed class SparsityReport
 {
-    // --- per-occupant nnz distribution ---
-
-    /// <summary>Minimum nonzero-count across all occupants.</summary>
     public int MinNnz { get; init; }
-
-    /// <summary>Maximum nonzero-count across all occupants.</summary>
     public int MaxNnz { get; init; }
-
-    /// <summary>Mean nonzero-count across all occupants.</summary>
     public double MeanNnz { get; init; }
-
-    /// <summary>Population standard deviation of nonzero-count across all occupants.</summary>
     public double StdDevNnz { get; init; }
 
-    /// <summary>
-    /// Histogram of nnz counts across all occupants.
-    /// Buckets: [0] = nnz==0, [1] = 1–4, [2] = 5–8, [3] = 9–16,
-    ///          [4] = 17–32, [5] = 33–64, [6] = 65+
-    /// </summary>
+    // Buckets: [0]=0, [1]=1–4, [2]=5–8, [3]=9–16, [4]=17–32, [5]=33–64, [6]=65+
     public int[] NnzHistogram { get; init; } = new int[7];
 
-    // --- dimension coverage ---
-
-    /// <summary>Total declared dimensions (from the first occupant; 0 if corpus is empty).</summary>
     public int TotalDimensions { get; init; }
-
-    /// <summary>Count of distinct dimensions that appear in at least one occupant.</summary>
     public int RealizedDimensions { get; init; }
-
-    /// <summary>RealizedDimensions / TotalDimensions. Range [0, 1].</summary>
     public double DimensionCoverage => TotalDimensions == 0 ? 0.0 : (double)RealizedDimensions / TotalDimensions;
-
-    /// <summary>
-    /// Up to 10 most-populated dimensions, ordered by occupant count descending.
-    /// Each entry is (dimension index, occupant count for that dimension).
-    /// </summary>
     public (ushort Dimension, int OccupantCount)[] TopActiveDimensions { get; init; } = [];
 
-    // --- per-leaf occupancy ---
-
-    /// <summary>Minimum occupant count across all leaf nodes.</summary>
     public int MinLeafOccupancy { get; init; }
-
-    /// <summary>Maximum occupant count across all leaf nodes.</summary>
     public int MaxLeafOccupancy { get; init; }
-
-    /// <summary>Population standard deviation of occupant count across all leaf nodes.</summary>
     public double StdDevLeafOccupancy { get; init; }
 
-    // --- branch balance ---
-
-    /// <summary>Branch nodes that have both a Below and an Above child realized.</summary>
+    // 1.0 = perfectly balanced; closer to 0 = highly skewed splits
     public int BothChildrenRealized { get; init; }
-
-    /// <summary>Branch nodes that have exactly one child realized (the other side is empty).</summary>
     public int OneChildRealized { get; init; }
-
-    /// <summary>
-    /// BothChildrenRealized / TotalBranchNodes. Range [0, 1].
-    /// 1.0 = perfectly balanced binary tree; values closer to 0 indicate highly skewed splits.
-    /// </summary>
     public double BranchBalanceRatio { get; init; }
-
-    /// <summary>Total number of branch nodes in the tree.</summary>
     public int TotalBranchNodes { get; init; }
-
-    /// <summary>Total number of occupants in the tree.</summary>
     public int TotalOccupants { get; init; }
 
     public override string ToString()
@@ -87,16 +35,12 @@ public sealed class SparsityReport
          + $"balance {BranchBalanceRatio:P0} ({BothChildrenRealized}/{TotalBranchNodes} branches both-realized)";
 }
 
-/// <summary>
-/// Accumulates raw counts during a single tree walk to build a <see cref="SparsityReport"/>.
-/// </summary>
 internal sealed class SparsityReportAccumulator
 {
-    private readonly int[] m_nnzBucketUpperBounds = [0, 4, 8, 16, 32, 64, int.MaxValue];
-
-    private readonly ConcurrentDictionary<ushort, int> m_dimensionCounts = new();
-    private readonly System.Collections.Generic.List<int> m_leafOccupancies = [];
-    private readonly System.Collections.Generic.List<int> m_nnzValues = [];
+    readonly int[] m_nnzBucketUpperBounds = [0, 4, 8, 16, 32, 64, int.MaxValue];
+    readonly ConcurrentDictionary<ushort, int> m_dimensionCounts = new();
+    readonly System.Collections.Generic.List<int> m_leafOccupancies = [];
+    readonly System.Collections.Generic.List<int> m_nnzValues = [];
 
     public int BothChildrenRealized { get; private set; }
     public int OneChildRealized { get; private set; }
@@ -204,7 +148,7 @@ internal sealed class SparsityReportAccumulator
         };
     }
 
-    private int NnzBucket(int nnz)
+    int NnzBucket(int nnz)
     {
         for (int i = 0; i < m_nnzBucketUpperBounds.Length; i++)
             if (nnz <= m_nnzBucketUpperBounds[i]) return i;

@@ -2,31 +2,16 @@ using SparseLattice.Math;
 ///////////////////////////////////
 namespace SparseLattice.Lattice;
 
-/// <summary>
-/// Wraps an <see cref="EmbeddingLattice{TPayload}"/> built from the model's output
-/// embedding table. Each occupant's payload is the token ID, and the vector is the
-/// quantized output embedding for that token.
-/// Instead of computing a full [hidden × vocab] matmul for logits, callers query
-/// KNN to find the top-K candidate tokens and score only those.
-/// </summary>
+// Token IDs stored as payloads; vectors are quantized output embeddings.
+// KNN replaces the full [hidden × vocab] matmul for logit computation.
 public sealed class VocabLattice
 {
-    private readonly EmbeddingLattice<int> m_lattice;
+    readonly EmbeddingLattice<int> m_lattice;
 
     public int VocabSize { get; }
     public int Dimensions { get; }
     public int K { get; }
 
-    /// <summary>
-    /// Builds a <see cref="VocabLattice"/> from a flat output embedding table.
-    /// </summary>
-    /// <param name="outputEmbeddings">
-    /// Row-major float array [vocabSize × dims] — the output (unembedding) weight matrix.
-    /// </param>
-    /// <param name="vocabSize">Number of tokens in the vocabulary.</param>
-    /// <param name="dims">Embedding dimension per token.</param>
-    /// <param name="k">Default K for KNN queries.</param>
-    /// <param name="quantizationOptions">Options for float→sparse quantization.</param>
     public VocabLattice(float[] outputEmbeddings, int vocabSize, int dims,
         int k = 32, QuantizationOptions? quantizationOptions = null)
     {
@@ -54,13 +39,6 @@ public sealed class VocabLattice
         m_lattice.Freeze();
     }
 
-    /// <summary>
-    /// Finds the K nearest vocabulary tokens to the given hidden state.
-    /// Returns token IDs sorted by ascending L2 distance.
-    /// </summary>
-    /// <param name="hiddenState">Dense float hidden state [dims].</param>
-    /// <param name="k">Number of candidates to return. Uses default K if null.</param>
-    /// <param name="quantizationOptions">Options for quantizing the query vector.</param>
     public int[] QueryTopK(float[] hiddenState, int? k = null, QuantizationOptions? quantizationOptions = null)
     {
         QuantizationOptions options = quantizationOptions ?? new QuantizationOptions
@@ -79,13 +57,6 @@ public sealed class VocabLattice
         return tokenIds;
     }
 
-    /// <summary>
-    /// Scores a set of candidate token IDs against the hidden state using exact
-    /// dot products. Returns (tokenId, score) pairs sorted descending by score.
-    /// </summary>
-    /// <param name="hiddenState">Dense float hidden state [dims].</param>
-    /// <param name="candidateTokenIds">Token IDs to score.</param>
-    /// <param name="outputEmbeddings">Flat [vocabSize × dims] output embedding table.</param>
     public static (int TokenId, float Score)[] ScoreCandidates(
         float[] hiddenState, int[] candidateTokenIds, float[] outputEmbeddings, int dims)
     {
@@ -104,10 +75,6 @@ public sealed class VocabLattice
         return scored;
     }
 
-    /// <summary>
-    /// Full brute-force logits for validation: dot product of hidden state against
-    /// every vocabulary token embedding. Returns token ID of the argmax.
-    /// </summary>
     public static int ArgmaxBruteForce(float[] hiddenState, float[] outputEmbeddings, int vocabSize, int dims)
     {
         int bestId = 0;
@@ -132,10 +99,7 @@ public sealed class VocabLattice
         return bestId;
     }
 
-    /// <summary>
-    /// Half-precision overload: avoids expanding the full embedding table to float[].
-    /// Each Half is promoted to float on-the-fly for the dot product.
-    /// </summary>
+    // Half→float promotion on-the-fly to avoid expanding the full table
     public static int ArgmaxBruteForce(float[] hiddenState, Half[] outputEmbeddings, int vocabSize, int dims)
     {
         int bestId = 0;

@@ -1,41 +1,25 @@
-﻿using System.Collections.Frozen;
+using System.Collections.Frozen;
 using System.Text;
 /////////////////////////////
 namespace SparseLattice.Gguf;
 
-/// <summary>
-/// WordPiece / SentencePiece tokenizer for BERT-family models (nomic-embed-text, bert-base, etc.).
-/// Vocabulary and token types are loaded directly from a <see cref="GgufReader"/>.
-/// </summary>
-/// <remarks>
-/// Supports two vocabulary conventions, auto-detected from the vocab content:
-/// <list type="bullet">
-///   <item><b>SentencePiece (▁ prefix)</b>: word-initial subwords are prefixed with U+2581 (<c>▁</c>),
-///         continuation subwords use the bare form.  Used by nomic-embed-text.</item>
-///   <item><b>Classic WordPiece (## prefix)</b>: word-initial subwords are bare,
-///         continuation subwords are prefixed with <c>##</c>.  Used by bert-base-uncased.</item>
-/// </list>
-/// </remarks>
+// Supports SentencePiece (▁ prefix) and Classic WordPiece (## prefix),
+// auto-detected from vocab content.
 public sealed class WordPieceTokenizer
 {
-    private readonly FrozenDictionary<string, int> m_vocab;
-    private readonly string[] m_idToToken;
-    private readonly bool m_useSentencePiecePrefix; // true = ▁ convention, false = ## convention
+    readonly FrozenDictionary<string, int> m_vocab;
+    readonly string[] m_idToToken;
+    readonly bool m_useSentencePiecePrefix;
 
-    /// <summary>SentencePiece word-initial marker (U+2581 LOWER ONE EIGHTH BLOCK).</summary>
-    private const char SpPrefix = '\u2581';
+    // U+2581 LOWER ONE EIGHTH BLOCK
+    const char SpPrefix = '\u2581';
 
     public int VocabSize  { get; }
-    public int BosTokenId { get; }   // [CLS] = 101
-    public int EosTokenId { get; }   // [SEP] = 102
-    public int UnkTokenId { get; }   // [UNK] = 100
-    public int PadTokenId { get; }   // [PAD] = 0
+    public int BosTokenId { get; }
+    public int EosTokenId { get; }
+    public int UnkTokenId { get; }
+    public int PadTokenId { get; }
 
-    // -----------------------------------------------------------------------
-    // Construction
-    // -----------------------------------------------------------------------
-
-    /// <summary>Builds a <see cref="WordPieceTokenizer"/> from an open <see cref="GgufReader"/>.</summary>
     public static WordPieceTokenizer FromGguf(GgufReader reader)
     {
         if (reader.Tokens.Count == 0)
@@ -45,10 +29,6 @@ public sealed class WordPieceTokenizer
         return new WordPieceTokenizer(reader.Tokens, reader.BosTokenId, reader.EosTokenId, reader.UnkTokenId);
     }
 
-    /// <summary>
-    /// Internal constructor — accepts a pre-built vocabulary list.
-    /// Used by unit tests that don't require a GGUF file.
-    /// </summary>
     internal WordPieceTokenizer(
         IReadOnlyList<string> tokens,
         int bosTokenId,
@@ -82,14 +62,6 @@ public sealed class WordPieceTokenizer
         m_useSentencePiecePrefix = spCount > wpCount;
     }
 
-    // -----------------------------------------------------------------------
-    // Public API
-    // -----------------------------------------------------------------------
-
-    /// <summary>
-    /// Encodes <paramref name="text"/> to a sequence of token IDs using WordPiece.
-    /// Prepends [CLS] and appends [SEP] when <paramref name="addSpecialTokens"/> is <c>true</c>.
-    /// </summary>
     public int[] Encode(string text, bool addSpecialTokens = true)
     {
         List<int> ids = [];
@@ -106,7 +78,6 @@ public sealed class WordPieceTokenizer
         return [.. ids];
     }
 
-    /// <summary>Decodes token IDs back to a string, removing subword prefixes.</summary>
     public string Decode(IReadOnlyList<int> tokenIds)
     {
         StringBuilder sb = new();
@@ -145,14 +116,7 @@ public sealed class WordPieceTokenizer
         return sb.ToString();
     }
 
-    // -----------------------------------------------------------------------
-    // Private — pre-tokenisation and WordPiece segmentation
-    // -----------------------------------------------------------------------
-
-    // Splits text into lowercase words on whitespace/punctuation/symbol boundaries,
-    // matching llama.cpp's WPM preprocess() function.
-    // Punctuation always splits; ASCII symbols (< 0x7F) also split.
-    private static IEnumerable<string> Pretokenize(string text)
+    static IEnumerable<string> Pretokenize(string text)
     {
         StringBuilder word = new();
         foreach (char c in text)
@@ -181,9 +145,7 @@ public sealed class WordPieceTokenizer
             yield return word.ToString().ToLowerInvariant();
     }
 
-    // Greedy longest-match subword segmentation for a single pre-tokenized word.
-    // Adapts to the detected vocab convention (▁ vs ##).
-    private List<int> EncodeWord(string word)
+    List<int> EncodeWord(string word)
     {
         if (word.Length == 0) return [];
 
@@ -193,11 +155,9 @@ public sealed class WordPieceTokenizer
             return EncodeWordClassicWP(word);
     }
 
-    // SentencePiece convention: ▁ is prepended to the entire word, then greedy
-    // longest-match left-to-right through the ▁-prefixed string.  The first
-    // match consumes the ▁ (word-initial token); subsequent pieces are bare
-    // (continuation tokens).  This matches llama.cpp's llm_tokenizer_wpm_session.
-    private List<int> EncodeWordSentencePiece(string word)
+    // ▁ is prepended to the entire word, then greedy longest-match left-to-right.
+    // First match consumes the ▁ (word-initial); subsequent pieces are bare (continuation).
+    List<int> EncodeWordSentencePiece(string word)
     {
         // Build the ▁-prefixed word string that the tokenizer walks through.
         string prefixed = SpPrefix + word;
@@ -231,8 +191,7 @@ public sealed class WordPieceTokenizer
         return ids;
     }
 
-    // Classic WordPiece convention: word-initial subwords are bare, continuations use ## prefix.
-    private List<int> EncodeWordClassicWP(string word)
+    List<int> EncodeWordClassicWP(string word)
     {
         if (m_vocab.TryGetValue(word, out int fullId))
             return [fullId];
@@ -267,8 +226,7 @@ public sealed class WordPieceTokenizer
         return ids;
     }
 
-    // CJK Unified Ideographs are treated as individual tokens in BERT.
-    private static bool IsCjkChar(char c)
+    static bool IsCjkChar(char c)
         => (c >= '\u4E00' && c <= '\u9FFF')
         || (c >= '\u3400' && c <= '\u4DBF')
         || (c >= '\uF900' && c <= '\uFAFF')

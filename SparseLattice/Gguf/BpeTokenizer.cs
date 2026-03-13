@@ -4,39 +4,31 @@ using System.Text.RegularExpressions;
 ///////////////////////////////////////
 namespace SparseLattice.Gguf;
 
-/// <summary>
-/// Byte-Pair Encoding tokenizer loaded from a GGUF model file.
-/// Implements the GPT-2-style BPE algorithm with byte-level encoding,
-/// as used by nomic-embed-text and similar models.
-/// </summary>
 public sealed class BpeTokenizer
 {
-    // GPT-2 byte-to-unicode mapping: maps each byte 0-255 to a unique printable
-    // unicode character so that all bytes are representable as vocab tokens.
-    private static readonly FrozenDictionary<byte, char> s_byteToUnicode;
-    private static readonly FrozenDictionary<char, byte> s_unicodeToByte;
+    // GPT-2 byte-to-unicode: maps each byte 0-255 to a unique printable char
+    static readonly FrozenDictionary<byte, char> s_byteToUnicode;
+    static readonly FrozenDictionary<char, byte> s_unicodeToByte;
 
     // Regex for GPT-2-style pre-tokenisation (splits on contractions,
     // punctuation, whitespace, and letter/digit runs).
     // Matches: optional leading space + letters, contractions, numbers,
     // non-whitespace runs, or whitespace runs.
-    private static readonly Regex s_pretokenizePattern = new(
+    static readonly Regex s_pretokenizePattern = new(
         @"'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+",
         RegexOptions.Compiled);
 
     static BpeTokenizer()
     {
-        // Build the standard GPT-2 byte ? unicode table.
-        // The 188 "safe" printable bytes map to themselves; the remaining 68
-        // bytes that are control characters or whitespace map to code-points
-        // starting at U+0100.
+        // 188 "safe" printable bytes map to themselves; remaining 68 control/whitespace
+        // bytes map to code-points starting at U+0100
         Dictionary<byte, char> b2u = new(256);
         int nextCodePoint = 0x100;
         for (int b = 0; b < 256; b++)
         {
-            bool isSafe = (b >= '!' && b <= '~')   // printable ASCII (excl. space)
-                       || (b >= 0xA1 && b <= 0xAC) // latin-1 supplement part 1
-                       || (b >= 0xAE && b <= 0xFF); // latin-1 supplement part 2
+            bool isSafe = (b >= '!' && b <= '~')
+                       || (b >= 0xA1 && b <= 0xAC)
+                       || (b >= 0xAE && b <= 0xFF);
             b2u[(byte)b] = isSafe ? (char)b : (char)(nextCodePoint++);
         }
         s_byteToUnicode = b2u.ToFrozenDictionary();
@@ -47,9 +39,9 @@ public sealed class BpeTokenizer
         s_unicodeToByte = u2b.ToFrozenDictionary();
     }
 
-    private readonly FrozenDictionary<string, int> m_vocab;       // token string ? id
-    private readonly FrozenDictionary<(string, string), int> m_mergeRanks; // pair ? rank
-    private readonly string[] m_idToToken;
+    readonly FrozenDictionary<string, int> m_vocab;
+    readonly FrozenDictionary<(string, string), int> m_mergeRanks;
+    readonly string[] m_idToToken;
 
     public int VocabSize   { get; }
     public int BosTokenId  { get; }
@@ -76,7 +68,7 @@ public sealed class BpeTokenizer
     }
 
     /// <summary>
-    /// Internal constructor — also used directly by unit tests that supply
+    /// Internal constructor â€” also used directly by unit tests that supply
     /// a hand-built vocabulary and merge table without a GGUF file.
     /// </summary>
     internal BpeTokenizer(
@@ -108,7 +100,7 @@ public sealed class BpeTokenizer
             string rule = merges[rank];
             int space   = rule.IndexOf(' ');
             if (space <= 0 || space == rule.Length - 1)
-                continue;   // malformed entry — skip
+                continue;   // malformed entry â€” skip
             string left  = rule[..space];
             string right = rule[(space + 1)..];
             ranks.TryAdd((left, right), rank);
@@ -170,10 +162,10 @@ public sealed class BpeTokenizer
     }
 
     // -----------------------------------------------------------------------
-    // Private — BPE encoding of a single pre-tokenized chunk
+    // Private â€” BPE encoding of a single pre-tokenized chunk
     // -----------------------------------------------------------------------
 
-    private List<int> EncodePretokenized(string word)
+    List<int> EncodePretokenized(string word)
     {
         byte[] utf8            = Encoding.UTF8.GetBytes(word);
         List<string?> slots    = new(utf8.Length);
@@ -194,7 +186,7 @@ public sealed class BpeTokenizer
         return ids;
     }
 
-    private void MergeUntilDone(List<string?> slots)
+    void MergeUntilDone(List<string?> slots)
     {
         bool merged = true;
         while (merged)

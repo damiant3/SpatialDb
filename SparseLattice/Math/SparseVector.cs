@@ -12,7 +12,7 @@ public readonly struct SparseEntry(ushort dimension, long value)
 
 public readonly struct SparseVector : IEquatable<SparseVector>
 {
-    private readonly SparseEntry[] m_entries;
+    readonly SparseEntry[] m_entries;
 
     public int NonzeroCount => m_entries.Length;
     public int TotalDimensions { get; }
@@ -301,7 +301,7 @@ public readonly struct SparseVector : IEquatable<SparseVector>
     public override string ToString()
         => $"Sparse({NonzeroCount}/{TotalDimensions})";
 
-    private static void ValidateEntriesOrThrow(SparseEntry[] entries, int totalDimensions)
+    static void ValidateEntriesOrThrow(SparseEntry[] entries, int totalDimensions)
     {
         for (int i = 0; i < entries.Length; i++)
         {

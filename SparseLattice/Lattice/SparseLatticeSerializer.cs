@@ -2,43 +2,21 @@ using SparseLattice.Math;
 ///////////////////////////////////////////
 namespace SparseLattice.Lattice;
 
-/// <summary>
-/// Deterministic binary serializer for a frozen <see cref="EmbeddingLattice{TPayload}"/> tree.
-/// The format is compact and versioned; it preserves the full sparse tree structure such that
-/// a round-trip save/load produces a byte-identical second save.
-///
-/// Wire format (little-endian throughout):
-///   [4 bytes]  magic   = 0x534C4154  ('SLAT')
-///   [2 bytes]  version = 1
-///   [node…]    recursive node encoding
-///
-/// Node encoding:
-///   [1 byte]   tag: 0 = leaf, 1 = branch
-///   Leaf:
-///     [4 bytes]  occupant count N
-///     N × occupant:
-///       [4 bytes]  total dimension count
-///       [4 bytes]  entry count E
-///       E × (2-byte dimension, 8-byte value)
-///       [payload encoded by IPayloadSerializer]
-///   Branch:
-///     [2 bytes]  split dimension
-///     [8 bytes]  split value
-///     [1 byte]   child mask (bit0=below present, bit1=above present)
-///     [node…]    below child (if bit0 set)
-///     [node…]    above child (if bit1 set)
-/// </summary>
+// Wire format (little-endian): [4B magic 'SLAT'] [2B version=1] [node…]
+// Node: [1B tag: 0=leaf, 1=branch]
+// Leaf: [4B count] N × [4B dims, 4B entries, E×(2B dim + 8B val), payload]
+// Branch: [2B splitDim] [8B splitVal] [1B childMask] [node…below] [node…above]
 public sealed class SparseLatticeSerializer
 {
-    private const uint s_Magic = 0x544C4153u;  // 'SLAT' LE
-    private const ushort s_Version = 1;
+    const uint Magic = 0x544C4153u;
+    const ushort Version = 1;
 
-    private const byte s_TagLeaf = 0;
-    private const byte s_TagBranch = 1;
-    private const byte s_BelowMask = 0b01;
-    private const byte s_AboveMask = 0b10;
+    const byte TagLeaf = 0;
+    const byte TagBranch = 1;
+    const byte BelowMask = 0b01;
+    const byte AboveMask = 0b10;
 
-    private SparseLatticeSerializer() { }
+    SparseLatticeSerializer() { }
 
     /// <summary>
     /// Serializes the frozen lattice to <paramref name="stream"/>.
@@ -54,8 +32,8 @@ public sealed class SparseLatticeSerializer
             throw new InvalidOperationException("Lattice must be frozen before serialization.");
 
         using BinaryWriter writer = new(stream, System.Text.Encoding.UTF8, leaveOpen: true);
-        writer.Write(s_Magic);
-        writer.Write(s_Version);
+        writer.Write(Magic);
+        writer.Write(Version);
         WriteNode(writer, lattice.Root, payloadSerializer);
     }
 
@@ -70,60 +48,40 @@ public sealed class SparseLatticeSerializer
         using BinaryReader reader = new(stream, System.Text.Encoding.UTF8, leaveOpen: true);
 
         uint magic = reader.ReadUInt32();
-        if (magic != s_Magic)
-            throw new InvalidDataException($"Invalid magic bytes: 0x{magic:X8}, expected 0x{s_Magic:X8}.");
+        if (magic != Magic)
+            throw new InvalidDataException($"Invalid magic bytes: 0x{magic:X8}, expected 0x{Magic:X8}.");
 
         ushort version = reader.ReadUInt16();
-        if (version != s_Version)
-            throw new InvalidDataException($"Unsupported serialization version {version}. Expected {s_Version}.");
+        if (version != Version)
+            throw new InvalidDataException($"Unsupported serialization version {version}. Expected {Version}.");
 
         ISparseNode root = ReadNode<TPayload>(reader, payloadSerializer);
         return EmbeddingLattice<TPayload>.FromFrozenRoot(root);
     }
 
-    // --- write ---
-
-    private static void WriteNode<TPayload>(
+    static void WriteNode<TPayload>(
         BinaryWriter writer,
         ISparseNode node,
         IPayloadSerializer<TPayload> payloadSerializer)
     {
         if (node is SparseLeafNode<TPayload> leaf)
         {
-            writer.Write(s_TagLeaf);
+            writer.Write(TagLeaf);
             WriteLeaf(writer, leaf, payloadSerializer);
             return;
         }
 
-        ushort splitDimension;
-        long splitValue;
-        ISparseNode? below;
-        ISparseNode? above;
-
-        if (node is FrozenBranchNode frozen)
-        {
-            splitDimension = frozen.SplitDimension;
-            splitValue = frozen.SplitValue;
-            below = frozen.Below;
-            above = frozen.Above;
-        }
-        else if (node is SparseBranchNode mutable)
-        {
-            splitDimension = mutable.SplitDimension;
-            splitValue = mutable.SplitValue;
-            below = mutable.Below;
-            above = mutable.Above;
-        }
-        else
+        if (!node.TryGetBranch(out ushort splitDimension, out long splitValue,
+                out ISparseNode? below, out ISparseNode? above))
             throw new InvalidOperationException($"Unknown node type '{node.GetType().FullName}'.");
 
-        writer.Write(s_TagBranch);
+        writer.Write(TagBranch);
         writer.Write(splitDimension);
         writer.Write(splitValue);
 
         byte childMask = 0;
-        if (below is not null) childMask |= s_BelowMask;
-        if (above is not null) childMask |= s_AboveMask;
+        if (below is not null) childMask |= BelowMask;
+        if (above is not null) childMask |= AboveMask;
         writer.Write(childMask);
 
         if (below is not null)
@@ -132,7 +90,7 @@ public sealed class SparseLatticeSerializer
             WriteNode(writer, above, payloadSerializer);
     }
 
-    private static void WriteLeaf<TPayload>(
+    static void WriteLeaf<TPayload>(
         BinaryWriter writer,
         SparseLeafNode<TPayload> leaf,
         IPayloadSerializer<TPayload> payloadSerializer)
@@ -153,21 +111,19 @@ public sealed class SparseLatticeSerializer
         }
     }
 
-    // --- read ---
-
-    private static ISparseNode ReadNode<TPayload>(
+    static ISparseNode ReadNode<TPayload>(
         BinaryReader reader,
         IPayloadSerializer<TPayload> payloadSerializer)
     {
         byte tag = reader.ReadByte();
-        if (tag == s_TagLeaf)
+        if (tag == TagLeaf)
             return ReadLeaf<TPayload>(reader, payloadSerializer);
-        if (tag == s_TagBranch)
+        if (tag == TagBranch)
             return ReadBranch<TPayload>(reader, payloadSerializer);
         throw new InvalidDataException($"Unknown node tag byte {tag}.");
     }
 
-    private static SparseLeafNode<TPayload> ReadLeaf<TPayload>(
+    static SparseLeafNode<TPayload> ReadLeaf<TPayload>(
         BinaryReader reader,
         IPayloadSerializer<TPayload> payloadSerializer)
     {
@@ -191,7 +147,7 @@ public sealed class SparseLatticeSerializer
         return new SparseLeafNode<TPayload>(occupants);
     }
 
-    private static FrozenBranchNode ReadBranch<TPayload>(
+    static FrozenBranchNode ReadBranch<TPayload>(
         BinaryReader reader,
         IPayloadSerializer<TPayload> payloadSerializer)
     {
@@ -199,10 +155,10 @@ public sealed class SparseLatticeSerializer
         long splitValue = reader.ReadInt64();
         byte childMask = reader.ReadByte();
 
-        ISparseNode? below = (childMask & s_BelowMask) != 0
+        ISparseNode? below = (childMask & BelowMask) != 0
             ? ReadNode<TPayload>(reader, payloadSerializer)
             : null;
-        ISparseNode? above = (childMask & s_AboveMask) != 0
+        ISparseNode? above = (childMask & AboveMask) != 0
             ? ReadNode<TPayload>(reader, payloadSerializer)
             : null;
 
@@ -210,17 +166,12 @@ public sealed class SparseLatticeSerializer
     }
 }
 
-/// <summary>
-/// Payload serialization contract. Implement one per payload type to support
-/// <see cref="SparseLatticeSerializer.Save{TPayload}"/> and <see cref="SparseLatticeSerializer.Load{TPayload}"/>.
-/// </summary>
 public interface IPayloadSerializer<TPayload>
 {
     void Write(BinaryWriter writer, TPayload payload);
     TPayload Read(BinaryReader reader);
 }
 
-/// <summary>Serializes <see cref="string"/> payloads as UTF-8 length-prefixed strings.</summary>
 public sealed class StringPayloadSerializer : IPayloadSerializer<string>
 {
     public static StringPayloadSerializer Instance { get; } = new();
@@ -232,7 +183,6 @@ public sealed class StringPayloadSerializer : IPayloadSerializer<string>
         => reader.ReadString();
 }
 
-/// <summary>Serializes <see cref="int"/> payloads as 4-byte signed integers.</summary>
 public sealed class Int32PayloadSerializer : IPayloadSerializer<int>
 {
     public static Int32PayloadSerializer Instance { get; } = new();

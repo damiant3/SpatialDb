@@ -52,6 +52,9 @@ Any conflict between this document and automated style tools (such as .editorcon
 - A single comment line consisting of a repeated comment character / between the usings/imports section and the file-scoped namespace declaration for readability. This separator should be the same number of characters as the namespace declaration on the following line.
 - Never use block comments `/* */` or `#regions`.
 - Use expressive names, never abbreviations or initialisms unless they are widely recognized (e.g., `Id`). Avoid generic names like `data`, `info`, `temp` in domain models.
+- Do not write `private` on class members that are already private by default. Omit the redundant access modifier on methods, fields, nested types, and other members where `private` is the language default.
+- Do not add XML doc comments (`/// <summary>`). Code is read by agents and compilers, not humans browsing docs. Expressive names replace summaries. Remove XML doc comments when editing existing files.
+- Do not add section-separator comments (`// --- section ---`, `// =====`, `// *****`). If a file needs section headers to be navigable, it needs to be split into smaller files instead.
 
 ### Disposable discipline
 - Always acquire disposable resources with a `using` declaration (`using SlimSyncer s = new(...);`). Never use raw `try/finally` to manage disposable lifetimes in business logic. The `try/finally` pattern belongs exclusively inside `Dispose()` implementations and finalizers — nowhere else.
