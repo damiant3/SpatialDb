@@ -62,6 +62,10 @@
             <TabItem Header="🎵 Music Director">
                 <controls:MusicPanel />
             </TabItem>
+
+            <TabItem Header="🔊 Sound FX">
+                <controls:SfxPanel />
+            </TabItem>
         </TabControl>
     </Grid>
 </Window>

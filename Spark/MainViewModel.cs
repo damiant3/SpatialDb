@@ -18,6 +18,7 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     readonly GalleryViewModel m_gallery;
     readonly StatusViewModel m_status;
     readonly MusicViewModel m_music;
+    readonly SfxViewModel m_sfx;
 
     SparkProject m_project;
     DocumentStore m_docs;
@@ -35,6 +36,7 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public GalleryViewModel Gallery => m_gallery;
     public StatusViewModel Status => m_status;
     public MusicViewModel Music => m_music;
+    public SfxViewModel Sfx => m_sfx;
 
     // ── Properties that remain on the root VM ───────────────────
 
@@ -62,7 +64,8 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         DetailViewModel detail,
         GalleryViewModel gallery,
         StatusViewModel status,
-        MusicViewModel music)
+        MusicViewModel music,
+        SfxViewModel sfx)
     {
         m_genService = genService;
         m_loraService = loraService;
@@ -73,6 +76,7 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         m_gallery = gallery;
         m_status = status;
         m_music = music;
+        m_sfx = sfx;
 
         // Wire service events
         m_genService.LogMessage += msg => m_log.Log(msg);
@@ -141,6 +145,7 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         UpdatePreferencesSummary();
         m_lora.LoadLoras();
         m_music.LoadProject(m_project.ProjectDir);
+        m_sfx.LoadProject(m_project.ProjectDir);
     }
 
     // ── Story context ───────────────────────────────────────────
@@ -647,6 +652,7 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         UpdatePreferencesSummary();
         m_lora.LoadLoras();
         m_music.LoadProject(m_project.ProjectDir);
+        m_sfx.LoadProject(m_project.ProjectDir);
     }
 
     void EditPrompts()
@@ -727,5 +733,6 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         m_genService.Dispose();
         m_music.Dispose();
+        m_sfx.Dispose();
     }
 }
