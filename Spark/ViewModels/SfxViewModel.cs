@@ -3,6 +3,8 @@ using System.IO;
 using System.Text.Json;
 using System.Windows.Input;
 using System.Windows.Threading;
+using Common.Wpf.Input;
+using Common.Wpf.ViewModels;
 using NAudio.Wave;
 using Spark.Services;
 ///////////////////////////////////////////////
@@ -13,7 +15,7 @@ namespace Spark.ViewModels;
 /// batch variants, A/B comparison, and a waveform visualizer.
 /// Uses the same MusicGen backend as the Music tab (short durations + SFX prompts).
 /// </summary>
-sealed class SfxViewModel : ViewModelBase, IDisposable
+sealed class SfxViewModel : ObservableObject, IDisposable
 {
     readonly MusicGenClient m_client = new();
     readonly LogViewModel m_log;
@@ -186,10 +188,10 @@ sealed class SfxViewModel : ViewModelBase, IDisposable
             try
             {
                 string json = File.ReadAllText(m_catalogPath);
-                var tracks = JsonSerializer.Deserialize<List<SfxTrack>>(json);
+                List<SfxTrack>? tracks = JsonSerializer.Deserialize<List<SfxTrack>>(json);
                 if (tracks is not null)
                 {
-                    foreach (var t in tracks.Where(t => !t.Deleted))
+                    foreach (SfxTrack? t in tracks.Where(t => !t.Deleted))
                     {
                         Tracks.Add(t);
                         if (t.Id >= m_nextId) m_nextId = t.Id + 1;
@@ -217,7 +219,7 @@ sealed class SfxViewModel : ViewModelBase, IDisposable
     void RebuildFilteredTracks()
     {
         FilteredTracks.Clear();
-        foreach (var t in Tracks)
+        foreach (SfxTrack t in Tracks)
         {
             if (m_selectedCategory == "All" || t.Category == m_selectedCategory)
                 FilteredTracks.Add(t);

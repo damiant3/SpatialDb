@@ -1,11 +1,12 @@
 using System.Collections.ObjectModel;
+using Common.Wpf.ViewModels;
 ///////////////////////////////////////////////
 namespace Spark.ViewModels;
 
 /// <summary>
 /// Owns the gallery grid of prompt stacks and selection state.
 /// </summary>
-sealed class GalleryViewModel : ViewModelBase
+sealed class GalleryViewModel : ObservableObject
 {
     readonly DetailViewModel m_detail;
     PromptStack? m_selectedStack;

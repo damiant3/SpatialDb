@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Common.Wpf.ViewModels;
 ///////////////////////////////////////////////
 namespace Spark.ViewModels;
 
@@ -6,7 +7,7 @@ namespace Spark.ViewModels;
 /// Manages the scrolling log output. Caps at MaxLines to prevent
 /// unbounded memory growth and UI layout crowding.
 /// </summary>
-sealed class LogViewModel : ViewModelBase
+sealed class LogViewModel : ObservableObject
 {
     const int MaxLines = 200;
 

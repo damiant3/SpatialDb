@@ -1,11 +1,8 @@
+using Common.Wpf.ViewModels;
 ///////////////////////////////////////////////
 namespace Spark.ViewModels;
 
-/// <summary>
-/// Owns all generation parameter settings (Width, Height, Steps, CFG, etc.).
-/// Bound by the ControlPanel XAML.
-/// </summary>
-sealed class GenerationSettingsViewModel : ViewModelBase
+sealed class GenerationSettingsViewModel : ObservableObject
 {
     int m_width = 1344;
     int m_height = 768;

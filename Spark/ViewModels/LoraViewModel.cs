@@ -1,3 +1,5 @@
+using Common.Wpf.Input;
+using Common.Wpf.ViewModels;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 ///////////////////////////////////////////////
@@ -7,7 +9,7 @@ namespace Spark.ViewModels;
 /// Owns all LoRA-related state: selection, weight, trigger words,
 /// download URL, browser integration.
 /// </summary>
-sealed class LoraViewModel : ViewModelBase
+sealed class LoraViewModel : ObservableObject
 {
     readonly LoraService m_loraService;
     readonly LogViewModel m_log;

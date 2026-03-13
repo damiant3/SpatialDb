@@ -1,3 +1,4 @@
+using Common.Wpf.ViewModels;
 using System.Collections.ObjectModel;
 ///////////////////////////////////////////////
 namespace Spark.ViewModels;
@@ -5,7 +6,7 @@ namespace Spark.ViewModels;
 /// <summary>
 /// Owns status bar text, queue items display, generating flag, and preferences summary.
 /// </summary>
-sealed class StatusViewModel : ViewModelBase
+sealed class StatusViewModel : ObservableObject
 {
     string m_statusText = "Ready.";
     string m_preferencesSummary = "";

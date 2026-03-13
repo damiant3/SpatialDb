@@ -1,6 +1,7 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:local="clr-namespace:Spark">
+                    xmlns:local="clr-namespace:Spark"
+                    xmlns:cwpf="clr-namespace:Common.Wpf.Converters;assembly=Common.Wpf">
 
     <!-- ════════════════════════════════════════════════════════ -->
     <!--  PALETTE — every color used in the app, declared once.  -->
@@ -353,7 +354,7 @@
     <!-- ════════════════════════════════════════ -->
 
     <BooleanToVisibilityConverter x:Key="BoolToVis" />
-    <local:NullToCollapsedConverter x:Key="NullToCollapsed" />
+    <cwpf:NullToCollapsedConverter x:Key="NullToCollapsed" />
 
     <!-- ════════════════════════════════════════ -->
     <!--  TABCONTROL + TABITEM                    -->

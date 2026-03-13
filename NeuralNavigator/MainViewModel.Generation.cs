@@ -185,7 +185,7 @@ sealed partial class MainViewModel
 
         int dims = state.Length;
         int d0, d1, d2;
-        if (m_selectedProjection.StartsWith("PCA") && m_embeddings is not null)
+        if (m_selectedProjection.StartsWith("PCA"))
             (d0, d1, d2) = FindTopVarianceDims(m_embeddings, m_vocabSize, m_dims);
         else
             (d0, d1, d2) = m_selectedProjection switch
@@ -324,7 +324,4 @@ sealed partial class MainViewModel
         // Fly to its generation position.
         FlyToPosition(token.Position, 20f);
     }
-
-    static void Dispatch(Action action)
-        => System.Windows.Application.Current.Dispatcher.Invoke(action);
 }

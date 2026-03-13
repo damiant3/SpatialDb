@@ -2,6 +2,8 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Input;
+using Common.Wpf.Input;
+using Common.Wpf.ViewModels;
 using HelixToolkit.SharpDX;
 using HelixToolkit.Wpf.SharpDX;
 using MeshGeometryModel3D = HelixToolkit.Wpf.SharpDX.MeshGeometryModel3D;

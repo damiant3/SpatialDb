@@ -19,4 +19,9 @@
     <PackageReference Include="NAudio" Version="2.2.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Common.Core\Common.Core.csproj" />
+    <ProjectReference Include="..\Common.Wpf\Common.Wpf.csproj" />
+  </ItemGroup>
+
 </Project>

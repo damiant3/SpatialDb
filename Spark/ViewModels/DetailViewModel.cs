@@ -1,12 +1,10 @@
 using System.Windows.Input;
+using Common.Wpf.Input;
+using Common.Wpf.ViewModels;
 ///////////////////////////////////////////////
 namespace Spark.ViewModels;
 
-/// <summary>
-/// Owns detail-panel state: the selected image, rating, actions (save/delete/regen),
-/// prompt augment, and variant commands.
-/// </summary>
-sealed class DetailViewModel : ViewModelBase
+sealed class DetailViewModel : ObservableObject
 {
     readonly LogViewModel m_log;
     ImageRecord? m_detailImage;

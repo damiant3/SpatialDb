@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Windows.Input;
+using Common.Wpf.Input;
 using Spark.Services;
 ///////////////////////////////////////////////
 namespace Spark.Wizard;
@@ -122,7 +123,7 @@ sealed class WizardViewModel : INotifyPropertyChanged
         {
             if (!SetField(ref m_selectedResolution, value)) return;
             // Parse "W × H" from the label
-            var parts = value.Split('×', '(');
+            string[] parts = value.Split('×', '(');
             if (parts.Length >= 2
                 && int.TryParse(parts[0].Trim(), out int w)
                 && int.TryParse(parts[1].Trim(), out int h))
@@ -191,7 +192,7 @@ sealed class WizardViewModel : INotifyPropertyChanged
 
     void BrowseFolder()
     {
-        var dlg = new Microsoft.Win32.OpenFolderDialog
+        Microsoft.Win32.OpenFolderDialog dlg = new Microsoft.Win32.OpenFolderDialog
         {
             Title = "Choose Project Folder",
             InitialDirectory = m_projectFolder,

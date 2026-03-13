@@ -1,16 +1,16 @@
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using Common.Wpf.Input;
 using Spark.ViewModels;
-///////////////////////////////////////////////
+////////////////
 namespace Spark;
 
 sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 {
     readonly GenerationService m_genService;
-    readonly LoraService m_loraService;
+    readonly LoraService m_loraService;  // unused?  todo: investigate.
     readonly LogViewModel m_log;
     readonly GenerationSettingsViewModel m_settings;
     readonly LoraViewModel m_lora;
