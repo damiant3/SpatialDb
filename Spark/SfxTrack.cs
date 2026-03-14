@@ -5,10 +5,6 @@ using System.Text.Json.Serialization;
 ///////////////////////////////////////////////
 namespace Spark;
 
-/// <summary>
-/// Metadata for a generated sound effect clip.
-/// Short-form audio (0.5–5s) categorised for game use.
-/// </summary>
 sealed class SfxTrack : INotifyPropertyChanged
 {
     [JsonPropertyName("id")]           public int Id { get; set; }
@@ -40,6 +36,7 @@ sealed class SfxTrack : INotifyPropertyChanged
     {
         "UI" => "🖱",
         "Combat" => "⚔",
+        "Firearms" => "🔫",
         "Nature" => "🌿",
         "Movement" => "👣",
         "Magic" => "✨",
@@ -48,6 +45,19 @@ sealed class SfxTrack : INotifyPropertyChanged
         "Creature" => "🐉",
         "Impact" => "💥",
         "Voice" => "🗣",
+        "Horror" => "👻",
+        "Sci-Fi" => "🚀",
+        "Vehicle" => "🚗",
+        "Household" => "🏠",
+        "Musical" => "🎵",
+        "Weather" => "⛈",
+        "Liquid" => "💧",
+        "Destruction" => "💣",
+        "Communication" => "📻",
+        "Sports" => "⚽",
+        "Food" => "🍖",
+        "Textile" => "👕",
+        "Alarm" => "🚨",
         _ => "🔊",
     };
     [JsonIgnore] public string FileName => Path.GetFileName(FilePath);

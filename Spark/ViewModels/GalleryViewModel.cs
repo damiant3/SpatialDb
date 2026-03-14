@@ -30,20 +30,58 @@ sealed class GalleryViewModel : ObservableObject
 
     public void RebuildStacks(List<ArtPrompt> prompts, ImageCatalog? catalog)
     {
-        int? selectedPrompt = m_selectedStack?.PromptNumber;
-        Stacks.Clear();
         if (catalog is null) return;
 
-        foreach (ArtPrompt prompt in prompts)
+        int? selectedPrompt = m_selectedStack?.PromptNumber;
+        Dictionary<int, int> topIndexes = [];
+        foreach (PromptStack existing in Stacks)
+            topIndexes[existing.PromptNumber] = existing.TopIndex;
+
+        HashSet<int> promptNumbers = new(prompts.Select(p => p.Number));
+
+        for (int i = Stacks.Count - 1; i >= 0; i--)
+            if (!promptNumbers.Contains(Stacks[i].PromptNumber))
+                Stacks.RemoveAt(i);
+
+        Dictionary<int, PromptStack> byNumber = [];
+        foreach (PromptStack s in Stacks)
+            byNumber[s.PromptNumber] = s;
+
+        for (int i = 0; i < prompts.Count; i++)
         {
-            PromptStack stack = new(prompt.Number, prompt.Title, prompt.Series, OnStackSelected);
-            stack.Cards = catalog.GetStack(prompt.Number);
-            stack.RefreshCards();
-            Stacks.Add(stack);
+            ArtPrompt prompt = prompts[i];
+            List<ImageRecord> cards = catalog.GetStack(prompt.Number);
+
+            if (byNumber.TryGetValue(prompt.Number, out PromptStack? existing))
+            {
+                existing.Cards = cards;
+                if (topIndexes.TryGetValue(prompt.Number, out int savedIdx))
+                    existing.SetTopIndex(savedIdx);
+                else
+                    existing.RefreshCards();
+
+                int currentIdx = Stacks.IndexOf(existing);
+                if (currentIdx != i)
+                {
+                    Stacks.RemoveAt(currentIdx);
+                    Stacks.Insert(Math.Min(i, Stacks.Count), existing);
+                }
+            }
+            else
+            {
+                PromptStack stack = new(prompt.Number, prompt.Title, prompt.Series, OnStackSelected);
+                stack.Cards = cards;
+                stack.RefreshCards();
+                Stacks.Insert(Math.Min(i, Stacks.Count), stack);
+            }
         }
 
         if (selectedPrompt.HasValue)
-            SelectedStack = Stacks.FirstOrDefault(s => s.PromptNumber == selectedPrompt.Value);
+        {
+            PromptStack? restored = Stacks.FirstOrDefault(s => s.PromptNumber == selectedPrompt.Value);
+            if (restored is not null && m_selectedStack != restored)
+                m_selectedStack = restored;
+        }
     }
 
     public void AddResultToStacks(GenerateResult result, ArtPrompt prompt,
@@ -79,8 +117,26 @@ sealed class GalleryViewModel : ObservableObject
         if (catalog is null) return;
         PromptStack? stack = Stacks.FirstOrDefault(s => s.PromptNumber == promptNumber);
         if (stack is null) return;
+        int prevCount = stack.Cards.Count;
         stack.Cards = catalog.GetStack(promptNumber);
         stack.RefreshCards();
+        if (stack.Cards.Count > prevCount)
+            FlashStack(stack);
+    }
+
+    static void FlashStack(PromptStack stack)
+    {
+        stack.JustUpdated = true;
+        System.Windows.Threading.DispatcherTimer flashTimer = new()
+        {
+            Interval = TimeSpan.FromSeconds(2),
+        };
+        flashTimer.Tick += (_, _) =>
+        {
+            flashTimer.Stop();
+            stack.JustUpdated = false;
+        };
+        flashTimer.Start();
     }
 
     void OnStackSelected(PromptStack stack)

@@ -14,11 +14,13 @@ sealed class PromptStack : INotifyPropertyChanged
 {
     readonly Action<PromptStack> m_onSelect;
     int m_topIndex;
+    bool m_justUpdated;
 
     public int PromptNumber { get; }
     public string Title { get; }
     public string Series { get; }
     public List<ImageRecord> Cards { get; set; } = [];
+    public int TopIndex => m_topIndex;
 
     public PromptStack(int promptNumber, string title, string series,
         Action<PromptStack> onSelect)
@@ -87,4 +89,10 @@ sealed class PromptStack : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
     void OnPropertyChanged([CallerMemberName] string? name = null)
         => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+    public bool JustUpdated
+    {
+        get => m_justUpdated;
+        set { m_justUpdated = value; OnPropertyChanged(); }
+    }
 }

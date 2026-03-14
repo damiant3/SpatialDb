@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using Common.Wpf.Input;
+using Spark.Presenters;
 using Spark.Services;
 using Spark.ViewModels;
 ////////////////
@@ -11,7 +12,7 @@ namespace Spark;
 sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 {
     readonly GenerationService m_genService;
-    readonly LoraService m_loraService;  // unused?  todo: investigate.
+    readonly LoraService m_loraService;
     readonly LogViewModel m_log;
     readonly GenerationSettingsViewModel m_settings;
     readonly LoraViewModel m_lora;
@@ -20,6 +21,8 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     readonly StatusViewModel m_status;
     readonly MusicViewModel m_music;
     readonly SfxViewModel m_sfx;
+    readonly MusicPresenter m_musicPresenter;
+    readonly SfxPresenter m_sfxPresenter;
     readonly LocalServiceManager m_serviceManager;
 
     SparkProject m_project;
@@ -69,6 +72,8 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         StatusViewModel status,
         MusicViewModel music,
         SfxViewModel sfx,
+        MusicPresenter musicPresenter,
+        SfxPresenter sfxPresenter,
         LocalServiceManager serviceManager)
     {
         m_genService = genService;
@@ -81,6 +86,8 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         m_status = status;
         m_music = music;
         m_sfx = sfx;
+        m_musicPresenter = musicPresenter;
+        m_sfxPresenter = sfxPresenter;
         m_serviceManager = serviceManager;
 
         // Wire service events
@@ -154,8 +161,8 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             m_gallery.SelectedStack = m_gallery.Stacks[0];
 
         m_lora.LoadLoras();
-        m_music.LoadProject(m_project.ProjectDir);
-        m_sfx.LoadProject(m_project.ProjectDir);
+        m_musicPresenter.LoadProject(m_project.ProjectDir);
+        m_sfxPresenter.LoadProject(m_project.ProjectDir);
 
         // Start background service health monitoring
         _ = m_serviceManager.StartAsync();
@@ -198,34 +205,47 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         if (m_detail.DetailImage is null || m_catalog is null || m_preferences is null) return;
         if (param is not string s || !int.TryParse(s, out int rating)) return;
 
-        int prevRating = m_detail.DetailImage.Rating;
-        if (prevRating > 0) BackOutPreference(m_detail.DetailImage, prevRating);
+        ImageRecord image = m_detail.DetailImage;
+        int prevRating = image.Rating;
+        if (prevRating > 0) BackOutPreference(image, prevRating);
 
-        m_detail.DetailImage.Rating = Math.Clamp(rating, 1, 5);
+        image.Rating = Math.Clamp(rating, 1, 5);
 
         if (rating >= 3)
         {
             double strength = rating >= 4 ? 1.5 : 0.5;
-            m_preferences.RecordPositive(m_detail.DetailImage, strength);
+            m_preferences.RecordPositive(image, strength);
         }
         else
         {
-            m_preferences.RecordNegative(m_detail.DetailImage, 0.5);
+            m_preferences.RecordNegative(image, 0.5);
         }
         m_catalog.Update();
 
-        m_gallery.Stacks.FirstOrDefault(st => st.PromptNumber == m_detail.DetailImage.PromptNumber)?.RefreshCards();
-        m_log.Log($"★ Rated {m_detail.DetailImage.DisplayName}: {m_detail.DetailImage.RatingStars}");
+        PromptStack? stack = m_gallery.Stacks.FirstOrDefault(st => st.PromptNumber == image.PromptNumber);
+        stack?.RefreshCards();
+        m_log.Log($"★ Rated {image.DisplayName}: {image.RatingStars}");
         m_detail.NotifyRatingChanged();
         UpdatePreferencesSummary();
 
         if (rating <= 2)
         {
-            m_log.Log($"⚡ Low rating — soft-deleting and queueing mutant regen…");
-            m_detail.DetailImage.SoftDelete();
-            m_catalog.Update();
+            m_log.Log("⚡ Low rating — soft-deleting and queueing mutant regen…");
+            ArtPrompt? prompt = m_prompts.FirstOrDefault(p => p.Number == image.PromptNumber);
+
             EnqueueRegen();
-            RebuildStacks();
+
+            image.SoftDelete();
+            m_catalog.Update();
+
+            if (prompt is not null)
+            {
+                m_gallery.RefreshStack(image.PromptNumber, m_catalog);
+                PromptStack? refreshed = m_gallery.Stacks.FirstOrDefault(st => st.PromptNumber == image.PromptNumber);
+                m_detail.DetailImage = refreshed?.TopCard;
+            }
+
+            UpdateStatus();
         }
     }
 
@@ -256,16 +276,18 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     void DeleteDetail()
     {
-        try
-        {
-            if (m_detail.DetailImage is null || m_catalog is null) return;
-            m_detail.DetailImage.SoftDelete();
-            m_catalog.Update();
-            m_log.Log($"🗑 Soft-deleted: {m_detail.DetailImage.DisplayName} (recoverable for 24h)");
-            m_detail.DetailImage = null;
-            RebuildStacks();
-        }
-        catch (Exception ex) { m_log.Log($"Error deleting: {ex.Message}"); }
+        if (m_detail.DetailImage is null || m_catalog is null) return;
+
+        ImageRecord image = m_detail.DetailImage;
+        int promptNum = image.PromptNumber;
+        image.SoftDelete();
+        m_catalog.Update();
+        m_log.Log($"🗑 Soft-deleted: {image.DisplayName} (recoverable for 24h)");
+
+        m_gallery.RefreshStack(promptNum, m_catalog);
+        PromptStack? stack = m_gallery.Stacks.FirstOrDefault(st => st.PromptNumber == promptNum);
+        m_detail.DetailImage = stack?.TopCard;
+        UpdateStatus();
     }
 
     void MarkSeen(ImageRecord record)
@@ -674,8 +696,8 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             m_gallery.SelectedStack = m_gallery.Stacks[0];
 
         m_lora.LoadLoras();
-        m_music.LoadProject(m_project.ProjectDir);
-        m_sfx.LoadProject(m_project.ProjectDir);
+        m_musicPresenter.LoadProject(m_project.ProjectDir);
+        m_sfxPresenter.LoadProject(m_project.ProjectDir);
     }
 
     void EditPrompts()
@@ -746,17 +768,15 @@ sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     static void Dispatch(Action action)
         => System.Windows.Application.Current.Dispatcher.Invoke(action);
 
-    #region INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
     void OnPropertyChanged([CallerMemberName] string? name = null)
         => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-    #endregion
 
     public void Dispose()
     {
         m_serviceManager.Dispose();
         m_genService.Dispose();
-        m_music.Dispose();
-        m_sfx.Dispose();
+        m_musicPresenter.Dispose();
+        m_sfxPresenter.Dispose();
     }
 }

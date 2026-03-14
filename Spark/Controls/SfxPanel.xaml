@@ -19,12 +19,7 @@
         <Border Grid.Column="0" Style="{StaticResource PanelBorder}" BorderThickness="0,0,1,0">
             <DockPanel>
                 <!-- Log (bottom) -->
-                <DockPanel DockPanel.Dock="Bottom" Margin="10,0,10,10" MaxHeight="100">
-                    <TextBlock DockPanel.Dock="Top" Text="LOG" Style="{StaticResource SectionHeader}" Margin="0,6,0,2" />
-                    <Border Background="{StaticResource DeepBg}" CornerRadius="3">
-                        <ListBox ItemsSource="{Binding Log.LogLines}" />
-                    </Border>
-                </DockPanel>
+                <controls:ExpandableLogPanel DockPanel.Dock="Bottom" Margin="10,0,10,10" MaxHeight="100" />
 
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Margin="10,10,10,0">
@@ -52,7 +47,7 @@
                                 <ColumnDefinition Width="36" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="Duration:" />
-                            <Slider Grid.Column="1" Minimum="0.5" Maximum="5"
+                            <Slider Grid.Column="1" Minimum="1" Maximum="10"
                                     Value="{Binding Sfx.Duration}"
                                     LargeChange="0.5" SmallChange="0.25" />
                             <TextBlock Grid.Column="2" Text="{Binding Sfx.Duration, StringFormat={}{0:F1}s}"

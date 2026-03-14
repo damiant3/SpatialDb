@@ -1,19 +1,15 @@
 <UserControl x:Class="Spark.Controls.ControlPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:Spark.Controls"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d">
 
     <Border Style="{StaticResource PanelBorder}" BorderThickness="0,0,1,0">
         <DockPanel>
-            <!-- ── Log (docked bottom, fixed max height) ── -->
-            <DockPanel DockPanel.Dock="Bottom" Margin="10,0,10,10" MaxHeight="160">
-                <TextBlock DockPanel.Dock="Top" Text="LOG" Style="{StaticResource SectionHeader}" Margin="0,6,0,2" />
-                <Border Background="{StaticResource DeepBg}" CornerRadius="3">
-                    <ListBox ItemsSource="{Binding Log.LogLines}" />
-                </Border>
-            </DockPanel>
+            <!-- Log (docked bottom) -->
+            <controls:ExpandableLogPanel DockPanel.Dock="Bottom" Margin="10,0,10,10" MaxHeight="160" />
 
             <!-- ── Everything above the log scrolls ── -->
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">

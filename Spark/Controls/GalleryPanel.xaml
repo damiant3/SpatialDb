@@ -16,8 +16,9 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                    <Border Margin="4" Background="{StaticResource PanelBg}"
+                    <Border x:Name="CardBorder" Margin="4" Background="{StaticResource PanelBg}"
                             CornerRadius="8" Padding="4" Cursor="Hand"
+                            BorderThickness="2" BorderBrush="Transparent"
                             ContextMenuOpening="OnCardContextMenuOpening"
                             MouseLeftButtonDown="OnCardMouseDown"
                             MouseMove="OnCardMouseMove"
@@ -85,6 +86,12 @@
                             </ToolTip>
                         </Border.ToolTip>
                     </Border>
+
+                    <DataTemplate.Triggers>
+                        <DataTrigger Binding="{Binding JustUpdated}" Value="True">
+                            <Setter TargetName="CardBorder" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                        </DataTrigger>
+                    </DataTemplate.Triggers>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>

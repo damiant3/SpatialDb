@@ -105,9 +105,12 @@ sealed class LocalServiceManager : INotifyPropertyChanged, IDisposable
         if (IsProbing) return;
         IsProbing = true;
 
-        Ollama.MarkProbing();
-        StableDiffusion.MarkProbing();
-        MusicGen.MarkProbing();
+        if (Ollama.Phase is not ServicePhase.Online)
+            Ollama.MarkProbing();
+        if (StableDiffusion.Phase is not ServicePhase.Online)
+            StableDiffusion.MarkProbing();
+        if (MusicGen.Phase is not ServicePhase.Online)
+            MusicGen.MarkProbing();
 
         try
         {

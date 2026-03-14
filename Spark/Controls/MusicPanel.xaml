@@ -19,12 +19,7 @@
         <Border Grid.Column="0" Style="{StaticResource PanelBorder}" BorderThickness="0,0,1,0">
             <DockPanel>
                 <!-- Log (bottom) -->
-                <DockPanel DockPanel.Dock="Bottom" Margin="10,0,10,10" MaxHeight="120">
-                    <TextBlock DockPanel.Dock="Top" Text="LOG" Style="{StaticResource SectionHeader}" Margin="0,6,0,2" />
-                    <Border Background="{StaticResource DeepBg}" CornerRadius="3">
-                        <ListBox ItemsSource="{Binding Log.LogLines}" />
-                    </Border>
-                </DockPanel>
+                <controls:ExpandableLogPanel DockPanel.Dock="Bottom" Margin="10,0,10,10" MaxHeight="120" />
 
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Margin="10,10,10,0">
@@ -43,18 +38,179 @@
 
                         <!-- Mood presets -->
                         <TextBlock Text="MOOD PRESETS" Style="{StaticResource SectionHeader}" Margin="0,8,0,3" />
-                        <ItemsControl ItemsSource="{Binding Music.MoodPresets}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Button Content="{Binding}" FontSize="7" Padding="4,2" Margin="0,0,3,3"
-                                            Command="{Binding DataContext.Music.ApplyMoodPresetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                            CommandParameter="{Binding}" />
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                        <Border Background="{StaticResource DeepBg}" CornerRadius="3" MaxHeight="80">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding Music.MoodPresets}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Content="{Binding}" FontSize="7" Padding="4,2" Margin="0,0,3,3"
+                                                    Command="{Binding DataContext.Music.ApplyMoodPresetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Border>
+
+                        <!-- Genres -->
+                        <TextBlock Text="GENRES" Style="{StaticResource SectionHeader}" Margin="0,8,0,3" />
+                        <Border Background="{StaticResource DeepBg}" CornerRadius="3" MaxHeight="80">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding Music.Genres}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Content="{Binding}" FontSize="7" Padding="4,2" Margin="0,0,3,3"
+                                                    Command="{Binding DataContext.Music.InjectTagCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Border>
+
+                        <!-- Instruments -->
+                        <TextBlock Text="INSTRUMENTS" Style="{StaticResource SectionHeader}" Margin="0,8,0,3" />
+                        <Border Background="{StaticResource DeepBg}" CornerRadius="3" MaxHeight="44">
+                            <ItemsControl ItemsSource="{Binding Music.InstrumentFamilies}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Content="{Binding}" FontSize="7" Padding="4,2" Margin="0,0,3,3"
+                                                Command="{Binding DataContext.Music.SelectFamilyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Border>
+                        <Border Background="{StaticResource DeepBg}" CornerRadius="3" MaxHeight="60"
+                                Margin="0,2,0,0">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding Music.FamilyInstruments}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Content="{Binding}" FontSize="7" Padding="4,2" Margin="0,0,3,3"
+                                                    Command="{Binding DataContext.Music.InjectTagCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Border>
+
+                        <!-- Composers & Artists -->
+                        <TextBlock Text="COMPOSERS" Style="{StaticResource SectionHeader}" Margin="0,8,0,3" />
+                        <Border Background="{StaticResource DeepBg}" CornerRadius="3" MaxHeight="60">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding Music.Composers}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Content="{Binding}" FontSize="7" Padding="4,2" Margin="0,0,3,3"
+                                                    Command="{Binding DataContext.Music.InjectTagCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}" ToolTip="Add to prompt" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Border>
+
+                        <TextBlock Text="ARTISTS" Style="{StaticResource SectionHeader}" Margin="0,8,0,3" />
+                        <Border Background="{StaticResource DeepBg}" CornerRadius="3" MaxHeight="60">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding Music.Artists}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Content="{Binding}" FontSize="7" Padding="4,2" Margin="0,0,3,3"
+                                                    Command="{Binding DataContext.Music.InjectTagCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}" ToolTip="Add to prompt" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Border>
+
+                        <!-- Notation Cues -->
+                        <TextBlock Text="NOTATION CUES" Style="{StaticResource SectionHeader}" Margin="0,8,0,3" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Tempo -->
+                            <StackPanel Grid.Column="0" Margin="0,0,3,0">
+                                <TextBlock Text="Tempo" FontSize="8" FontWeight="Bold" Margin="0,0,0,2" />
+                                <Border Background="{StaticResource DeepBg}" CornerRadius="3" MaxHeight="70">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl ItemsSource="{Binding Music.TempoLabels}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Button Content="{Binding}" FontSize="6" Padding="3,1" Margin="0,0,0,1"
+                                                            HorizontalContentAlignment="Left"
+                                                            Command="{Binding DataContext.Music.InjectTagCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Border>
+                            </StackPanel>
+
+                            <!-- Key -->
+                            <StackPanel Grid.Column="1" Margin="3,0,3,0">
+                                <TextBlock Text="Key" FontSize="8" FontWeight="Bold" Margin="0,0,0,2" />
+                                <Border Background="{StaticResource DeepBg}" CornerRadius="3" MaxHeight="70">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl ItemsSource="{Binding Music.Keys}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Button Content="{Binding}" FontSize="6" Padding="3,1" Margin="0,0,0,1"
+                                                            HorizontalContentAlignment="Left"
+                                                            Command="{Binding DataContext.Music.InjectTagCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Border>
+                            </StackPanel>
+
+                            <!-- Scale -->
+                            <StackPanel Grid.Column="2" Margin="3,0,0,0">
+                                <TextBlock Text="Scale" FontSize="8" FontWeight="Bold" Margin="0,0,0,2" />
+                                <Border Background="{StaticResource DeepBg}" CornerRadius="3" MaxHeight="70">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl ItemsSource="{Binding Music.Scales}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Button Content="{Binding}" FontSize="6" Padding="3,1" Margin="0,0,0,1"
+                                                            HorizontalContentAlignment="Left"
+                                                            Command="{Binding DataContext.Music.InjectTagCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Border>
+                            </StackPanel>
+                        </Grid>
 
                         <!-- ── SETTINGS ── -->
                         <TextBlock Text="SETTINGS" Style="{StaticResource SectionHeader}" Margin="0,6,0,3" />

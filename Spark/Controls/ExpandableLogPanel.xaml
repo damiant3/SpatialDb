@@ -1,0 +1,66 @@
+<UserControl x:Class="Spark.Controls.ExpandableLogPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid x:Name="RootGrid">
+        <!-- Collapsed view: compact, no scrollbar, double-click to expand -->
+        <DockPanel x:Name="CollapsedView">
+            <TextBlock DockPanel.Dock="Top" Text="LOG" Style="{StaticResource SectionHeader}" Margin="0,6,0,2"
+                       MouseLeftButtonDown="OnHeaderDoubleClick" Cursor="Hand"
+                       ToolTip="Double-click to expand log" />
+            <Border Background="{StaticResource DeepBg}" CornerRadius="3" ClipToBounds="True">
+                <ListBox x:Name="CompactLogList"
+                         ItemsSource="{Binding Log.LogLines}"
+                         ScrollViewer.VerticalScrollBarVisibility="Hidden"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         BorderThickness="0" Background="Transparent">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBox Text="{Binding Mode=OneWay}" IsReadOnly="True" BorderThickness="0"
+                                     Background="Transparent" Foreground="{StaticResource CodeFg}"
+                                     FontFamily="Consolas" FontSize="8" Padding="0"
+                                     TextWrapping="NoWrap" IsReadOnlyCaretVisible="True" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Border>
+        </DockPanel>
+
+        <!-- Expanded popup: floats over all content for full-width readable log -->
+        <Popup x:Name="ExpandedPopup" Placement="Center" PlacementTarget="{Binding ElementName=RootGrid}"
+               StaysOpen="True" AllowsTransparency="True" PopupAnimation="Fade">
+            <Border Background="{StaticResource PanelBg}" CornerRadius="6"
+                    BorderBrush="{StaticResource AccentBrush}" BorderThickness="2"
+                    Width="700" Height="400">
+                <DockPanel>
+                    <DockPanel DockPanel.Dock="Top" Margin="8,6,8,4">
+                        <TextBlock Text="LOG" Style="{StaticResource SectionHeader}" VerticalAlignment="Center" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Content="📋 Copy All" Style="{StaticResource ToolbarBtn}" FontSize="9"
+                                    Click="OnCopyAll" Margin="0,0,6,0" />
+                            <Button Content="✕ Close" Style="{StaticResource ToolbarBtn}" FontSize="9"
+                                    Click="OnCollapseClick" />
+                        </StackPanel>
+                    </DockPanel>
+                    <Border Background="{StaticResource DeepBg}" CornerRadius="3" Margin="6,0,6,6">
+                        <ListBox x:Name="ExpandedLogList"
+                                 ItemsSource="{Binding Log.LogLines}"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                 BorderThickness="0" Background="Transparent"
+                                 SelectionMode="Extended">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBox Text="{Binding Mode=OneWay}" IsReadOnly="True" BorderThickness="0"
+                                             Background="Transparent" Foreground="{StaticResource CodeFg}"
+                                             FontFamily="Consolas" FontSize="9" Padding="1,0"
+                                             TextWrapping="NoWrap" IsReadOnlyCaretVisible="True" />
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Border>
+                </DockPanel>
+            </Border>
+        </Popup>
+    </Grid>
+</UserControl>

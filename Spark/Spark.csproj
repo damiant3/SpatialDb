@@ -11,6 +11,8 @@
   <ItemGroup>
     <Content Include="art_directions.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="creative_pools.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="music_config.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="sfx_config.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="refine_presets.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="universe.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

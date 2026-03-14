@@ -5,9 +5,6 @@ using System.Text.Json.Serialization;
 ///////////////////////////////////////////////
 namespace Spark;
 
-/// <summary>
-/// Metadata for a generated music track — the audio equivalent of <see cref="ImageRecord"/>.
-/// </summary>
 sealed class MusicTrack : INotifyPropertyChanged
 {
     [JsonPropertyName("id")]           public int Id { get; set; }
